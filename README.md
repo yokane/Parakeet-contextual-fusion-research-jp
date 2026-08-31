@@ -33,6 +33,22 @@ The benchmark separates eight error/disambiguation classes instead of collapsing
 
 Every row stores `difficulty.acoustic`, `difficulty.lexical`, `difficulty.context`, and `difficulty.phone_distance`. Exact homophones intentionally have phone distance `0` while remaining acoustically unresolvable at the segmental-phone level.
 
+## Published release
+
+`saeeew/JP-HomophoneBench` currently contains the public `homophone8-research` config built from release `v0.1.0`.
+
+```text
+records:    660
+train:      439
+validation: 69
+test:       152
+core8:      complete
+```
+
+This config deliberately includes CC BY-NC 4.0-derived rows from `IDEMITSU/hoiku-yougo-stt-ja`, so it is a research/mixed-license configuration. Inspect each row's `source.license` before reuse. A complete `permissive` core8 config is not published yet because the current non-NC sources alone do not cover all eight categories.
+
+See `docs/release-v0.1.0.md` for exact category counts, sources, and SHA-256 values.
+
 ## Setup
 
 ```bash
@@ -72,27 +88,21 @@ The split is homophone-group aware: a stable SHA-256 hash maps a whole phonetic 
 
 ## Upstream sources
 
+The builder supports:
+
 - `NagaYu/mondegreen-asr-errors`: synthetic phonetic-error taxonomy, CC0-1.0.
 - `IDEMITSU/hoiku-yougo-stt-ja`: domain vocabulary/readings/mis-conversions/context, CC BY-NC 4.0.
 - `HaitongSUN/prosodic-abx` / `japanese_pitch_accent`: real pitch-accent minimal-pair metadata/audio source, CC BY 4.0.
 - `data/seed/semantic_homophones.example.tsv`: redistributable exact/semantic homophone seed examples.
 
-The default Hub artifact is metadata-first. Upstream audio is not republished; rows store `audio_ref` provenance.
+The published v0.1.0 release contains rows from Prosodic ABX, Hoiku vocabulary, and the manual CC0 seed. The default Hub artifact is metadata-first: upstream audio is not republished; rows store `audio_ref` provenance.
 
 ## Publish to Hugging Face
 
+The currently published complete core8 config is:
+
 ```bash
 export HF_TOKEN=hf_...
-python scripts/publish_hf_dataset.py \
-  --release-dir data/releases/v0.1.0 \
-  --repo-id saeeew/JP-HomophoneBench \
-  --config-name homophone8 \
-  --license-policy permissive
-```
-
-`permissive` excludes NonCommercial-derived rows. For a deliberately research-only config:
-
-```bash
 python scripts/publish_hf_dataset.py \
   --release-dir data/releases/v0.1.0 \
   --repo-id saeeew/JP-HomophoneBench \
@@ -100,7 +110,28 @@ python scripts/publish_hf_dataset.py \
   --license-policy research
 ```
 
-GitHub Actions also provides the manual `jp-homophone-hf-publish` workflow. Add a repository secret named `HF_TOKEN` with Dataset write permission, then dispatch the workflow.
+Or simply:
+
+```bash
+make hf-publish
+```
+
+`research` allows NonCommercial-derived rows to remain in the generated Dataset. The publisher preserves the upstream license in every row and the Dataset Card uses a mixed/other license declaration.
+
+A future `permissive` config should only be published after open-license sources or owned fixtures cover all core8 categories. The publisher refuses an incomplete core8 config unless explicitly overridden.
+
+GitHub Actions also provides a manual-only `jp-homophone-hf-publish` workflow. The repository secret `HF_TOKEN` must have Hugging Face Dataset write permission.
+
+## Load the published Dataset
+
+```python
+from datasets import load_dataset
+
+ds = load_dataset(
+    "saeeew/JP-HomophoneBench",
+    "homophone8-research",
+)
+```
 
 ## Run ASR experiments
 
@@ -151,10 +182,11 @@ Diagnostic interpretation:
 ## Repository layout
 
 ```text
-.github/workflows/    CI and HF publication
+.github/workflows/    CI and manual HF publication
 configs/              experiment defaults
 data/                 benchmark metadata/seeds
 experiments/          E00-E06 runners
+patches/              E06 NeMo integration contract
 schemas/              JSON Schema
 scripts/              builders, validators, decoders, rerankers
 src/                  reusable Python package
