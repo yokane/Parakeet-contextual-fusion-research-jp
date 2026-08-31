@@ -111,7 +111,11 @@ def paired_comparison(rows: list[dict[str, Any]], *, baseline: str) -> dict[str,
         if experiment == baseline:
             continue
         paired = [(base[key], items[key]) for key in sorted(base.keys() & items.keys())]
-        cer_deltas = [float(new["cer"]) - float(old["cer"]) for old, new in paired if old.get("cer") is not None and new.get("cer") is not None]
+        cer_deltas = [
+            float(new["cer"]) - float(old["cer"])
+            for old, new in paired
+            if old.get("cer") is not None and new.get("cer") is not None
+        ]
         entity_deltas = [
             (1 if new.get("entity_correct") else 0) - (1 if old.get("entity_correct") else 0)
             for old, new in paired
@@ -140,6 +144,11 @@ def parse_result_spec(value: str) -> tuple[str, Path]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Collect E00-E06 results into category-aware Parquet metrics")
     parser.add_argument("--benchmark", type=Path, required=True)
+    parser.add_argument(
+        "--execution-manifest",
+        type=Path,
+        help="NeMo manifest used for decoding; provides safe positional benchmark IDs if predictions omit them",
+    )
     parser.add_argument("--result", action="append", required=True, type=parse_result_spec)
     parser.add_argument("--parquet", type=Path, default=Path("results/metrics.parquet"))
     parser.add_argument("--summary", type=Path, default=Path("results/summary.json"))
@@ -150,7 +159,10 @@ def main() -> None:
 
     benchmark_rows = read_records(args.benchmark)
     benchmark_by_id = {str(row.get("id")): row for row in benchmark_rows if row.get("id") is not None}
+    execution_rows = read_records(args.execution_manifest) if args.execution_manifest else []
+    execution_ids = [str(row.get("benchmark_id") or row.get("id") or "") for row in execution_rows]
     output_rows: list[dict[str, Any]] = []
+    unmatched: list[dict[str, Any]] = []
 
     for experiment, result_path in args.result:
         results = read_records(result_path)
@@ -160,11 +172,16 @@ def main() -> None:
             match_mode = "id"
             if benchmark_id is not None:
                 benchmark = benchmark_by_id.get(str(benchmark_id))
-            if benchmark is None and position < len(benchmark_rows):
+            if benchmark is None and execution_ids and position < len(execution_ids):
+                benchmark_id = execution_ids[position]
+                benchmark = benchmark_by_id.get(benchmark_id)
+                match_mode = "execution_position"
+            if benchmark is None and not execution_ids and len(results) == len(benchmark_rows):
                 benchmark = benchmark_rows[position]
                 benchmark_id = benchmark.get("id")
-                match_mode = "position"
+                match_mode = "benchmark_position"
             if benchmark is None:
+                unmatched.append({"experiment": experiment, "position": position, "benchmark_id": benchmark_id})
                 continue
 
             reference = str(benchmark.get("text") or "")
@@ -174,9 +191,15 @@ def main() -> None:
             target_present = bool(target and target in prediction)
             distractor_hits = [value for value in distractors if value in prediction]
             metadata = benchmark.get("metadata") or {}
-            is_negative = bool(metadata.get("negative") or metadata.get("negative_context") or metadata.get("target_present") is False)
+            is_negative = bool(
+                metadata.get("negative")
+                or metadata.get("negative_context")
+                or metadata.get("target_present") is False
+            )
             bias_phrases = [target, *distractors]
-            bias_false_positive = bool(is_negative and any(phrase and phrase in prediction for phrase in bias_phrases))
+            bias_false_positive = bool(
+                is_negative and any(phrase and phrase in prediction for phrase in bias_phrases)
+            )
             row: dict[str, Any] = {
                 "experiment": experiment,
                 "benchmark_id": str(benchmark_id),
@@ -199,6 +222,12 @@ def main() -> None:
                 row[f"oracle_at_{k}"] = oracle_at_k(target, ranked, k) if target and ranked else None
             output_rows.append(row)
 
+    if unmatched:
+        raise RuntimeError(
+            "result rows could not be matched safely; pass --execution-manifest when the decoded set is a subset "
+            f"of the benchmark. unmatched={unmatched[:5]}"
+        )
+
     args.parquet.parent.mkdir(parents=True, exist_ok=True)
     args.summary.parent.mkdir(parents=True, exist_ok=True)
     table = pa.Table.from_pylist(output_rows)
@@ -212,6 +241,7 @@ def main() -> None:
 
     summary = {
         "benchmark": str(args.benchmark),
+        "execution_manifest": str(args.execution_manifest) if args.execution_manifest else None,
         "rows": len(output_rows),
         "oracle_k": ks,
         "experiments": {
@@ -226,7 +256,10 @@ def main() -> None:
         },
         "paired_vs_baseline": paired_comparison(output_rows, baseline=args.baseline),
     }
-    args.summary.write_text(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    args.summary.write_text(
+        json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     print(json.dumps(summary, ensure_ascii=False, indent=2, sort_keys=True))
 
 
