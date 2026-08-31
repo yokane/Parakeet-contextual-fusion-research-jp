@@ -7,8 +7,9 @@ HF_LICENSE_POLICY ?= permissive
 GENERATED ?= data/generated
 RESULTS_DIR ?= results
 RESULT_SPECS ?=
+SATURATION_SPEC ?= configs/saturation.example.json
 
-.PHONY: lint test validate bench bench-permissive bench-validate hf-publish hf-eval-index hf-eval-audio metrics run-e00 run-e01 run-e02 run-e03 run-e04 run-e05 run-e06
+.PHONY: lint test validate bench bench-permissive bench-validate hf-publish hf-eval-index hf-eval-audio metrics saturation run-e00 run-e01 run-e02 run-e03 run-e04 run-e05 run-e06
 
 lint:
 	ruff check src scripts tests
@@ -74,6 +75,12 @@ metrics:
 		$(foreach spec,$(RESULT_SPECS),--result $(spec)) \
 		--parquet $(RESULTS_DIR)/metrics.parquet \
 		--summary $(RESULTS_DIR)/summary.json
+
+saturation:
+	$(PYTHON) scripts/analyze_saturation.py \
+		--metrics $(RESULTS_DIR)/metrics.parquet \
+		--sweep $(SATURATION_SPEC) \
+		--output $(RESULTS_DIR)/saturation.json
 
 run-e00:
 	bash experiments/E00_tdt_greedy.sh

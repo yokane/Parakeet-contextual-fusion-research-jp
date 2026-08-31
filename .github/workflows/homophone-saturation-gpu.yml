@@ -1,0 +1,235 @@
+name: homophone-saturation-gpu
+
+on:
+  workflow_dispatch:
+    inputs:
+      config_name:
+        description: "JP-HomophoneBench HF config"
+        required: true
+        default: "homophone8-research"
+        type: choice
+        options: [homophone8, homophone8-research]
+      split:
+        description: "Evaluation split"
+        required: true
+        default: "test"
+        type: choice
+        options: [test, validation]
+      pb_alphas:
+        description: "Comma-separated GPU-PB alpha sweep"
+        required: true
+        default: "0.0,0.25,0.5,1.0,1.5,2.0"
+        type: string
+      ngpu_lm_path:
+        description: "NGPU-LM model path on the self-hosted runner"
+        required: true
+        default: "artifacts/lm/ja-6gram.nemo"
+        type: string
+      artifact_suffix:
+        description: "Result artifact suffix"
+        required: true
+        default: "pb-alpha"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homophone-saturation-gpu-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: [self-hosted, linux, gpu]
+    timeout-minutes: 240
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      MODEL_NAME: nvidia/parakeet-tdt_ctc-0.6b-ja
+      NEMO_ROOT: /opt/NeMo
+      MANIFEST: data/generated/saturation/nemo_eval.jsonl
+      BENCH_INDEX: data/generated/saturation/bench_index.jsonl
+      CONTEXT_PHRASES: data/generated/saturation/context_phrases.txt
+      NGPU_LM: ${{ inputs.ngpu_lm_path }}
+      SWEEP_ROOT: results/saturation
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check GPU and NeMo environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          nvidia-smi
+          python - <<'PY'
+          import nemo
+          import torch
+
+          print("nemo", getattr(nemo, "__version__", "unknown"))
+          print("torch", torch.__version__)
+          print("cuda", torch.cuda.is_available())
+          if not torch.cuda.is_available():
+              raise SystemExit("CUDA is not available")
+          PY
+          test -f "${NEMO_ROOT}/examples/asr/speech_to_text_eval.py"
+          test -f "${NGPU_LM}" || {
+            echo "NGPU-LM file not found: ${NGPU_LM}" >&2
+            exit 2
+          }
+
+      - name: Install evaluation dependencies
+        run: |
+          python -m pip install 'datasets>=4,<5' 'huggingface-hub>=0.34,<2' soundfile pyarrow
+          python -m pip install --no-deps -e .
+
+      - name: Rehydrate fixed evaluation set
+        run: |
+          python scripts/materialize_hf_eval.py \
+            --repo-id saeeew/JP-HomophoneBench \
+            --config "${{ inputs.config_name }}" \
+            --split "${{ inputs.split }}" \
+            --output-dir data/generated/saturation \
+            --rehydrate-audio \
+            --require-audio
+          python scripts/validate_eval_manifest.py "${MANIFEST}" --require-audio
+
+      - name: Record sweep environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${SWEEP_ROOT}"
+          python - <<'PY'
+          import json
+          import platform
+          import subprocess
+
+          import nemo
+          import torch
+
+          def command(*args):
+              return subprocess.check_output(args, text=True).strip()
+
+          report = {
+              "git_sha": command("git", "rev-parse", "HEAD"),
+              "python": platform.python_version(),
+              "torch": torch.__version__,
+              "nemo": getattr(nemo, "__version__", "unknown"),
+              "cuda_runtime": torch.version.cuda,
+              "gpu": torch.cuda.get_device_name(0),
+              "config": "${{ inputs.config_name }}",
+              "split": "${{ inputs.split }}",
+              "pb_alphas": "${{ inputs.pb_alphas }}",
+          }
+          with open("results/saturation/environment.json", "w", encoding="utf-8") as handle:
+              json.dump(report, handle, ensure_ascii=False, indent=2, sort_keys=True)
+              handle.write("\n")
+          print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+          PY
+
+      - name: Run E03 GPU-PB alpha sweep
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > "${SWEEP_ROOT}/result_specs.txt"
+          IFS=',' read -r -a alphas <<< "${{ inputs.pb_alphas }}"
+          for raw_alpha in "${alphas[@]}"; do
+            alpha="${raw_alpha//[[:space:]]/}"
+            test -n "${alpha}" || continue
+            label="$(python -c 'import sys; print(f"{float(sys.argv[1]):.2f}")' "${alpha}")"
+            experiment="E03_pb_${label}"
+            run_dir="${SWEEP_ROOT}/${experiment}"
+            mkdir -p "${run_dir}"
+            echo "Running ${experiment}"
+            RESULTS_DIR="${run_dir}" PB_ALPHA="${alpha}" bash experiments/E03_gpu_pb.sh
+            result="${run_dir}/E03_gpu_pb.json"
+            test -f "${result}" || {
+              echo "Missing E03 result: ${result}" >&2
+              exit 2
+            }
+            printf '%s=%s\n' "${experiment}" "${result}" >> "${SWEEP_ROOT}/result_specs.txt"
+          done
+          test -s "${SWEEP_ROOT}/result_specs.txt"
+
+      - name: Collect paired sweep metrics
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=()
+          while IFS= read -r spec; do
+            test -n "${spec}" || continue
+            args+=(--result "${spec}")
+          done < "${SWEEP_ROOT}/result_specs.txt"
+          python scripts/collect_experiment_metrics.py \
+            --benchmark "${BENCH_INDEX}" \
+            --execution-manifest "${MANIFEST}" \
+            "${args[@]}" \
+            --baseline E03_pb_0.00 \
+            --parquet "${SWEEP_ROOT}/metrics.parquet" \
+            --summary "${SWEEP_ROOT}/summary.json"
+
+      - name: Build sweep specification
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+
+          alphas = [
+              float(value.strip())
+              for value in "${{ inputs.pb_alphas }}".split(",")
+              if value.strip()
+          ]
+          points = [
+              {"experiment": f"E03_pb_{alpha:.2f}", "value": alpha}
+              for alpha in sorted(set(alphas))
+          ]
+          if len(points) < 2:
+              raise SystemExit("At least two distinct PB alpha values are required")
+          spec = {
+              "sweeps": [
+                  {
+                      "name": "gpu_pb_alpha",
+                      "parameter": "PB_ALPHA",
+                      "benefit_metric": "entity_accuracy",
+                      "risk_metric": "distractor_false_positive_rate",
+                      "categories": [
+                          "exact_homophone",
+                          "near_homophone",
+                          "voicing",
+                          "long_vowel",
+                          "geminate",
+                          "moraic_nasal",
+                          "pitch_accent",
+                          "semantic_only",
+                      ],
+                      "points": points,
+                  }
+              ]
+          }
+          with open("results/saturation/sweep.json", "w", encoding="utf-8") as handle:
+              json.dump(spec, handle, ensure_ascii=False, indent=2, sort_keys=True)
+              handle.write("\n")
+          PY
+
+      - name: Detect TurboBias saturation
+        run: |
+          python scripts/analyze_saturation.py \
+            --metrics "${SWEEP_ROOT}/metrics.parquet" \
+            --sweep "${SWEEP_ROOT}/sweep.json" \
+            --output "${SWEEP_ROOT}/saturation.json" \
+            --bootstrap-samples 10000 \
+            --confidence 0.95 \
+            --min-gain 0.01 \
+            --min-risk-increase 0.02 \
+            --alpha 0.05
+
+      - name: Upload saturation artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: homophone-saturation-${{ inputs.artifact_suffix }}-${{ inputs.config_name }}-${{ inputs.split }}
+          path: |
+            data/generated/saturation/eval_provenance.json
+            data/generated/saturation/bench_index.jsonl
+            data/generated/saturation/nemo_eval.jsonl
+            data/generated/saturation/context_phrases.txt
+            results/saturation
+          if-no-files-found: error
+          retention-days: 30
