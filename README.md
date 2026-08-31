@@ -1,3 +1,5 @@
+[![Dataset on HF](https://huggingface.co/datasets/huggingface/badges/resolve/main/dataset-on-hf-md.svg)](https://huggingface.co/datasets/saeeew/JP-HomophoneBench)
+
 # Parakeet Contextual Fusion Research JP
 
 Japanese contextual-ASR research suite for `nvidia/parakeet-tdt_ctc-0.6b-ja`, with a reproducible `JP-HomophoneBench` builder, Hugging Face publication pipeline, and category-aware E00-E06 evaluation flow.
