@@ -1,0 +1,171 @@
+name: bootstrap-import
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - parakeet-context-fusion-export.b64
+      - .github/workflows/bootstrap-import.yml
+
+permissions:
+  contents: write
+
+jobs:
+  import-and-publish:
+    runs-on: ubuntu-latest
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Expand research bundle into repository root
+        run: |
+          set -euo pipefail
+          base64 -d parakeet-context-fusion-export.b64 > /tmp/context-fusion.tar.gz
+          tar -xzf /tmp/context-fusion.tar.gz -C .
+          rm -f parakeet-context-fusion-export.b64
+      - name: Install benchmark dependencies
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -e '.[dev,g2p]'
+      - name: Run CPU validation
+        run: |
+          set -euo pipefail
+          ruff check src scripts tests
+          pytest
+          python -m compileall -q src scripts
+          find experiments scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+      - name: Build fixed JP-HomophoneBench release
+        run: |
+          set -euo pipefail
+          python scripts/build_jp_homophone_bench.py \
+            --output-dir data/releases/v0.1.0 \
+            --semantic-tsv data/seed/semantic_homophones.example.tsv \
+            --near-threshold 1.0 \
+            --require-core8
+          python scripts/validate_jp_homophone_release.py \
+            --release-dir data/releases/v0.1.0 \
+            --schema schemas/benchmark.schema.json \
+            --require-core8
+      - name: Publish Hugging Face Dataset
+        run: |
+          set -euo pipefail
+          test -n "$HF_TOKEN" || { echo 'HF_TOKEN secret is required' >&2; exit 2; }
+          python scripts/publish_hf_dataset.py \
+            --release-dir data/releases/v0.1.0 \
+            --repo-id saeeew/JP-HomophoneBench \
+            --config-name homophone8 \
+            --license-policy permissive
+      - name: Install permanent repository workflows
+        run: |
+          set -euo pipefail
+          mkdir -p .github/workflows
+          cat > .github/workflows/ci.yml <<'YAML'
+          name: ci
+          on:
+            workflow_dispatch:
+            pull_request:
+            push:
+              branches: [main]
+          permissions:
+            contents: read
+          jobs:
+            cpu-checks:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-python@v5
+                  with:
+                    python-version: '3.11'
+                    cache: pip
+                    cache-dependency-path: pyproject.toml
+                - run: python -m pip install --upgrade pip
+                - run: python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
+                - run: python -m pip install datasets huggingface-hub jsonschema numpy omegaconf pydantic pyyaml soundfile pytest ruff
+                - run: python -m pip install --no-deps -e .
+                - run: ruff check src scripts tests
+                - run: pytest
+                - run: python -m compileall -q src scripts
+                - run: find experiments scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+          YAML
+          cat > .github/workflows/publish-hf.yml <<'YAML'
+          name: publish-hf
+          on:
+            workflow_dispatch:
+              inputs:
+                release_version:
+                  description: Release directory name
+                  required: true
+                  default: v0.1.0
+                  type: string
+                config_name:
+                  description: HF dataset config
+                  required: true
+                  default: homophone8
+                  type: string
+                license_policy:
+                  description: Publication license policy
+                  required: true
+                  default: permissive
+                  type: choice
+                  options: [permissive, research]
+          permissions:
+            contents: read
+          jobs:
+            publish:
+              runs-on: ubuntu-latest
+              env:
+                HF_TOKEN: ${{ secrets.HF_TOKEN }}
+                RELEASE_DIR: data/releases/${{ inputs.release_version }}
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-python@v5
+                  with:
+                    python-version: '3.11'
+                    cache: pip
+                    cache-dependency-path: pyproject.toml
+                - run: python -m pip install --upgrade pip
+                - run: python -m pip install -e '.[dev,g2p]'
+                - name: Build and validate
+                  run: |
+                    python scripts/build_jp_homophone_bench.py \
+                      --output-dir "$RELEASE_DIR" \
+                      --semantic-tsv data/seed/semantic_homophones.example.tsv \
+                      --near-threshold 1.0 \
+                      --require-core8
+                    python scripts/validate_jp_homophone_release.py \
+                      --release-dir "$RELEASE_DIR" \
+                      --schema schemas/benchmark.schema.json \
+                      --require-core8
+                - name: Publish to saeeew/JP-HomophoneBench
+                  run: |
+                    test -n "$HF_TOKEN" || { echo 'HF_TOKEN secret is required' >&2; exit 2; }
+                    python scripts/publish_hf_dataset.py \
+                      --release-dir "$RELEASE_DIR" \
+                      --repo-id saeeew/JP-HomophoneBench \
+                      --config-name "${{ inputs.config_name }}" \
+                      --license-policy "${{ inputs.license_policy }}"
+          YAML
+          rm -f .github/workflows/bootstrap-import.yml
+          rm -f .github/workflows/parakeet-context-fusion-ci.yml
+          rm -f .github/workflows/jp-homophone-hf-publish.yml
+      - name: Adapt README paths for standalone repository
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('README.md')
+          text = p.read_text(encoding='utf-8')
+          text = text.replace('cd experiments/parakeet-context-fusion\n', '')
+          text = text.replace('YOUR_HF_NAME/JP-HomophoneBench', 'saeeew/JP-HomophoneBench')
+          p.write_text(text, encoding='utf-8')
+          PY
+      - name: Commit standalone repository state
+        run: |
+          set -euo pipefail
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m 'feat: import Parakeet contextual fusion research suite'
+          git push origin HEAD:main
