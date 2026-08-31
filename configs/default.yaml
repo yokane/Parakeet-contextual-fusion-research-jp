@@ -3,13 +3,20 @@ model:
   sample_rate: 16000
 
 data:
-  manifest: data/generated/bench.jsonl
+  hf_repo: saeeew/JP-HomophoneBench
+  hf_config: homophone8
+  hf_split: test
+  index_manifest: data/generated/bench_index.jsonl
+  manifest: data/generated/bench_index.jsonl
   nemo_manifest: data/generated/nemo_eval.jsonl
   context_phrases: data/generated/context_phrases.txt
   lm_corpus: data/generated/lm_corpus.txt
+  provenance: data/generated/eval_provenance.json
 
 output:
   root: results
+  metrics_parquet: results/metrics.parquet
+  summary_json: results/summary.json
 
 beam:
   size: 8
@@ -46,5 +53,10 @@ sweeps:
   phone_alpha: [0.0, 0.05, 0.10, 0.20, 0.40, 0.80]
 
 metrics:
+  primary:
+    - cer
+    - entity_accuracy
+    - distractor_false_positive_rate
+    - mrr
   oracle_k: [1, 4, 8, 16, 32]
   bootstrap_samples: 10000
