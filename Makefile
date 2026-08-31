@@ -1,6 +1,8 @@
 PYTHON ?= python
 RELEASE ?= data/releases/v0.1.0
 HF_REPO ?= saeeew/JP-HomophoneBench
+HF_CONFIG ?= homophone8-research
+HF_LICENSE_POLICY ?= research
 
 .PHONY: lint test validate bench bench-validate hf-publish run-e00 run-e01 run-e02 run-e03 run-e04 run-e05 run-e06
 
@@ -28,8 +30,8 @@ hf-publish:
 	$(PYTHON) scripts/publish_hf_dataset.py \
 		--release-dir $(RELEASE) \
 		--repo-id $(HF_REPO) \
-		--config-name homophone8 \
-		--license-policy permissive
+		--config-name $(HF_CONFIG) \
+		--license-policy $(HF_LICENSE_POLICY)
 
 run-e00:
 	bash experiments/E00_tdt_greedy.sh
