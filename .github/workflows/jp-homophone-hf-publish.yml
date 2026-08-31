@@ -43,8 +43,8 @@ jobs:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_REPO_ID: saeeew/JP-HomophoneBench
       RELEASE_DIR: data/releases/${{ inputs.release_version || 'v0.1.0' }}
-      CONFIG_NAME: ${{ inputs.config_name || 'homophone8' }}
-      LICENSE_POLICY: ${{ inputs.license_policy || 'permissive' }}
+      CONFIG_NAME: ${{ inputs.config_name || 'homophone8-research' }}
+      LICENSE_POLICY: ${{ inputs.license_policy || 'research' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
