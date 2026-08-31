@@ -9,6 +9,15 @@ on:
       - "tests/**"
       - "schemas/**"
       - "pyproject.toml"
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "scripts/**"
+      - "tests/**"
+      - "schemas/**"
+      - "pyproject.toml"
+      - ".github/workflows/parakeet-context-fusion-ci.yml"
 
 permissions:
   contents: read
