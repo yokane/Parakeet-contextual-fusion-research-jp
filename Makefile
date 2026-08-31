@@ -2,9 +2,13 @@ PYTHON ?= python
 RELEASE ?= data/releases/v0.1.0
 HF_REPO ?= saeeew/JP-HomophoneBench
 HF_CONFIG ?= homophone8
+HF_SPLIT ?= test
 HF_LICENSE_POLICY ?= permissive
+GENERATED ?= data/generated
+RESULTS_DIR ?= results
+RESULT_SPECS ?=
 
-.PHONY: lint test validate bench bench-permissive bench-validate hf-publish run-e00 run-e01 run-e02 run-e03 run-e04 run-e05 run-e06
+.PHONY: lint test validate bench bench-permissive bench-validate hf-publish hf-eval-index hf-eval-audio metrics run-e00 run-e01 run-e02 run-e03 run-e04 run-e05 run-e06
 
 lint:
 	ruff check src scripts tests
@@ -13,7 +17,7 @@ test:
 	pytest
 
 validate:
-	$(PYTHON) scripts/validate_manifest.py data/generated/bench.jsonl
+	$(PYTHON) scripts/validate_eval_manifest.py $(GENERATED)/bench_index.jsonl
 
 bench:
 	$(PYTHON) scripts/build_jp_homophone_bench.py \
@@ -43,6 +47,33 @@ hf-publish:
 		--repo-id $(HF_REPO) \
 		--config-name $(HF_CONFIG) \
 		--license-policy $(HF_LICENSE_POLICY)
+
+hf-eval-index:
+	$(PYTHON) scripts/materialize_hf_eval.py \
+		--repo-id $(HF_REPO) \
+		--config $(HF_CONFIG) \
+		--split $(HF_SPLIT) \
+		--output-dir $(GENERATED) \
+		--no-rehydrate-audio
+	$(PYTHON) scripts/validate_eval_manifest.py $(GENERATED)/bench_index.jsonl
+
+hf-eval-audio:
+	$(PYTHON) scripts/materialize_hf_eval.py \
+		--repo-id $(HF_REPO) \
+		--config $(HF_CONFIG) \
+		--split $(HF_SPLIT) \
+		--output-dir $(GENERATED) \
+		--rehydrate-audio \
+		--require-audio
+	$(PYTHON) scripts/validate_eval_manifest.py $(GENERATED)/nemo_eval.jsonl --require-audio
+
+metrics:
+	@test -n "$(RESULT_SPECS)" || { echo 'Set RESULT_SPECS="E00=path E01=path ..."' >&2; exit 2; }
+	$(PYTHON) scripts/collect_experiment_metrics.py \
+		--benchmark $(GENERATED)/bench_index.jsonl \
+		$(foreach spec,$(RESULT_SPECS),--result $(spec)) \
+		--parquet $(RESULTS_DIR)/metrics.parquet \
+		--summary $(RESULTS_DIR)/summary.json
 
 run-e00:
 	bash experiments/E00_tdt_greedy.sh
