@@ -1,6 +1,10 @@
 name: jp-homophone-hf-publish
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/jp-homophone-hf-publish.yml"
   workflow_dispatch:
     inputs:
       release_version:
@@ -38,9 +42,9 @@ jobs:
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_REPO_ID: saeeew/JP-HomophoneBench
-      RELEASE_DIR: data/releases/${{ inputs.release_version }}
-      CONFIG_NAME: ${{ inputs.config_name }}
-      LICENSE_POLICY: ${{ inputs.license_policy }}
+      RELEASE_DIR: data/releases/${{ inputs.release_version || 'v0.1.0' }}
+      CONFIG_NAME: ${{ inputs.config_name || 'homophone8' }}
+      LICENSE_POLICY: ${{ inputs.license_policy || 'permissive' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -68,6 +72,12 @@ jobs:
             --semantic-tsv data/seed/semantic_homophones.example.tsv \
             --near-threshold 1.0 \
             --require-core8
+      - name: Add CC0 permissive phonetic supplement
+        if: env.LICENSE_POLICY == 'permissive'
+        run: |
+          python scripts/augment_permissive_core8.py \
+            --release-dir "$RELEASE_DIR" \
+            --seed data/seed/permissive_phonetic_core.tsv
       - name: Validate release invariants
         run: |
           python scripts/validate_jp_homophone_release.py \
@@ -78,7 +88,7 @@ jobs:
         shell: bash
         run: |
           private_arg=()
-          if [[ "${{ inputs.private }}" == "true" ]]; then private_arg+=(--private); fi
+          if [[ "${{ inputs.private || false }}" == "true" ]]; then private_arg+=(--private); fi
           python scripts/publish_hf_dataset.py \
             --release-dir "$RELEASE_DIR" \
             --repo-id "$HF_REPO_ID" \
@@ -88,7 +98,7 @@ jobs:
       - name: Upload immutable JSONL artifact
         uses: actions/upload-artifact@v4
         with:
-          name: jp-homophone-bench-${{ inputs.release_version }}
+          name: jp-homophone-bench-${{ inputs.release_version || 'v0.1.0' }}
           path: ${{ env.RELEASE_DIR }}
           if-no-files-found: error
           retention-days: 30
