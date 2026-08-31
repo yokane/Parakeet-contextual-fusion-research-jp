@@ -1,0 +1,86 @@
+name: homophone-eval-smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "scripts/materialize_hf_eval.py"
+      - "scripts/collect_experiment_metrics.py"
+      - "scripts/validate_eval_manifest.py"
+      - "tests/test_eval_pipeline.py"
+      - ".github/workflows/homophone-eval-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/materialize_hf_eval.py"
+      - "scripts/collect_experiment_metrics.py"
+      - "scripts/validate_eval_manifest.py"
+      - "tests/test_eval_pipeline.py"
+      - ".github/workflows/homophone-eval-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  hf-index-and-metrics:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install evaluation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'datasets>=4,<5' 'huggingface-hub>=1,<2' soundfile pyarrow pytest
+          python -m pip install --no-deps -e .
+      - name: Pull published HF benchmark index
+        run: |
+          python scripts/materialize_hf_eval.py \
+            --repo-id saeeew/JP-HomophoneBench \
+            --config homophone8 \
+            --split test \
+            --output-dir data/generated/smoke \
+            --no-rehydrate-audio
+      - name: Validate benchmark index
+        run: python scripts/validate_eval_manifest.py data/generated/smoke/bench_index.jsonl
+      - name: Build identity smoke predictions
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          source = Path("data/generated/smoke/bench_index.jsonl")
+          target = Path("results/smoke_identity.jsonl")
+          target.parent.mkdir(parents=True, exist_ok=True)
+          with target.open("w", encoding="utf-8") as sink:
+              for line in source.read_text(encoding="utf-8").splitlines():
+                  if not line:
+                      continue
+                  row = json.loads(line)
+                  sink.write(json.dumps({"benchmark_id": row["id"], "pred_text": row["text"]}, ensure_ascii=False) + "\n")
+          PY
+      - name: Collect smoke metrics
+        run: |
+          python scripts/collect_experiment_metrics.py \
+            --benchmark data/generated/smoke/bench_index.jsonl \
+            --result E00=results/smoke_identity.jsonl \
+            --parquet results/smoke_metrics.parquet \
+            --summary results/smoke_summary.json
+      - name: Run focused regression test
+        run: pytest -q tests/test_eval_pipeline.py
+      - name: Upload smoke artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: homophone-eval-smoke
+          path: |
+            data/generated/smoke/bench_index.jsonl
+            data/generated/smoke/context_phrases.txt
+            data/generated/smoke/lm_corpus.txt
+            data/generated/smoke/eval_provenance.json
+            results/smoke_metrics.parquet
+            results/smoke_summary.json
+          if-no-files-found: error
+          retention-days: 14
