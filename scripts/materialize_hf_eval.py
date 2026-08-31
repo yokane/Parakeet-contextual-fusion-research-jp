@@ -10,10 +10,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-import soundfile as sf
 from datasets import Audio, Dataset, load_dataset
 from huggingface_hub import HfApi
-
+import soundfile as sf
 
 PREFERRED_AUDIO_COLUMNS = ("audio", "speech", "wav")
 
@@ -83,7 +82,11 @@ class SourceDatasetCache:
             self.revisions[repo_id] = revision
         return dataset, audio_column
 
-    def _index_map(self, key: tuple[str, str | None, str, str | None], dataset: Dataset) -> dict[str, int]:
+    def _index_map(
+        self,
+        key: tuple[str, str | None, str, str | None],
+        dataset: Dataset,
+    ) -> dict[str, int]:
         cached = self.id_maps.get(key)
         if cached is not None:
             return cached
@@ -109,7 +112,12 @@ class SourceDatasetCache:
         revision = source.get("revision") or None
         row_id = str(audio_ref.get("row_id") or source.get("source_id") or "")
         key = (repo_id, config, split, revision)
-        dataset, audio_column = self._load(repo_id=repo_id, config=config, split=split, revision=revision)
+        dataset, audio_column = self._load(
+            repo_id=repo_id,
+            config=config,
+            split=split,
+            revision=revision,
+        )
 
         index: int | None = None
         if row_id.isdigit():
@@ -145,8 +153,6 @@ def copy_audio(value: Any, *, destination_stem: Path) -> tuple[Path, float]:
         info = sf.info(str(destination))
         duration = float(info.frames) / float(info.samplerate)
     except Exception:
-        # Some source formats are readable by HF/ffmpeg but not libsndfile. Decode once and
-        # normalize to WAV so NeMo and subsequent jobs receive a stable local file.
         if not payload:
             payload = Path(str(source_path)).read_bytes() if source_path else None
         if not payload:
@@ -160,12 +166,23 @@ def copy_audio(value: Any, *, destination_stem: Path) -> tuple[Path, float]:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Materialize JP-HomophoneBench into NeMo evaluation inputs")
+    parser = argparse.ArgumentParser(
+        description="Materialize JP-HomophoneBench into NeMo evaluation inputs"
+    )
     parser.add_argument("--repo-id", default="saeeew/JP-HomophoneBench")
     parser.add_argument("--config", default="homophone8")
-    parser.add_argument("--split", action="append", dest="splits", help="repeatable; defaults to test")
+    parser.add_argument(
+        "--split",
+        action="append",
+        dest="splits",
+        help="repeatable; defaults to test",
+    )
     parser.add_argument("--output-dir", type=Path, default=Path("data/generated"))
-    parser.add_argument("--rehydrate-audio", action=argparse.BooleanOptionalAction, default=True)
+    parser.add_argument(
+        "--rehydrate-audio",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+    )
     parser.add_argument("--require-audio", action="store_true")
     args = parser.parse_args()
 
@@ -203,8 +220,14 @@ def main() -> None:
     nemo_path = args.output_dir / "nemo_eval.jsonl"
     provenance_path = args.output_dir / "eval_provenance.json"
     write_jsonl(index_path, benchmark_rows)
-    context_path.write_text("\n".join(sorted(phrases)) + ("\n" if phrases else ""), encoding="utf-8")
-    corpus_path.write_text("\n".join(corpus) + ("\n" if corpus else ""), encoding="utf-8")
+    context_path.write_text(
+        "\n".join(sorted(phrases)) + ("\n" if phrases else ""),
+        encoding="utf-8",
+    )
+    corpus_path.write_text(
+        "\n".join(corpus) + ("\n" if corpus else ""),
+        encoding="utf-8",
+    )
 
     source_cache = SourceDatasetCache()
     nemo_rows: list[dict[str, Any]] = []
@@ -223,7 +246,12 @@ def main() -> None:
                     destination_stem=audio_dir / safe_name(bench_id),
                 )
             except Exception as exc:
-                skipped.append({"id": bench_id, "reason": f"rehydrate_error:{type(exc).__name__}:{exc}"})
+                skipped.append(
+                    {
+                        "id": bench_id,
+                        "reason": f"rehydrate_error:{type(exc).__name__}:{exc}",
+                    }
+                )
                 continue
 
             target = row.get("target") or {}
@@ -239,7 +267,9 @@ def main() -> None:
                     "category": row.get("category"),
                     "target_surface": target.get("surface"),
                     "target_reading": target.get("reading"),
-                    "candidate_surfaces": [item.get("surface") for item in candidates if item.get("surface")],
+                    "candidate_surfaces": [
+                        item.get("surface") for item in candidates if item.get("surface")
+                    ],
                     "source_dataset": source.get("dataset"),
                     "source_license": source.get("license"),
                 }
@@ -247,7 +277,12 @@ def main() -> None:
     write_jsonl(nemo_path, nemo_rows)
 
     category_counts = Counter(str(row.get("category") or "unknown") for row in benchmark_rows)
-    runnable_category_counts = Counter(str(row.get("category") or "unknown") for row in benchmark_rows if str(row.get("id") or "") in {str(item["benchmark_id"]) for item in nemo_rows})
+    runnable_ids = {str(item["benchmark_id"]) for item in nemo_rows}
+    runnable_category_counts = Counter(
+        str(row.get("category") or "unknown")
+        for row in benchmark_rows
+        if str(row.get("id") or "") in runnable_ids
+    )
     provenance = {
         "repo_id": args.repo_id,
         "config": args.config,
@@ -262,7 +297,10 @@ def main() -> None:
         "source_revisions": dict(sorted(source_cache.revisions.items())),
         "skipped": skipped,
     }
-    provenance_path.write_text(json.dumps(provenance, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    provenance_path.write_text(
+        json.dumps(provenance, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
     print(json.dumps(provenance, ensure_ascii=False, indent=2, sort_keys=True))
     if args.require_audio and not nemo_rows:
         raise SystemExit("no runnable audio rows were materialized")
