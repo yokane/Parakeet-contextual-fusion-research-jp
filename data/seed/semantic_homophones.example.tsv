@@ -1,0 +1,4 @@
+target_surface	target_reading	candidate_surface	candidate_reading	context	source_name	source_license	source_revision	notes
+気候	きこう	機構	きこう	今年の気候は例年より変化が大きい。	manual-cc0-example	cc0-1.0		semantic context selects 気候
+校正	こうせい	構成	こうせい	原稿の校正を終えてから公開する。	manual-cc0-example	cc0-1.0		semantic context selects 校正
+公演	こうえん	講演	こうえん	劇団の公演は午後七時に始まる。	manual-cc0-example	cc0-1.0		semantic context selects 公演
