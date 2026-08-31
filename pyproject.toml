@@ -8,11 +8,12 @@ version = "0.1.0"
 description = "Japanese TDT/CTC contextual ASR fusion experiments for Parakeet"
 requires-python = ">=3.10,<3.13"
 dependencies = [
-  "datasets>=3.0,<5",
+  "datasets>=4.0,<5",
   "huggingface-hub>=0.34,<2",
   "jsonschema>=4.23",
   "numpy>=1.26",
   "omegaconf>=2.3",
+  "pyarrow>=15",
   "pydantic>=2.8",
   "pyyaml>=6.0",
   "soundfile>=0.12",
