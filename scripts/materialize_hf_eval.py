@@ -10,9 +10,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+import soundfile as sf
 from datasets import Audio, Dataset, load_dataset
 from huggingface_hub import HfApi
-import soundfile as sf
 
 PREFERRED_AUDIO_COLUMNS = ("audio", "speech", "wav")
 
