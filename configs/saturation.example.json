@@ -1,0 +1,28 @@
+{
+  "sweeps": [
+    {
+      "name": "gpu_pb_alpha",
+      "parameter": "PB_ALPHA",
+      "benefit_metric": "entity_accuracy",
+      "risk_metric": "distractor_false_positive_rate",
+      "categories": [
+        "exact_homophone",
+        "near_homophone",
+        "voicing",
+        "long_vowel",
+        "geminate",
+        "moraic_nasal",
+        "pitch_accent",
+        "semantic_only"
+      ],
+      "points": [
+        {"experiment": "E03_pb_0.00", "value": 0.0},
+        {"experiment": "E03_pb_0.25", "value": 0.25},
+        {"experiment": "E03_pb_0.50", "value": 0.5},
+        {"experiment": "E03_pb_1.00", "value": 1.0},
+        {"experiment": "E03_pb_1.50", "value": 1.5},
+        {"experiment": "E03_pb_2.00", "value": 2.0}
+      ]
+    }
+  ]
+}
