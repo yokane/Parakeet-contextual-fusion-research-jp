@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.pyc
+artifacts/
+results/
+data/generated/
+data/releases/
+*.nemo
+*.arpa
+*.binary
+*.pt
