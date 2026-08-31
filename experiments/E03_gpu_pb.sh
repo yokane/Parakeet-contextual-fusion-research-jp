@@ -18,7 +18,7 @@ nemo_eval \
   rnnt_decoding.beam.allow_cuda_graphs=true \
   rnnt_decoding.beam.ngram_lm_model="${NGPU_LM}" \
   rnnt_decoding.beam.ngram_lm_alpha="${LM_ALPHA}" \
-  rnnt_decoding.beam.boosting_tree.key_phrases_file="${CONTEXT_PHRASES}" \
-  rnnt_decoding.beam.boosting_tree.context_score=1.0 \
-  rnnt_decoding.beam.boosting_tree.depth_scaling=2.0 \
-  rnnt_decoding.beam.boosting_tree_alpha="${PB_ALPHA}"
+  rnnt_decoding.malsd.boosting_tree.key_phrases_file="${CONTEXT_PHRASES}" \
+  rnnt_decoding.malsd.boosting_tree.context_score=1.0 \
+  rnnt_decoding.malsd.boosting_tree.depth_scaling=2.0 \
+  rnnt_decoding.malsd.boosting_tree_alpha="${PB_ALPHA}"
