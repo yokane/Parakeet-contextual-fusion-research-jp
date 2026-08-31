@@ -1,10 +1,6 @@
 name: jp-homophone-hf-publish
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/jp-homophone-hf-publish.yml"
   workflow_dispatch:
     inputs:
       release_version:
@@ -15,14 +11,14 @@ on:
       config_name:
         description: "HF dataset config name"
         required: true
-        default: "homophone8-research"
+        default: "homophone8"
         type: string
       license_policy:
-        description: "research includes NonCommercial-derived rows; permissive excludes them"
+        description: "permissive excludes NonCommercial-derived rows; research includes them"
         required: true
-        default: "research"
+        default: "permissive"
         type: choice
-        options: [research, permissive]
+        options: [permissive, research]
       private:
         description: "Publish HF dataset as private"
         required: true
@@ -42,9 +38,9 @@ jobs:
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_REPO_ID: saeeew/JP-HomophoneBench
-      RELEASE_DIR: data/releases/${{ inputs.release_version || 'v0.1.0' }}
-      CONFIG_NAME: ${{ inputs.config_name || 'homophone8' }}
-      LICENSE_POLICY: ${{ inputs.license_policy || 'permissive' }}
+      RELEASE_DIR: data/releases/${{ inputs.release_version }}
+      CONFIG_NAME: ${{ inputs.config_name }}
+      LICENSE_POLICY: ${{ inputs.license_policy }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -88,7 +84,7 @@ jobs:
         shell: bash
         run: |
           private_arg=()
-          if [[ "${{ inputs.private || false }}" == "true" ]]; then private_arg+=(--private); fi
+          if [[ "${{ inputs.private }}" == "true" ]]; then private_arg+=(--private); fi
           python scripts/publish_hf_dataset.py \
             --release-dir "$RELEASE_DIR" \
             --repo-id "$HF_REPO_ID" \
@@ -98,7 +94,7 @@ jobs:
       - name: Upload immutable JSONL artifact
         uses: actions/upload-artifact@v4
         with:
-          name: jp-homophone-bench-${{ inputs.release_version || 'v0.1.0' }}
+          name: jp-homophone-bench-${{ inputs.release_version }}
           path: ${{ env.RELEASE_DIR }}
           if-no-files-found: error
           retention-days: 30
