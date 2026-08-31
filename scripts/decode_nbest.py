@@ -48,10 +48,10 @@ def main() -> None:
             cfg.beam.ngram_lm_model = str(args.ngram_lm_model)
             cfg.beam.ngram_lm_alpha = args.ngram_lm_alpha
         if args.context_phrases:
-            cfg.beam.boosting_tree.key_phrases_file = str(args.context_phrases)
-            cfg.beam.boosting_tree.context_score = 1.0
-            cfg.beam.boosting_tree.depth_scaling = 2.0
-            cfg.beam.boosting_tree_alpha = args.boosting_tree_alpha
+            cfg.malsd.boosting_tree.key_phrases_file = str(args.context_phrases)
+            cfg.malsd.boosting_tree.context_score = 1.0
+            cfg.malsd.boosting_tree.depth_scaling = 2.0
+            cfg.malsd.boosting_tree_alpha = args.boosting_tree_alpha
     try:
         model.change_decoding_strategy(cfg, decoder_type="rnnt")
     except TypeError:
@@ -68,7 +68,10 @@ def main() -> None:
                 {
                     "text": str(getattr(hyp, "text", hyp)),
                     "tdt": float(getattr(hyp, "score", 0.0)),
-                    "metadata": {"tokens": list(getattr(hyp, "tokens", []) or []), "last_frame": getattr(hyp, "last_frame", None)},
+                    "metadata": {
+                        "tokens": list(getattr(hyp, "tokens", []) or []),
+                        "last_frame": getattr(hyp, "last_frame", None),
+                    },
                 }
                 for hyp in hypotheses
             ]
