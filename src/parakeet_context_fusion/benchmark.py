@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from .japanese_g2p import reading_to_phones
-from .phoneme import VOICING_PAIRS, weighted_phone_distance
+from .phone_distance import VOICING_PAIRS, weighted_phone_distance
 
 CORE_CATEGORIES = (
     "exact_homophone",
