@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/parakeet-context-fusion/benchmark.schema.json",
+  "title": "JP-HomophoneBench record",
+  "type": "object",
+  "required": ["id", "group_id", "split", "text", "category", "source", "difficulty"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "group_id": {"type": "string", "minLength": 1},
+    "split": {"enum": ["train", "validation", "test"]},
+    "audio_filepath": {"type": ["string", "null"]},
+    "audio_ref": {
+      "type": ["object", "null"],
+      "properties": {
+        "kind": {"enum": ["hf_row", "local", "none"]},
+        "repo_id": {"type": ["string", "null"]},
+        "config": {"type": ["string", "null"]},
+        "split": {"type": ["string", "null"]},
+        "row_id": {"type": ["string", "number", "null"]}
+      },
+      "additionalProperties": true
+    },
+    "text": {"type": "string"},
+    "target": {
+      "type": ["object", "null"],
+      "properties": {
+        "surface": {"type": "string"},
+        "reading": {"type": ["string", "null"]},
+        "phones": {"type": "array", "items": {"type": "string"}},
+        "pitch_accent": {"type": ["integer", "number", "string", "null"]},
+        "start_sec": {"type": ["number", "null"], "minimum": 0},
+        "end_sec": {"type": ["number", "null"], "minimum": 0}
+      },
+      "required": ["surface", "phones"],
+      "additionalProperties": true
+    },
+    "candidates": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["surface", "phones", "relation"],
+        "properties": {
+          "surface": {"type": "string"},
+          "reading": {"type": ["string", "null"]},
+          "phones": {"type": "array", "items": {"type": "string"}},
+          "pitch_accent": {"type": ["integer", "number", "string", "null"]},
+          "phone_distance": {"type": ["number", "null"], "minimum": 0},
+          "relation": {"enum": ["target", "random", "orthographic", "near_homophone", "exact_homophone", "voicing", "long_vowel", "geminate", "moraic_nasal", "pitch_accent", "semantic_only", "prosodic"]}
+        },
+        "additionalProperties": true
+      }
+    },
+    "category": {"enum": ["general", "voicing", "long_vowel", "geminate", "moraic_nasal", "near_homophone", "pitch_accent", "exact_homophone", "semantic_only", "acoustic_stress"]},
+    "source": {
+      "type": "object",
+      "required": ["dataset", "license"],
+      "properties": {
+        "dataset": {"type": "string"},
+        "config": {"type": ["string", "null"]},
+        "split": {"type": ["string", "null"]},
+        "source_id": {"type": ["string", "number", "null"]},
+        "revision": {"type": ["string", "null"]},
+        "license": {"type": "string", "minLength": 1},
+        "synthetic": {"type": "boolean", "default": false},
+        "audio_redistributed": {"type": "boolean", "default": false}
+      },
+      "additionalProperties": true
+    },
+    "difficulty": {
+      "type": "object",
+      "required": ["acoustic", "lexical", "context"],
+      "properties": {
+        "acoustic": {"type": "number", "minimum": 0, "maximum": 1},
+        "lexical": {"type": "number", "minimum": 0, "maximum": 1},
+        "context": {"type": "number", "minimum": 0, "maximum": 1},
+        "phone_distance": {"type": ["number", "null"], "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "metadata": {"type": "object"}
+  },
+  "additionalProperties": true
+}
