@@ -1,0 +1,50 @@
+model:
+  name: nvidia/parakeet-tdt_ctc-0.6b-ja
+  sample_rate: 16000
+
+data:
+  manifest: data/generated/bench.jsonl
+  nemo_manifest: data/generated/nemo_eval.jsonl
+  context_phrases: data/generated/context_phrases.txt
+  lm_corpus: data/generated/lm_corpus.txt
+
+output:
+  root: results
+
+beam:
+  size: 8
+  strategy: malsd_batch
+  blank_lm_score_mode: lm_weighted_full
+
+fusion:
+  ngpulm:
+    enabled: false
+    model_path: artifacts/lm/ja-6gram.nemo
+    alpha: 0.20
+  gpu_pb:
+    enabled: false
+    alpha: 1.0
+    context_score: 1.0
+    depth_scaling: 2.0
+    bpe_mode: default
+  ctc_local:
+    enabled: false
+    alpha: 0.20
+    margin_frames: 8
+    length_norm_power: 1.0
+  phone:
+    enabled: false
+    alpha: 0.20
+    checkpoint: artifacts/phone_head.pt
+    length_norm_power: 1.0
+
+sweeps:
+  beam_size: [1, 2, 4, 8, 12, 16]
+  ngpulm_alpha: [0.0, 0.05, 0.10, 0.20, 0.30, 0.40]
+  gpu_pb_alpha: [0.0, 0.25, 0.50, 1.0, 1.5, 2.0]
+  ctc_alpha: [0.0, 0.05, 0.10, 0.20, 0.40]
+  phone_alpha: [0.0, 0.05, 0.10, 0.20, 0.40, 0.80]
+
+metrics:
+  oracle_k: [1, 4, 8, 16, 32]
+  bootstrap_samples: 10000
