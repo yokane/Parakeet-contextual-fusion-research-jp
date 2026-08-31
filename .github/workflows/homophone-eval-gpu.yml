@@ -1,0 +1,141 @@
+name: homophone-eval-gpu
+
+on:
+  workflow_dispatch:
+    inputs:
+      config_name:
+        description: "JP-HomophoneBench HF config"
+        required: true
+        default: "homophone8"
+        type: choice
+        options: [homophone8, homophone8-research]
+      split:
+        description: "Evaluation split"
+        required: true
+        default: "test"
+        type: choice
+        options: [test, validation]
+      experiments:
+        description: "Comma-separated E00..E06; E04+ need their prerequisite artifacts"
+        required: true
+        default: "E00,E01"
+        type: string
+      ngpu_lm_path:
+        description: "NGPU-LM .nemo/.arpa path on the runner"
+        required: true
+        default: "artifacts/lm/ja-6gram.nemo"
+        type: string
+      results_name:
+        description: "Artifact suffix"
+        required: true
+        default: "manual"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homophone-eval-gpu-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    runs-on: [self-hosted, linux, gpu]
+    timeout-minutes: 180
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      MODEL_NAME: nvidia/parakeet-tdt_ctc-0.6b-ja
+      NEMO_ROOT: /opt/NeMo
+      MANIFEST: data/generated/eval/nemo_eval.jsonl
+      BENCH_INDEX: data/generated/eval/bench_index.jsonl
+      CONTEXT_PHRASES: data/generated/eval/context_phrases.txt
+      NGPU_LM: ${{ inputs.ngpu_lm_path }}
+      RESULTS_DIR: results/${{ inputs.results_name }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check GPU and NeMo environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          nvidia-smi
+          python - <<'PY'
+          import nemo
+          import torch
+          print("nemo", getattr(nemo, "__version__", "unknown"))
+          print("torch", torch.__version__)
+          print("cuda", torch.cuda.is_available())
+          if not torch.cuda.is_available():
+              raise SystemExit("CUDA is not available on this self-hosted runner")
+          PY
+          test -f "${NEMO_ROOT}/examples/asr/speech_to_text_eval.py"
+      - name: Install evaluation-only Python dependencies
+        run: |
+          python -m pip install 'datasets>=4,<5' 'huggingface-hub>=1,<2' soundfile pyarrow
+          python -m pip install --no-deps -e .
+      - name: Rehydrate published benchmark audio
+        run: |
+          python scripts/materialize_hf_eval.py \
+            --repo-id saeeew/JP-HomophoneBench \
+            --config "${{ inputs.config_name }}" \
+            --split "${{ inputs.split }}" \
+            --output-dir data/generated/eval \
+            --rehydrate-audio \
+            --require-audio
+          python scripts/validate_eval_manifest.py "${MANIFEST}" --require-audio
+      - name: Run selected experiments
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RESULTS_DIR}"
+          IFS=',' read -r -a selected <<< "${{ inputs.experiments }}"
+          for experiment in "${selected[@]}"; do
+            experiment="${experiment//[[:space:]]/}"
+            case "${experiment}" in
+              E00) bash experiments/E00_tdt_greedy.sh ;;
+              E01) bash experiments/E01_tdt_beam.sh ;;
+              E02) bash experiments/E02_ngpulm.sh ;;
+              E03) bash experiments/E03_gpu_pb.sh ;;
+              E04) bash experiments/E04_ctc_rerank.sh ;;
+              E05) bash experiments/E05_phone_rerank.sh ;;
+              E06) bash experiments/E06_inbeam.sh ;;
+              *) echo "Unknown experiment: ${experiment}" >&2; exit 2 ;;
+            esac
+          done
+      - name: Collect category-aware metrics
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=()
+          IFS=',' read -r -a selected <<< "${{ inputs.experiments }}"
+          for experiment in "${selected[@]}"; do
+            experiment="${experiment//[[:space:]]/}"
+            case "${experiment}" in
+              E00) path="${RESULTS_DIR}/E00_tdt_greedy.json" ;;
+              E01) path="${RESULTS_DIR}/E01_tdt_beam.json" ;;
+              E02) path="${RESULTS_DIR}/E02_ngpulm.json" ;;
+              E03) path="${RESULTS_DIR}/E03_gpu_pb.json" ;;
+              E04) path="${RESULTS_DIR}/E04_ctc_rerank.jsonl" ;;
+              E05) path="${RESULTS_DIR}/E05_phone_rerank.jsonl" ;;
+              E06) path="${RESULTS_DIR}/E06_inbeam.jsonl" ;;
+              *) continue ;;
+            esac
+            test -f "${path}" || { echo "Missing experiment result: ${path}" >&2; exit 2; }
+            args+=(--result "${experiment}=${path}")
+          done
+          python scripts/collect_experiment_metrics.py \
+            --benchmark "${BENCH_INDEX}" \
+            "${args[@]}" \
+            --parquet "${RESULTS_DIR}/metrics.parquet" \
+            --summary "${RESULTS_DIR}/summary.json"
+      - name: Upload experiment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: homophone-eval-${{ inputs.results_name }}-${{ inputs.config_name }}-${{ inputs.split }}
+          path: |
+            data/generated/eval/eval_provenance.json
+            data/generated/eval/bench_index.jsonl
+            data/generated/eval/nemo_eval.jsonl
+            data/generated/eval/context_phrases.txt
+            ${{ env.RESULTS_DIR }}
+          if-no-files-found: error
+          retention-days: 30
