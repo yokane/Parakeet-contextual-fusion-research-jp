@@ -1,10 +1,10 @@
 PYTHON ?= python
 RELEASE ?= data/releases/v0.1.0
 HF_REPO ?= saeeew/JP-HomophoneBench
-HF_CONFIG ?= homophone8-research
-HF_LICENSE_POLICY ?= research
+HF_CONFIG ?= homophone8
+HF_LICENSE_POLICY ?= permissive
 
-.PHONY: lint test validate bench bench-validate hf-publish run-e00 run-e01 run-e02 run-e03 run-e04 run-e05 run-e06
+.PHONY: lint test validate bench bench-permissive bench-validate hf-publish run-e00 run-e01 run-e02 run-e03 run-e04 run-e05 run-e06
 
 lint:
 	ruff check src scripts tests
@@ -20,6 +20,11 @@ bench:
 		--output-dir $(RELEASE) \
 		--semantic-tsv data/seed/semantic_homophones.example.tsv
 
+bench-permissive: bench
+	$(PYTHON) scripts/augment_permissive_core8.py \
+		--release-dir $(RELEASE) \
+		--seed data/seed/permissive_phonetic_core.tsv
+
 bench-validate:
 	$(PYTHON) scripts/validate_jp_homophone_release.py \
 		--release-dir $(RELEASE) \
@@ -27,6 +32,12 @@ bench-validate:
 		--require-core8
 
 hf-publish:
+	@if [ "$(HF_LICENSE_POLICY)" = "permissive" ]; then \
+		$(MAKE) bench-permissive RELEASE=$(RELEASE); \
+	else \
+		$(MAKE) bench RELEASE=$(RELEASE); \
+	fi
+	$(MAKE) bench-validate RELEASE=$(RELEASE)
 	$(PYTHON) scripts/publish_hf_dataset.py \
 		--release-dir $(RELEASE) \
 		--repo-id $(HF_REPO) \
