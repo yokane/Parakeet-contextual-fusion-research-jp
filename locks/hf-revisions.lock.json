@@ -21,7 +21,7 @@
     "benchmark": {
       "repo_id": "saeeew/JP-HomophoneBench",
       "repo_type": "dataset",
-      "revision": "06b8501ae5d0afa98496f7d37a63de9c1c2ba6bb"
+      "revision": "2d319deb4c30648509a74d86362f5a7133bf6214"
     }
   },
   "schema_version": 2
