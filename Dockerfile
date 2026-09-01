@@ -3,11 +3,12 @@ ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     HF_HOME=/opt/hf-cache \
-    UV_CACHE_DIR=/root/.cache/uv
+    UV_CACHE_DIR=/root/.cache/uv \
+    UV_PYTHON_PREFERENCE=only-managed \
+    UV_PROJECT_ENVIRONMENT=/workspace/parakeet-context-fusion/.venv
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean \
     && printf '%s\n' 'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
@@ -20,30 +21,30 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       cmake \
       git \
       libsndfile1 \
-      ninja-build
+      ninja-build \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace/parakeet-context-fusion
 
-# Dependency boundary. The project lock is copied before any source so source-only
-# edits cannot invalidate the expensive ASR dependency layer.
+# Bootstrap only the exact package manager first. uv then installs the exact
+# Python interpreter used by mise.toml/stack.lock.yaml.
+RUN --mount=type=cache,target=/root/.cache/uv \
+    python -m pip install --no-cache-dir uv==0.12.1 \
+    && uv python install 3.12.3
+
+# Dependency boundary: only dependency metadata is copied before the expensive
+# NeMo/CUDA environment is synchronized. Source-only edits do not invalidate it.
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv \
-    python -m pip install --no-cache-dir uv==0.12.8 \
-    && uv export \
+    uv sync \
       --locked \
-      --extra nemo \
-      --no-emit-project \
-      --no-emit-package torch \
-      --format requirements-txt \
-      --output-file /tmp/runtime-requirements.txt \
-    && uv pip install \
-      --system \
-      --require-hashes \
-      --requirements /tmp/runtime-requirements.txt \
-    && rm -f /tmp/runtime-requirements.txt
+      --python 3.12.3 \
+      --extra gpu \
+      --extra research \
+      --no-install-project
 
-# Source boundary. The editable project install is intentionally after the locked
-# third-party environment and never resolves dependencies.
+# Source boundary: frequently changed project files are copied only after the
+# locked third-party environment has been materialized.
 COPY README.md ./
 COPY src ./src
 COPY scripts ./scripts
@@ -52,9 +53,15 @@ COPY configs ./configs
 COPY experiments ./experiments
 COPY hf_model ./hf_model
 COPY locks ./locks
-COPY mise.toml ./
+COPY mise.toml stack.lock.yaml ./
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv pip install --system --no-deps -e .
+    uv sync \
+      --locked \
+      --python 3.12.3 \
+      --extra gpu \
+      --extra research
+
+ENV PATH="/workspace/parakeet-context-fusion/.venv/bin:${PATH}"
 
 CMD ["python", "-m", "parakeet_context_fusion.cli", "--help"]
