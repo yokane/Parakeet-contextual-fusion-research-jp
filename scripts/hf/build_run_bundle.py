@@ -7,7 +7,7 @@ import json
 import os
 import re
 import shutil
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -82,7 +82,7 @@ def build_run_bundle(
         "schema_version": 1,
         "run_id": run_id,
         "workflow_kind": workflow_kind,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "model_family": "J-PACF-YOMI-TDT",
         "model": os.environ.get("MODEL_NAME", "nvidia/parakeet-tdt_ctc-0.6b-ja"),
         "benchmark": "saeeew/JP-HomophoneBench",
