@@ -168,7 +168,7 @@ jobs:
             -v "$PWD/.jpacf-state:/workspace/state" \
             -w /workspace/project \
             "$image" \
-            bash /opt/jpacf/scripts/container/inside.sh bash -lc \
+            bash -lc \
             'source scripts/hf/hf-identity.sh; hf_bucket_cli buckets sync dist/runtime "hf://buckets/${HF_BUCKET}/runtime/sha-${GITHUB_SHA}" --token "$HF_TOKEN"'
 
       - name: Upload runtime identity
