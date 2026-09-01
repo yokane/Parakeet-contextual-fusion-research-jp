@@ -66,8 +66,8 @@ jobs:
           install: true
           cache: true
 
-      - name: Materialize locked provider environment
-        run: mise run deps:sync-research
+      - name: Materialize locked Vast provider environment
+        run: mise run deps:sync-vast
 
       - name: Validate inventory policy
         shell: bash
