@@ -240,40 +240,57 @@ jobs:
           PY
             fi
 
-            readarray -t state < <(python - <<'PY'
+            actual="$(python - <<'PY'
           import json
           from pathlib import Path
           try:
               row = json.loads(Path("dist/vast-smoke/instance-status-latest.json").read_text())
           except Exception:
               print("")
-              print("")
-              print("")
           else:
               print(row.get("actual_status") or "")
-              print(row.get("status_msg") or "")
-              print(row.get("dph_total") or "")
           PY
-            )
-            actual="${state[0]:-}"
-            status_msg="${state[1]:-}"
-            actual_dph="${state[2]:-}"
+            )"
+            status_msg="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          try:
+              row = json.loads(Path("dist/vast-smoke/instance-status-latest.json").read_text())
+          except Exception:
+              print("")
+          else:
+              value = str(row.get("status_msg") or "")
+              print(" | ".join(part.strip() for part in value.splitlines() if part.strip()))
+          PY
+            )"
+            actual_dph="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          try:
+              row = json.loads(Path("dist/vast-smoke/instance-status-latest.json").read_text())
+          except Exception:
+              print("")
+          else:
+              value = row.get("dph_total")
+              print("" if value is None else value)
+          PY
+            )"
 
             if [[ "$actual" =~ ^(exited|offline|stopped)$ ]]; then
               echo "Vast entered terminal status: ${actual}: ${status_msg}" >&2
               exit 1
             fi
 
-            if [[ -n "$actual_dph" ]]; then
-              python - "$VAST_DPH_TOTAL" "$actual_dph" <<'PY'
+            if [[ "$actual" == "running" ]]; then
+              if [[ -n "$actual_dph" ]]; then
+                python - "$VAST_DPH_TOTAL" "$actual_dph" <<'PY'
           import math, sys
           quoted, actual = map(float, sys.argv[1:])
           if not math.isclose(quoted, actual, rel_tol=0.08, abs_tol=0.02):
               raise SystemExit(f"Vast price mismatch: quoted={quoted:.6f}/h actual={actual:.6f}/h")
           PY
-            fi
+              fi
 
-            if [[ "$actual" == "running" ]]; then
               ssh_url="$(uv run --locked vastai ssh-url "$VAST_INSTANCE_ID" \
                 --api-key "$VAST_API_KEY" 2>/dev/null || true)"
               if [[ "$ssh_url" =~ ^ssh://root@(.+):([0-9]+)$ ]]; then
