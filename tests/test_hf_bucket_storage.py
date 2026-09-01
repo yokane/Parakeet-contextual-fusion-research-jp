@@ -145,7 +145,8 @@ def test_ghcr_build_uses_runner_selected_buildkit_cache_contract() -> None:
     assert "cache-from: ${{ env.BUILDKIT_CACHE_FROM }}" in text
     assert "cache-to: ${{ env.BUILDKIT_CACHE_TO }}" in text
     assert "if: ${{ env.SELF_CACHE_PERSISTENT == 'true' }}" in text
-    assert "mv \"${BUILDKIT_CACHE_DIR}-next\" \"${BUILDKIT_CACHE_DIR}\"" in text
+    assert 'test -f "${BUILDKIT_CACHE_DIR}/index.json"' in text
+    assert "BUILDKIT_CACHE_DIR}-next" not in text
     assert "tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}" in text
 
 
