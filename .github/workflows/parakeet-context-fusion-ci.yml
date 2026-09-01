@@ -10,6 +10,11 @@ on:
       - "experiments/**"
       - "configs/**"
       - "schemas/**"
+      - "locks/**"
+      - "sbom/**"
+      - "mise.toml"
+      - "mise.lock"
+      - "uv.lock"
       - "Makefile"
       - "pyproject.toml"
       - "Dockerfile"
@@ -24,6 +29,11 @@ on:
       - "experiments/**"
       - "configs/**"
       - "schemas/**"
+      - "locks/**"
+      - "sbom/**"
+      - "mise.toml"
+      - "mise.lock"
+      - "uv.lock"
       - "Makefile"
       - "pyproject.toml"
       - "Dockerfile"
@@ -35,65 +45,23 @@ permissions:
 
 jobs:
   cpu-checks:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - id: python
-        uses: actions/setup-python@v7
+      - name: Install repository toolchain from mise.lock
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          python-version: "3.11"
+          version: 2026.8.16
+          install: true
+          cache: true
 
-      # Cache the installed dependency environment, not the source tree. The
-      # key changes only when dependency metadata/Python changes.
-      - name: Restore dependency environment
-        id: dependency-cache
-        uses: actions/cache@v6
+      - name: Restore uv artifact cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .venv
-          key: >-
-            jpacf-ci-venv-${{ runner.os }}-${{ runner.arch }}-py${{ steps.python.outputs.python-version }}-${{ hashFiles('pyproject.toml') }}
+          path: .cache/uv
+          key: jpacf-uv-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('uv.lock') }}
 
-      - name: Install CPU dependencies on cache miss
-        if: steps.dependency-cache.outputs.cache-hit != 'true'
-        shell: bash
-        run: |
-          set -euo pipefail
-          python -m venv .venv
-          .venv/bin/python -m pip install --upgrade pip setuptools wheel
-          .venv/bin/python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
-          .venv/bin/python - <<'PY'
-          import subprocess
-          import sys
-          import tomllib
-          from pathlib import Path
-
-          project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]
-          requirements = [
-              requirement
-              for requirement in project.get("dependencies", [])
-              if not requirement.lower().startswith("torch")
-          ]
-          requirements.extend(project.get("optional-dependencies", {}).get("dev", []))
-          subprocess.check_call([sys.executable, "-m", "pip", "install", *requirements])
-          PY
-
-      - name: Activate cached dependency environment
-        shell: bash
-        run: echo "${GITHUB_WORKSPACE}/.venv/bin" >> "${GITHUB_PATH}"
-
-      # Source installation is intentionally separate from dependency caching.
-      - name: Install source only
-        run: python -m pip install --no-deps -e .
-
-      - name: Lint
-        run: ruff check src scripts tests
-
-      - name: Unit tests
-        run: pytest
-
-      - name: Compile Python sources
-        run: python -m compileall -q src scripts
-
-      - name: Shell syntax
-        run: find experiments scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
+      - name: Run canonical CI job
+        run: mise run ci
