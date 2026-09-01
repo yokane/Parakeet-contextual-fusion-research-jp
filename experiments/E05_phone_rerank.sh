@@ -13,7 +13,7 @@ if [[ ! -d "${ENCODER_FEATURE_DIR}" ]]; then
   exit 2
 fi
 
-uv run --locked python scripts/rerank_phone.py \
+uv run --locked --no-sync python scripts/rerank_phone.py \
   --input "${INPUT}" \
   --output "${OUT}" \
   --checkpoint "${PHONE_HEAD}" \
