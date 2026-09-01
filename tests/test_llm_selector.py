@@ -33,9 +33,17 @@ def test_parse_selection_accepts_json_and_rejects_out_of_range() -> None:
 
 
 def test_reference_context_is_forbidden() -> None:
-    row = {"text": "正解文", "metadata": {"document_context": "許可文脈"}}
+    row = {
+        "text": "正解文",
+        "metadata": {
+            "document_context": "許可文脈",
+            "gold_text": "別名の正解文",
+        },
+    }
     with pytest.raises(ValueError):
         context_from_row(row, "text")
+    with pytest.raises(ValueError):
+        context_from_row(row, "metadata.gold_text")
     assert context_from_row(row, "metadata.document_context") == "許可文脈"
 
 
