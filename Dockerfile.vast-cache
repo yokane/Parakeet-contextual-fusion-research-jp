@@ -8,6 +8,8 @@ LABEL org.opencontainers.image.source="${SOURCE_REPOSITORY}" \
       org.opencontainers.image.title="J-PACF-YOMI-TDT Vast cache candidate" \
       org.opencontainers.image.description="CUDA13 research runtime derived from a digest-locked Vast.ai cache-friendly base"
 
+# This candidate intentionally stays separate from the canonical runtime until
+# both GPU verification and a Vast cold-start comparison have passed.
 # Vast base images place the selected Python in /venv/main. Keep that first on
 # PATH during the build, then install the repository-owned uv environment under
 # /opt/jpacf/.venv exactly as the canonical runtime does.
