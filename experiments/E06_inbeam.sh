@@ -8,7 +8,7 @@ if [[ ! -f "${E06_DRIVER}" ]]; then
   exit 2
 fi
 
-uv run --locked python "${E06_DRIVER}" \
+uv run --locked --no-sync python "${E06_DRIVER}" \
   --manifest "${MANIFEST}" \
   --model "${MODEL_NAME}" \
   --beam-size "${BEAM_SIZE}" \
