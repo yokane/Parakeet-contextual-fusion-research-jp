@@ -93,10 +93,7 @@ jobs:
           image='${{ steps.build.outputs.image }}'
           [[ "$image" =~ @sha256:[0-9a-f]{64}$ ]]
           mkdir -p .jpacf-state
-          docker pull "$image"
-          docker run --rm --gpus all --ipc=host --shm-size 8g \
-            -v "$PWD/.jpacf-state:/workspace/state" \
-            "$image"
+          JPA_CF_IMAGE="$image" bash scripts/container/run.sh
 
       - name: Promote verified digest to main tag
         if: ${{ github.ref == 'refs/heads/main' }}
@@ -141,16 +138,13 @@ jobs:
           set -euo pipefail
           [[ -n "${HF_TOKEN:-}" ]] || { echo "HF_TOKEN is required" >&2; exit 2; }
           image='${{ steps.build.outputs.image }}'
-          docker run --rm \
-            -e HF_TOKEN \
-            -e HF_BUCKET \
-            -e GITHUB_SHA \
-            -v "$PWD:/workspace/project" \
-            -v "$PWD/.jpacf-state:/workspace/state" \
-            -w /workspace/project \
-            "$image" \
-            bash -lc \
-            'source scripts/hf/hf-identity.sh; hf_bucket_cli buckets sync dist/runtime "hf://buckets/${HF_BUCKET}/runtime/sha-${GITHUB_SHA}" --token "$HF_TOKEN"'
+          JPA_CF_IMAGE="$image" \
+          HF_TOKEN="$HF_TOKEN" \
+          HF_BUCKET="$HF_BUCKET" \
+          GITHUB_SHA="$GITHUB_SHA" \
+            bash scripts/container/run.sh \
+              bash -lc \
+              'source scripts/hf/hf-identity.sh; hf_bucket_cli buckets sync dist/runtime "hf://buckets/${HF_BUCKET}/runtime/sha-${GITHUB_SHA}" --token "$HF_TOKEN"'
 
       - name: Upload runtime identity
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
