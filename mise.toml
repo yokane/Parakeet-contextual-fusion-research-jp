@@ -8,7 +8,6 @@ uv = "0.12.1"
 
 [env]
 UV_PROJECT_ENVIRONMENT = ".venv"
-UV_CACHE_DIR = ".cache/uv"
 PYTHONUTF8 = "1"
 JPA_CF_PLATFORM = "linux/amd64"
 JPA_CF_CUDA_MAJOR = "13"
