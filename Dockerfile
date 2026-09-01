@@ -84,4 +84,4 @@ RUN mkdir -p /workspace/state/{hf,uv,xdg,torch,home,artifacts,generated,results,
 
 WORKDIR /opt/jpacf
 
-CMD ["/opt/jpacf/scripts/container/inside.sh", "python", "/opt/jpacf/scripts/container/verify_runtime.py", "--require-gpu"]
+CMD ["bash", "/opt/jpacf/scripts/container/inside.sh", "python", "/opt/jpacf/scripts/container/verify_runtime.py", "--require-gpu"]
