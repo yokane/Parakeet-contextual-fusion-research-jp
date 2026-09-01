@@ -1,0 +1,93 @@
+# syntax=docker/dockerfile:1.7
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+ARG SOURCE_REPOSITORY=https://github.com/yokane/Parakeet-contextual-fusion-research-jp
+
+LABEL org.opencontainers.image.source="${SOURCE_REPOSITORY}" \
+      org.opencontainers.image.title="J-PACF-YOMI-TDT Vast cache candidate" \
+      org.opencontainers.image.description="CUDA13 research runtime derived from a digest-locked Vast.ai cache-friendly base"
+
+# Vast base images place the selected Python in /venv/main. Keep that first on
+# PATH during the build, then install the repository-owned uv environment under
+# /opt/jpacf/.venv exactly as the canonical runtime does.
+ENV PATH="/venv/main/bin:${PATH}" \
+    DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    JPA_CF_IMAGE_HOME=/opt/jpacf \
+    JPA_CF_WORKSPACE=/opt/jpacf \
+    JPA_CF_STATE_ROOT=/workspace/state \
+    HOME=/workspace/state/home \
+    HF_HOME=/workspace/state/hf \
+    HF_HUB_CACHE=/workspace/state/hf/hub \
+    HF_XET_CACHE=/workspace/state/hf/xet \
+    UV_CACHE_DIR=/workspace/state/uv \
+    XDG_CACHE_HOME=/workspace/state/xdg \
+    TORCH_HOME=/workspace/state/torch \
+    HF_TRANSPORT_PROJECT=/opt/jpacf/tools/hf-bucket \
+    UV_PROJECT_ENVIRONMENT=/opt/jpacf/.venv
+
+RUN command -v python \
+    && python --version \
+    && rm -f /etc/apt/apt.conf.d/docker-clean \
+    && printf '%s\n' 'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
+      > /etc/apt/apt.conf.d/keep-cache
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update \
+    && apt-get install -y --no-install-recommends \
+      build-essential \
+      ca-certificates \
+      cmake \
+      curl \
+      git \
+      libsndfile1 \
+      ninja-build \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/jpacf
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    python -m pip install --no-cache-dir uv==0.12.1 \
+    && uv python install 3.12.3
+
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/cache/uv \
+    uv sync \
+      --locked \
+      --python 3.12.3 \
+      --extra dev \
+      --extra gpu \
+      --no-install-project
+
+COPY tools/hf-bucket ./tools/hf-bucket
+RUN --mount=type=cache,target=/cache/uv \
+    env -u UV_PROJECT_ENVIRONMENT \
+      uv sync --project tools/hf-bucket --locked
+
+COPY README.md ./
+COPY src ./src
+COPY scripts ./scripts
+COPY schemas ./schemas
+COPY configs ./configs
+COPY experiments ./experiments
+COPY hf_model ./hf_model
+COPY locks ./locks
+COPY mise.toml mise.lock stack.lock.yaml ./
+
+RUN --mount=type=cache,target=/cache/uv \
+    uv sync \
+      --locked \
+      --python 3.12.3 \
+      --extra dev \
+      --extra gpu
+
+ENV PATH="/opt/jpacf/.venv/bin:${PATH}" \
+    PYTHONPATH="/opt/jpacf/src"
+
+RUN mkdir -p /workspace/state/{hf,uv,xdg,torch,home,artifacts,generated,results,dist,vendor}
+
+WORKDIR /opt/jpacf
+
+CMD ["bash", "/opt/jpacf/scripts/container/inside.sh", "python", "/opt/jpacf/scripts/container/verify_runtime.py", "--require-gpu"]
