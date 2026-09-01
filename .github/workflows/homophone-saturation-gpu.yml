@@ -6,11 +6,11 @@ on:
       config_name:
         description: "JP-HomophoneBench HF config"
         required: true
-        default: "homophone8-research"
+        default: "homophone8-audio"
         type: choice
-        options: [homophone8, homophone8-research]
+        options: [homophone8-audio, homophone8, homophone8-research]
       split:
-        description: "Evaluation split"
+        description: "Evaluation split; homophone8-audio publishes test only"
         required: true
         default: "test"
         type: choice
@@ -63,19 +63,26 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Configure self-hosted cache contract
+        id: cache
+        shell: bash
+        run: bash scripts/ci/setup_actions_cache.sh
+
       - name: Install exact mise toolchain
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           version: 2026.8.16
           install: true
-          cache: true
+          cache: ${{ steps.cache.outputs.persistent != 'true' }}
 
       - name: Restore uv and HF caches
+        if: ${{ steps.cache.outputs.persistent != 'true' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: |
-            .cache/uv
-            ~/.cache/huggingface
+            ${{ env.UV_CACHE_DIR }}
+            ${{ env.HF_HUB_CACHE }}
+            ${{ env.HF_XET_CACHE }}
           key: jpacf-saturation-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('uv.lock', 'tools/hf-bucket/uv.lock', 'locks/hf-revisions.lock.json') }}
 
       - name: Materialize exact GPU and Bucket environments
