@@ -45,7 +45,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mise lock --platforms linux-x64
+          mise lock --platform linux-x64
           mise install --locked
           python --version
           uv --version
