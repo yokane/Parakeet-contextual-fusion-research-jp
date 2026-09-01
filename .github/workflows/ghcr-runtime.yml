@@ -50,6 +50,16 @@ jobs:
           ACTIONS_CACHE_SCOPE: ${{ env.CACHE_SCOPE }}
         run: bash scripts/ci/setup_actions_cache.sh
 
+      - name: Isolate Docker client configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker_config="${RUNNER_TEMP}/docker-config"
+          rm -rf "${docker_config}"
+          mkdir -p "${docker_config}"
+          printf '{}\n' > "${docker_config}/config.json"
+          echo "DOCKER_CONFIG=${docker_config}" >> "${GITHUB_ENV}"
+
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
