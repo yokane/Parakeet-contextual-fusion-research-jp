@@ -1,0 +1,347 @@
+name: vast-e00-e04
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/portable-ghcr-gpu-runtime]
+    paths:
+      - ".github/workflows/vast-e00-e04.yml"
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: vast-e00-e04-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  RUNTIME_IMAGE: ghcr.io/yokane/jpacf-yomi-tdt-runtime@sha256:df3140308992bfb0fc5b84cae6dfbbe6e388709725e9aa0810329965c91ba2ad
+  HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
+  STORAGE_GB: "50"
+  GPU_RAM_GB: "24"
+  GPU_ALLOWLIST: RTX_4090
+  MIN_INET_DOWN_MBPS: "1000"
+  MIN_RELIABILITY: "0.98"
+  RELAY_PORT: "8081"
+  WAIT_MAX_ATTEMPTS: "900"
+  PREDICTED_MINUTES: "45"
+  MAX_COST_USD: "0.50"
+  OFFER_LIMIT: "50"
+
+jobs:
+  e00-e04:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    env:
+      VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      GHCR_TOKEN: ${{ github.token }}
+      EVIDENCE_RUN_ID: vast-e00-e04-${{ github.run_id }}-${{ github.run_attempt }}
+      VAST_LABEL: jpacf-e00-e04-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install exact mise toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: true
+
+      - name: Materialize Vast and HF transport environments
+        shell: bash
+        run: |
+          set -euo pipefail
+          mise run deps:sync-vast
+          mise run hf:transport:sync
+          command -v jq >/dev/null
+
+      - name: Preflight immutable runtime and HF Bucket
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${VAST_API_KEY:-}"
+          test -n "${HF_TOKEN:-}"
+          test -n "${GHCR_TOKEN:-}"
+          [[ "$RUNTIME_IMAGE" =~ ^ghcr\.io/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+@sha256:[0-9a-f]{64}$ ]]
+          mkdir -p dist/vast-e00-e04
+          probe=dist/vast-e00-e04/hf-preflight.txt
+          roundtrip=dist/vast-e00-e04/hf-preflight-roundtrip.txt
+          remote="hf://buckets/${HF_BUCKET}/_auth-probe/vast-e00-e04/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.txt"
+          printf 'run=%s\nattempt=%s\nsha=%s\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" > "$probe"
+          source scripts/hf/hf-identity.sh
+          hf_bucket_cli buckets cp "$probe" "$remote" --token "$HF_TOKEN"
+          hf_bucket_cli buckets cp "$remote" "$roundtrip" --token "$HF_TOKEN"
+          cmp "$probe" "$roundtrip"
+          hf_bucket_cli buckets rm "$remote" -y --token "$HF_TOKEN"
+
+      - name: Select fastest budget-compliant on-demand RTX 4090
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/providers
+          uv run --locked python scripts/providers/vast/build_search_query.py \
+            --gpu-name "$GPU_ALLOWLIST" --num-gpus 1 \
+            --gpu-ram ">=${GPU_RAM_GB}" \
+            --inet-down ">=${MIN_INET_DOWN_MBPS}" \
+            --reliability ">=${MIN_RELIABILITY}" \
+            --output-json dist/providers/vast-e00-e04-search-query.json \
+            > dist/providers/vast-e00-e04-search-query.txt
+          query="$(cat dist/providers/vast-e00-e04-search-query.txt)"
+          uv run --locked vastai search offers \
+            --api-key "$VAST_API_KEY" --raw --no-default --type on-demand \
+            --order 'inet_down-,dph_total' --storage "$STORAGE_GB" --limit "$OFFER_LIMIT" \
+            "$query" > dist/providers/vast-e00-e04-raw.json
+          uv run --locked python scripts/providers/vast/rank_offers.py \
+            --input dist/providers/vast-e00-e04-raw.json \
+            --predicted-minutes "$PREDICTED_MINUTES" \
+            --max-cost-usd "$MAX_COST_USD" \
+            --min-inet-down-mbps "$MIN_INET_DOWN_MBPS" \
+            --output dist/providers/vast-e00-e04-inventory.json \
+            > dist/providers/vast-e00-e04-inventory.md
+          cat dist/providers/vast-e00-e04-inventory.md >> "$GITHUB_STEP_SUMMARY"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload=json.loads(Path('dist/providers/vast-e00-e04-inventory.json').read_text())
+          offers=[row for row in payload.get('offers', []) if not row.get('is_bid')]
+          if not offers:
+              raise SystemExit('no budget-compliant on-demand RTX 4090 offer')
+          selected=max(offers, key=lambda row:(float(row.get('inet_down_mbps') or 0), -float(row.get('dph_total') or 999)))
+          Path('dist/providers/vast-e00-e04-selected.json').write_text(json.dumps(selected, indent=2, sort_keys=True)+'\n')
+          with open('/tmp/vast-e00-e04.env','w') as h:
+              h.write(f"VAST_OFFER_ID={selected['offer_id']}\n")
+              h.write(f"VAST_GPU_NAME={selected['gpu_name']}\n")
+              h.write(f"VAST_DPH_TOTAL={selected['dph_total']}\n")
+              h.write(f"VAST_PREDICTED_COST={selected['predicted_cost_usd']}\n")
+              h.write(f"VAST_INET_DOWN={selected['inet_down_mbps']}\n")
+          PY
+          cat /tmp/vast-e00-e04.env >> "$GITHUB_ENV"
+
+      - name: Build one-time E00-E04 entrypoint payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          relay_token="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+          echo "::add-mask::${relay_token}"
+          echo "JPA_CF_RELAY_TOKEN=${relay_token}" >> "$GITHUB_ENV"
+          cat > "$RUNNER_TEMP/vast-e00-e04.sh" <<'REMOTE'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          export JPA_CF_CONTAINER_RUNTIME=1
+          export EVAL_DIR=/workspace/state/generated/eval
+          export RESULTS_DIR="/workspace/state/results/${EVIDENCE_RUN_ID}"
+          export MODEL_NEMO=/workspace/state/artifacts/model/parakeet-tdt_ctc-0.6b-ja.nemo
+          export NEMO_ROOT=/workspace/state/vendor/nemo-speech
+          export KENLM_ROOT=/workspace/state/vendor/kenlm
+          export NGPU_LM=/workspace/state/artifacts/lm/ja-6gram.nemo
+          export RUN_E05=0
+          export RUN_E06=0
+          work=/workspace/state/artifacts/vast-e00-e04
+          run_dir="/workspace/state/dist/hf-runs/${EVIDENCE_RUN_ID}"
+          rm -rf "$work" "$RESULTS_DIR" "$run_dir"
+          mkdir -p "$work" "$RESULTS_DIR" /workspace/state/dist/hf-runs
+          started="$(date +%s)"
+          set +e
+          timeout 3600s bash -lc '
+            set -euo pipefail
+            cd /opt/jpacf
+            bash scripts/research/prepare_e00_e04.sh
+            bash experiments/run_staged_e00_e06.sh
+            cp "${RESULTS_DIR}/metrics_e00_e04.parquet" "${RESULTS_DIR}/metrics.parquet"
+            cp "${RESULTS_DIR}/summary_e00_e04.json" "${RESULTS_DIR}/summary.json"
+            uv run --locked --no-sync python scripts/hf/build_run_bundle.py \
+              --results-dir "${RESULTS_DIR}" \
+              --output-dir "/workspace/state/dist/hf-runs/${EVIDENCE_RUN_ID}" \
+              --run-id "${EVIDENCE_RUN_ID}" \
+              --workflow-kind vast-e00-e04 \
+              --benchmark-index "${EVAL_DIR}/bench_index.jsonl" \
+              --execution-manifest "${EVAL_DIR}/nemo_eval.jsonl"
+          ' > "$work/experiment.log" 2>&1
+          status=$?
+          set -e
+          ended="$(date +%s)"
+          export EXPERIMENT_EXIT_CODE="$status" EXPERIMENT_STARTED="$started" EXPERIMENT_ENDED="$ended"
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+          lock=json.loads(Path('/opt/jpacf/locks/hf-revisions.lock.json').read_text())
+          payload={
+              'schema_version': 1,
+              'provider': 'vast',
+              'transport': 'entrypoint-http-relay',
+              'run_id': os.environ['EVIDENCE_RUN_ID'],
+              'exit_code': int(os.environ['EXPERIMENT_EXIT_CODE']),
+              'started_epoch': int(os.environ['EXPERIMENT_STARTED']),
+              'ended_epoch': int(os.environ['EXPERIMENT_ENDED']),
+              'elapsed_seconds': int(os.environ['EXPERIMENT_ENDED'])-int(os.environ['EXPERIMENT_STARTED']),
+              'runtime_image': os.environ['EXPECTED_IMAGE'],
+              'source_git_sha': os.environ['SOURCE_GIT_SHA'],
+              'base_model_revision': lock['repositories']['base_model']['revision'],
+              'benchmark_revision': lock['repositories']['benchmark']['revision'],
+          }
+          Path('/workspace/state/artifacts/vast-e00-e04/status.json').write_text(json.dumps(payload, indent=2, sort_keys=True)+'\n')
+          PY
+          if [[ "$status" -eq 0 ]]; then
+            tar -C /workspace/state/dist/hf-runs -czf "$work/run-bundle.tar.gz" "$EVIDENCE_RUN_ID"
+            printf '%s\n' "$EVIDENCE_RUN_ID" > "$work/_SUCCESS"
+          else
+            printf '%s\n' "$status" > "$work/_FAILED"
+          fi
+          python - <<'PY'
+          import hmac, os
+          from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+          from pathlib import Path
+          root=Path('/workspace/state/artifacts/vast-e00-e04')
+          token=os.environ['JPA_CF_RELAY_TOKEN']
+          port=int(os.environ['JPA_CF_RELAY_PORT'])
+          names={'/status.json':'status.json','/experiment.log':'experiment.log','/run-bundle.tar.gz':'run-bundle.tar.gz','/_SUCCESS':'_SUCCESS','/_FAILED':'_FAILED'}
+          class Handler(BaseHTTPRequestHandler):
+              def do_GET(self):
+                  if not hmac.compare_digest(self.headers.get('Authorization',''), f'Bearer {token}'):
+                      self.send_response(401); self.end_headers(); return
+                  if self.path == '/health':
+                      body=b'ready\n'
+                  else:
+                      name=names.get(self.path)
+                      path=root/name if name else None
+                      if path is None or not path.is_file():
+                          self.send_response(404); self.end_headers(); return
+                      body=path.read_bytes()
+                  self.send_response(200)
+                  self.send_header('Content-Length', str(len(body)))
+                  self.end_headers()
+                  self.wfile.write(body)
+              def log_message(self, fmt, *args):
+                  return
+          ThreadingHTTPServer(('0.0.0.0', port), Handler).serve_forever()
+          PY
+          REMOTE
+          sha256sum "$RUNNER_TEMP/vast-e00-e04.sh" > dist/vast-e00-e04/payload.sha256
+          echo "VAST_PAYLOAD_B64=$(base64 -w0 "$RUNNER_TEMP/vast-e00-e04.sh")" >> "$GITHUB_ENV"
+
+      - name: Create Vast entrypoint instance
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker_env="-p ${RELAY_PORT}:${RELAY_PORT} -e JPA_CF_RELAY_PORT=${RELAY_PORT} -e JPA_CF_RELAY_TOKEN=${JPA_CF_RELAY_TOKEN} -e VAST_PAYLOAD_B64=${VAST_PAYLOAD_B64} -e EVIDENCE_RUN_ID=${EVIDENCE_RUN_ID} -e EXPECTED_IMAGE=${RUNTIME_IMAGE} -e SOURCE_GIT_SHA=${GITHUB_SHA} -e GITHUB_REPOSITORY=${GITHUB_REPOSITORY} -e GITHUB_WORKFLOW=${GITHUB_WORKFLOW} -e GITHUB_RUN_ID=${GITHUB_RUN_ID} -e GITHUB_RUN_ATTEMPT=${GITHUB_RUN_ATTEMPT} -e GITHUB_SHA=${GITHUB_SHA}"
+          response="$(uv run --locked vastai create instance "$VAST_OFFER_ID" \
+            --api-key "$VAST_API_KEY" --raw --image "$RUNTIME_IMAGE" \
+            --disk "$STORAGE_GB" --label "$VAST_LABEL" \
+            --login "-u ${GITHUB_ACTOR} -p ${GHCR_TOKEN} ghcr.io" \
+            --env "$docker_env" --cancel-unavail \
+            --args /bin/bash -lc 'echo "$VAST_PAYLOAD_B64" | base64 -d | bash')"
+          printf '%s\n' "$response" > dist/vast-e00-e04/create-response.json
+          id="$(python -c "import json; print(int(json.load(open('dist/vast-e00-e04/create-response.json'))['new_contract']))")"
+          printf '%s\n' "$id" > "$RUNNER_TEMP/vast-instance-id"
+          echo "VAST_INSTANCE_ID=$id" >> "$GITHUB_ENV"
+
+      - name: Wait for E00-E04 relay
+        shell: bash
+        run: |
+          set -euo pipefail
+          status_path="$RUNNER_TEMP/vast-e00-e04-status.json"
+          : > dist/vast-e00-e04/instance-status.jsonl
+          ready=0
+          for attempt in $(seq 1 "$WAIT_MAX_ATTEMPTS"); do
+            raw="$(uv run --locked vastai show instance "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --raw 2>/dev/null || true)"
+            if [[ -n "$raw" ]]; then
+              printf '%s\n' "$raw" > "$status_path"
+              snapshot="$(python - "$attempt" "$RELAY_PORT" "$status_path" <<'PY'
+          import json,sys
+          from pathlib import Path
+          row=json.loads(Path(sys.argv[3]).read_text())
+          ports=row.get('ports',{}).get(f'{sys.argv[2]}/tcp') or []
+          if isinstance(ports,dict): ports=[ports]
+          ext=''
+          for item in ports:
+              if isinstance(item,dict) and item.get('HostPort'):
+                  ext=str(item['HostPort']); break
+          msg=' | '.join(x.strip() for x in str(row.get('status_msg') or '').splitlines() if x.strip())
+          print(json.dumps({'attempt':int(sys.argv[1]),'actual_status':row.get('actual_status') or '','status_msg':msg,'dph_total':row.get('dph_total'),'public_ipaddr':row.get('public_ipaddr') or '','relay_external_port':ext},sort_keys=True))
+          PY
+              )"
+              printf '%s\n' "$snapshot" >> dist/vast-e00-e04/instance-status.jsonl
+              printf '%s\n' "$snapshot" > dist/vast-e00-e04/instance-status-current.json
+              actual="$(jq -r '.actual_status' <<<"$snapshot")"
+              msg="$(jq -r '.status_msg' <<<"$snapshot")"
+              host="$(jq -r '.public_ipaddr' <<<"$snapshot")"
+              port="$(jq -r '.relay_external_port' <<<"$snapshot")"
+              if [[ "$actual" =~ ^(exited|offline|stopped)$ ]]; then
+                echo "terminal Vast status: $actual: $msg" >&2
+                exit 1
+              fi
+              if [[ "$actual" == running && -n "$host" && -n "$port" ]]; then
+                base="http://${host}:${port}"
+                if [[ "$(curl -fsS --connect-timeout 5 --max-time 10 -H "Authorization: Bearer ${JPA_CF_RELAY_TOKEN}" "${base}/health" 2>/dev/null || true)" == ready ]]; then
+                  echo "VAST_RELAY_BASE=$base" >> "$GITHUB_ENV"
+                  ready=1
+                  break
+                fi
+              fi
+              if (( attempt % 12 == 0 )); then echo "Vast E00-E04 wait ${attempt}/${WAIT_MAX_ATTEMPTS}: ${actual}: ${msg}"; fi
+            fi
+            sleep 5
+          done
+          [[ "$ready" == 1 ]] || { tail -30 dist/vast-e00-e04/instance-status.jsonl >&2; exit 1; }
+
+      - name: Relay and publish append-only E00-E04 run
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl_opts=(-fsS --retry 3 --connect-timeout 10 --max-time 120 -H "Authorization: Bearer ${JPA_CF_RELAY_TOKEN}")
+          curl "${curl_opts[@]}" "${VAST_RELAY_BASE}/status.json" -o dist/vast-e00-e04/status.json
+          curl "${curl_opts[@]}" "${VAST_RELAY_BASE}/experiment.log" -o dist/vast-e00-e04/experiment.log
+          cat dist/vast-e00-e04/status.json
+          exit_code="$(jq -r '.exit_code' dist/vast-e00-e04/status.json)"
+          [[ "$exit_code" == 0 ]] || { tail -200 dist/vast-e00-e04/experiment.log >&2; exit "$exit_code"; }
+          curl "${curl_opts[@]}" "${VAST_RELAY_BASE}/run-bundle.tar.gz" -o dist/vast-e00-e04/run-bundle.tar.gz
+          mkdir -p dist/vast-e00-e04/extracted
+          tar -C dist/vast-e00-e04/extracted -xzf dist/vast-e00-e04/run-bundle.tar.gz
+          run_dir="dist/vast-e00-e04/extracted/${EVIDENCE_RUN_ID}"
+          source scripts/hf/hf-identity.sh
+          bash scripts/hf/hf-push-run.sh "$run_dir"
+          remote="hf://buckets/${HF_BUCKET}/runs/${EVIDENCE_RUN_ID}/run-context.json"
+          hf_bucket_cli buckets cp "$remote" dist/vast-e00-e04/run-context-roundtrip.json --token "$HF_TOKEN"
+          cmp "$run_dir/run-context.json" dist/vast-e00-e04/run-context-roundtrip.json
+          {
+            echo '### Vast E00-E04 complete'
+            echo "- run: ${EVIDENCE_RUN_ID}"
+            echo "- GPU: ${VAST_GPU_NAME}"
+            echo "- advertised download: ${VAST_INET_DOWN} Mbps"
+            echo "- on-demand rate: \$${VAST_DPH_TOTAL}/h"
+            echo "- runtime: \`${RUNTIME_IMAGE}\`"
+            echo "- HF Bucket: \`hf://buckets/${HF_BUCKET}/runs/${EVIDENCE_RUN_ID}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Capture Vast failure logs
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          set +e
+          if [[ -s "$RUNNER_TEMP/vast-instance-id" ]]; then
+            id="$(cat "$RUNNER_TEMP/vast-instance-id")"
+            uv run --locked vastai logs "$id" --api-key "$VAST_API_KEY" --tail 500 > dist/vast-e00-e04/vast-container.log 2>&1 || true
+          fi
+
+      - name: Destroy Vast instance
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set +e
+          if [[ -s "$RUNNER_TEMP/vast-instance-id" ]]; then
+            id="$(cat "$RUNNER_TEMP/vast-instance-id")"
+            uv run --locked vastai destroy instance "$id" --api-key "$VAST_API_KEY" -y || true
+          fi
+
+      - name: Upload short-lived evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vast-e00-e04-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/providers/vast-e00-e04-*
+            dist/vast-e00-e04/
+          if-no-files-found: warn
+          retention-days: 30
