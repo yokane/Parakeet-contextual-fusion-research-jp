@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from importlib import metadata
 from pathlib import Path
 from typing import Any
 
@@ -22,6 +23,13 @@ from parakeet_context_fusion.llm_selector import (
 
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+
+
+def package_version(name: str) -> str | None:
+    try:
+        return metadata.version(name)
+    except metadata.PackageNotFoundError:
+        return None
 
 
 def main() -> None:
@@ -166,6 +174,8 @@ def main() -> None:
                     "generated_tokens": int(new_tokens.shape[-1]),
                     "peak_vram_bytes": peak_vram_bytes,
                     "transformers_version": transformers.__version__,
+                    "accelerate_version": package_version("accelerate"),
+                    "safetensors_version": package_version("safetensors"),
                     "torch_version": torch.__version__,
                     "device_map": args.device_map,
                     "dtype": args.dtype,
