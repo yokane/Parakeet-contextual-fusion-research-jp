@@ -1,0 +1,58 @@
+name: hf-bucket-maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Bucket operation"
+        required: true
+        default: "validate"
+        type: choice
+        options: [validate, bootstrap]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-bucket-maintenance
+  cancel-in-progress: false
+
+jobs:
+  bucket:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install Bucket-capable HF CLI
+        run: python -m pip install 'huggingface-hub>=1.9,<2'
+
+      - name: Bootstrap canonical layout
+        if: ${{ inputs.operation == 'bootstrap' }}
+        run: bash scripts/hf/hf-bootstrap-bucket.sh
+
+      - name: Validate canonical layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || { echo "HF_TOKEN is missing" >&2; exit 2; }
+          hf buckets info "${HF_BUCKET}" --token "${HF_TOKEN}"
+          hf buckets list "${HF_BUCKET}" -R -q --token "${HF_TOKEN}" > bucket-listing.txt
+          python scripts/hf/validate_bucket_layout.py --listing bucket-listing.txt
+
+      - name: Upload layout evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: hf-bucket-layout-${{ github.run_id }}
+          path: bucket-listing.txt
+          retention-days: 7
+          if-no-files-found: error
