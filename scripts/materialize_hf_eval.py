@@ -15,6 +15,14 @@ from datasets import Audio, Dataset, load_dataset
 from huggingface_hub import HfApi
 
 PREFERRED_AUDIO_COLUMNS = ("audio", "speech", "wav")
+FULL_REVISION = re.compile(r"^[0-9a-f]{40}$")
+
+
+def require_revision(value: Any, *, label: str) -> str:
+    revision = str(value or "").strip()
+    if not FULL_REVISION.fullmatch(revision):
+        raise RuntimeError(f"{label} must be a full 40-character Hugging Face commit revision")
+    return revision
 
 
 def safe_name(value: str) -> str:
@@ -55,9 +63,9 @@ def detect_audio_column(dataset: Dataset) -> str | None:
 
 class SourceDatasetCache:
     def __init__(self) -> None:
-        self.datasets: dict[tuple[str, str | None, str, str | None], tuple[Dataset, str]] = {}
-        self.id_maps: dict[tuple[str, str | None, str, str | None], dict[str, int]] = {}
-        self.revisions: dict[str, str | None] = {}
+        self.datasets: dict[tuple[str, str | None, str, str], tuple[Dataset, str]] = {}
+        self.id_maps: dict[tuple[str, str | None, str, str], dict[str, int]] = {}
+        self.revisions: dict[str, str] = {}
 
     def _load(
         self,
@@ -65,8 +73,9 @@ class SourceDatasetCache:
         repo_id: str,
         config: str | None,
         split: str,
-        revision: str | None,
+        revision: str,
     ) -> tuple[Dataset, str]:
+        revision = require_revision(revision, label=f"source revision for {repo_id}")
         key = (repo_id, config, split, revision)
         if key in self.datasets:
             return self.datasets[key]
@@ -76,15 +85,15 @@ class SourceDatasetCache:
             raise RuntimeError(f"no Audio feature found in {repo_id} config={config!r} split={split!r}")
         dataset = dataset.cast_column(audio_column, Audio(decode=False))
         self.datasets[key] = (dataset, audio_column)
-        try:
-            self.revisions[repo_id] = HfApi().dataset_info(repo_id, revision=revision).sha
-        except Exception:
-            self.revisions[repo_id] = revision
+        resolved = HfApi().dataset_info(repo_id, revision=revision).sha
+        if resolved != revision:
+            raise RuntimeError(f"source revision mismatch for {repo_id}: {resolved!r} != {revision!r}")
+        self.revisions[repo_id] = revision
         return dataset, audio_column
 
     def _index_map(
         self,
-        key: tuple[str, str | None, str, str | None],
+        key: tuple[str, str | None, str, str],
         dataset: Dataset,
     ) -> dict[str, int]:
         cached = self.id_maps.get(key)
@@ -109,7 +118,10 @@ class SourceDatasetCache:
             raise RuntimeError("row has no rehydratable Hugging Face source repository")
         config = audio_ref.get("config") or source.get("config") or None
         split = str(audio_ref.get("split") or source.get("split") or "train")
-        revision = source.get("revision") or None
+        revision = require_revision(
+            audio_ref.get("revision") or source.get("revision"),
+            label=f"audio source revision for {repo_id}",
+        )
         row_id = str(audio_ref.get("row_id") or source.get("source_id") or "")
         key = (repo_id, config, split, revision)
         dataset, audio_column = self._load(
@@ -170,6 +182,7 @@ def main() -> None:
         description="Materialize JP-HomophoneBench into NeMo evaluation inputs"
     )
     parser.add_argument("--repo-id", default="saeeew/JP-HomophoneBench")
+    parser.add_argument("--revision", required=True)
     parser.add_argument("--config", default="homophone8")
     parser.add_argument(
         "--split",
@@ -186,27 +199,29 @@ def main() -> None:
     parser.add_argument("--require-audio", action="store_true")
     args = parser.parse_args()
 
+    revision = require_revision(args.revision, label=f"benchmark revision for {args.repo_id}")
+    resolved_revision = HfApi().dataset_info(args.repo_id, revision=revision).sha
+    if resolved_revision != revision:
+        raise SystemExit(
+            f"benchmark revision mismatch for {args.repo_id}: {resolved_revision!r} != {revision!r}"
+        )
+
     splits = args.splits or ["test"]
     args.output_dir.mkdir(parents=True, exist_ok=True)
     audio_dir = args.output_dir / "audio"
     benchmark_rows: list[dict[str, Any]] = []
     phrases: set[str] = set()
     corpus: list[str] = []
-    published_revision: str | None = None
-    try:
-        published_revision = HfApi().dataset_info(args.repo_id).sha
-    except Exception:
-        pass
 
     for split in splits:
-        dataset = load_dataset(args.repo_id, args.config, split=split)
+        dataset = load_dataset(args.repo_id, args.config, split=split, revision=revision)
         for raw in dataset:
             row = dict(raw)
             row["hf_publication"] = {
                 "repo_id": args.repo_id,
                 "config": args.config,
                 "split": split,
-                "revision": published_revision,
+                "revision": revision,
             }
             benchmark_rows.append(row)
             phrases.update(row_phrases(row))
@@ -287,7 +302,7 @@ def main() -> None:
         "repo_id": args.repo_id,
         "config": args.config,
         "splits": splits,
-        "published_revision": published_revision,
+        "published_revision": revision,
         "records": len(benchmark_rows),
         "runnable_audio_records": len(nemo_rows),
         "categories": dict(sorted(category_counts.items())),
