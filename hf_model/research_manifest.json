@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "model_id": "saeeew/J-PACF-YOMI-tdt",
+  "display_name": "J-PACF-YOMI-TDT",
+  "method_name": "J-PACF",
+  "method_expansion": "Japanese Phoneme-Aware Context Fusion",
+  "family_name": "YOMI-TDT",
+  "status": "research-scaffold",
+  "standalone_checkpoint_published": false,
+  "base_model": {
+    "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+    "library": "nemo",
+    "license": "cc-by-4.0"
+  },
+  "benchmark": {
+    "repo_id": "saeeew/JP-HomophoneBench",
+    "public_config": "homophone8",
+    "research_config": "homophone8-research"
+  },
+  "source_repository": "https://github.com/yokane/Parakeet-contextual-fusion-research-jp",
+  "experiment_ladder": [
+    "E00_tdt_greedy",
+    "E01_tdt_beam",
+    "E02_ngpulm",
+    "E03_gpu_phrase_boosting",
+    "E04_local_ctc_rerank",
+    "E05_phone_rerank",
+    "E06_inbeam_fusion"
+  ],
+  "artifact_policy": {
+    "metadata_and_configs": "publishable_now",
+    "base_or_derived_nemo_checkpoint": "publish_only_after_validation",
+    "phone_head": "publish_only_after_e05_validation",
+    "metrics": "publish_with_release_manifest",
+    "license_for_base_derived_model_artifacts": "cc-by-4.0"
+  }
+}
