@@ -36,10 +36,6 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       cmake \
       curl \
       git \
-      libboost-program-options-dev \
-      libboost-system-dev \
-      libboost-test-dev \
-      libboost-thread-dev \
       libsndfile1 \
       ninja-build \
     && rm -rf /var/lib/apt/lists/*
@@ -80,6 +76,19 @@ RUN --mount=type=cache,target=/cache/uv \
       --python 3.12.3 \
       --extra dev \
       --extra gpu
+
+# KenLM is compiled only for E00-E04 preparation. Keep its small required Boost
+# runtime/build dependency delta in a late layer so the large pinned CUDA/NeMo
+# and Python dependency layers stay reusable across runtime revisions and Vast pulls.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update \
+    && apt-get install -y --no-install-recommends \
+      libboost-program-options-dev \
+      libboost-system-dev \
+      libboost-test-dev \
+      libboost-thread-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 ENV PATH="/opt/jpacf/.venv/bin:${PATH}" \
     PYTHONPATH="/opt/jpacf/src"
