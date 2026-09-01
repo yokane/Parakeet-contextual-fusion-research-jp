@@ -23,7 +23,8 @@ env:
   GPU_ALLOWLIST: RTX_4090
   MIN_INET_DOWN_MBPS: "500"
   MIN_RELIABILITY: "0.98"
-  STARTUP_MAX_ATTEMPTS: "180"
+  STARTUP_MAX_ATTEMPTS: "360"
+  RELAY_PORT: "8081"
   PREDICTED_MINUTES: "20"
   MAX_COST_USD: "0.50"
   OFFER_LIMIT: "50"
@@ -31,7 +32,7 @@ env:
 jobs:
   vast-to-hf-bucket:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 50
     env:
       VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -72,6 +73,7 @@ jobs:
           inet_down = float("${{ env.MIN_INET_DOWN_MBPS }}")
           reliability = float("${{ env.MIN_RELIABILITY }}")
           attempts = int("${{ env.STARTUP_MAX_ATTEMPTS }}")
+          relay_port = int("${{ env.RELAY_PORT }}")
           if predicted <= 0:
               raise SystemExit("PREDICTED_MINUTES must be positive")
           if not (0 < budget <= 0.50):
@@ -80,8 +82,10 @@ jobs:
               raise SystemExit("MIN_INET_DOWN_MBPS must be at least 100")
           if not (0.0 < reliability <= 1.0):
               raise SystemExit("MIN_RELIABILITY must be in (0, 1]")
-          if not (1 <= attempts <= 240):
-              raise SystemExit("STARTUP_MAX_ATTEMPTS must be in [1, 240]")
+          if not (1 <= attempts <= 480):
+              raise SystemExit("STARTUP_MAX_ATTEMPTS must be in [1, 480]")
+          if not (1024 <= relay_port <= 65535):
+              raise SystemExit("RELAY_PORT must be in [1024, 65535]")
           PY
 
       - name: Preflight HF Bucket write before any Vast spend
@@ -157,176 +161,19 @@ jobs:
           PY
           cat /tmp/vast-selected.env >> "$GITHUB_ENV"
 
-      - name: Generate ephemeral SSH identity
+      - name: Build one-time headless relay payload
         shell: bash
         run: |
           set -euo pipefail
-          key="$RUNNER_TEMP/vast-smoke-ed25519"
-          rm -f "$key" "$key.pub"
-          ssh-keygen -q -t ed25519 -N '' -C "${VAST_LABEL}" -f "$key"
-          chmod 600 "$key"
-          echo "VAST_SSH_KEY=$key" >> "$GITHUB_ENV"
-
-      - name: Create matching on-demand Vast GPU instance
-        shell: bash
-        run: |
-          set -euo pipefail
-          create_response="$(
-            uv run --locked vastai create instance "$VAST_OFFER_ID" \
-              --api-key "$VAST_API_KEY" \
-              --raw \
-              --image "$RUNTIME_IMAGE" \
-              --disk "$STORAGE_GB" \
-              --label "$VAST_LABEL" \
-              --login "-u ${GITHUB_ACTOR} -p ${GHCR_TOKEN} ghcr.io" \
-              --ssh \
-              --direct \
-              --cancel-unavail
-          )"
-          printf '%s\n' "$create_response" > dist/vast-smoke/create-response.json
-          instance_id="$(python - <<'PY'
-          import json
-          from pathlib import Path
-          payload = json.loads(Path("dist/vast-smoke/create-response.json").read_text())
-          value = payload.get("new_contract")
-          if value is None:
-              raise SystemExit("Vast create response did not contain new_contract")
-          print(int(value))
+          relay_token="$(python - <<'PY'
+          import secrets
+          print(secrets.token_hex(32))
           PY
           )"
-          printf '%s\n' "$instance_id" > "$RUNNER_TEMP/vast-instance-id"
-          echo "VAST_INSTANCE_ID=$instance_id" >> "$GITHUB_ENV"
-          echo "Created Vast instance ${instance_id} from offer ${VAST_OFFER_ID}."
+          echo "::add-mask::${relay_token}"
+          echo "JPA_CF_RELAY_TOKEN=${relay_token}" >> "$GITHUB_ENV"
 
-      - name: Attach ephemeral SSH public key
-        shell: bash
-        run: |
-          set -euo pipefail
-          uv run --locked vastai attach ssh "$VAST_INSTANCE_ID" \
-            "$(cat "${VAST_SSH_KEY}.pub")" \
-            --api-key "$VAST_API_KEY" \
-            | tee dist/vast-smoke/attach-ssh.txt
-
-      - name: Wait for image pull, running container, and SSH
-        shell: bash
-        run: |
-          set -euo pipefail
-          ready=0
-          : > dist/vast-smoke/instance-status.jsonl
-          for attempt in $(seq 1 "$STARTUP_MAX_ATTEMPTS"); do
-            raw="$(uv run --locked vastai show instance "$VAST_INSTANCE_ID" \
-              --api-key "$VAST_API_KEY" --raw 2>/dev/null || true)"
-            if [[ -n "$raw" ]]; then
-              printf '%s\n' "$raw" > dist/vast-smoke/instance-status-latest.json
-              python - "$attempt" <<'PY' >> dist/vast-smoke/instance-status.jsonl
-          import json, sys
-          from pathlib import Path
-          try:
-              row = json.loads(Path("dist/vast-smoke/instance-status-latest.json").read_text())
-          except Exception:
-              raise SystemExit(0)
-          print(json.dumps({
-              "attempt": int(sys.argv[1]),
-              "actual_status": row.get("actual_status"),
-              "intended_status": row.get("intended_status"),
-              "status_msg": row.get("status_msg"),
-              "dph_total": row.get("dph_total"),
-              "inet_down": row.get("inet_down"),
-              "ssh_host": row.get("ssh_host"),
-              "ssh_port": row.get("ssh_port"),
-              "public_ipaddr": row.get("public_ipaddr"),
-              "ports": row.get("ports", {}).get("22/tcp"),
-          }, sort_keys=True))
-          PY
-            fi
-
-            actual="$(python - <<'PY'
-          import json
-          from pathlib import Path
-          try:
-              row = json.loads(Path("dist/vast-smoke/instance-status-latest.json").read_text())
-          except Exception:
-              print("")
-          else:
-              print(row.get("actual_status") or "")
-          PY
-            )"
-            status_msg="$(python - <<'PY'
-          import json
-          from pathlib import Path
-          try:
-              row = json.loads(Path("dist/vast-smoke/instance-status-latest.json").read_text())
-          except Exception:
-              print("")
-          else:
-              value = str(row.get("status_msg") or "")
-              print(" | ".join(part.strip() for part in value.splitlines() if part.strip()))
-          PY
-            )"
-            actual_dph="$(python - <<'PY'
-          import json
-          from pathlib import Path
-          try:
-              row = json.loads(Path("dist/vast-smoke/instance-status-latest.json").read_text())
-          except Exception:
-              print("")
-          else:
-              value = row.get("dph_total")
-              print("" if value is None else value)
-          PY
-            )"
-
-            if [[ "$actual" =~ ^(exited|offline|stopped)$ ]]; then
-              echo "Vast entered terminal status: ${actual}: ${status_msg}" >&2
-              exit 1
-            fi
-
-            if [[ "$actual" == "running" ]]; then
-              if [[ -n "$actual_dph" ]]; then
-                python - "$VAST_DPH_TOTAL" "$actual_dph" <<'PY'
-          import math, sys
-          quoted, actual = map(float, sys.argv[1:])
-          if not math.isclose(quoted, actual, rel_tol=0.08, abs_tol=0.02):
-              raise SystemExit(f"Vast price mismatch: quoted={quoted:.6f}/h actual={actual:.6f}/h")
-          PY
-              fi
-
-              ssh_url="$(uv run --locked vastai ssh-url "$VAST_INSTANCE_ID" \
-                --api-key "$VAST_API_KEY" 2>/dev/null || true)"
-              if [[ "$ssh_url" =~ ^ssh://root@(.+):([0-9]+)$ ]]; then
-                host="${BASH_REMATCH[1]}"
-                port="${BASH_REMATCH[2]}"
-                if timeout 10s ssh \
-                  -i "$VAST_SSH_KEY" \
-                  -p "$port" \
-                  -o BatchMode=yes \
-                  -o ConnectTimeout=7 \
-                  -o StrictHostKeyChecking=no \
-                  -o UserKnownHostsFile=/dev/null \
-                  "root@${host}" 'true' >/dev/null 2>&1; then
-                  echo "VAST_SSH_HOST=$host" >> "$GITHUB_ENV"
-                  echo "VAST_SSH_PORT=$port" >> "$GITHUB_ENV"
-                  printf '%s\n' "$ssh_url" > dist/vast-smoke/ssh-url.txt
-                  ready=1
-                  break
-                fi
-              fi
-            fi
-            echo "Vast not ready (${attempt}/${STARTUP_MAX_ATTEMPTS}, actual_status=${actual:-unknown}, status=${status_msg:-none})."
-            sleep 5
-          done
-
-          if [[ "$ready" != 1 ]]; then
-            echo "Vast instance did not reach running+SSH-ready state inside bounded startup window." >&2
-            tail -30 dist/vast-smoke/instance-status.jsonl >&2 || true
-            exit 1
-          fi
-
-      - name: Execute GPU evidence workload over SSH
-        shell: bash
-        run: |
-          set -euo pipefail
-          cat > "$RUNNER_TEMP/vast-gpu-smoke.sh" <<'REMOTE'
+          cat > "$RUNNER_TEMP/vast-headless-smoke.sh" <<'REMOTE'
           #!/usr/bin/env bash
           set -euo pipefail
           export JPA_CF_CONTAINER_RUNTIME=1
@@ -354,13 +201,14 @@ jobs:
           ).strip().splitlines()[0]
           gpu_name, driver_version, memory_mib = [part.strip() for part in smi.split(",", 2)]
           payload = {
-              "schema_version": 1,
+              "schema_version": 2,
               "provider": "vast",
-              "transport": "ephemeral-ssh-relay",
+              "transport": "entrypoint-http-relay",
               "run_key": os.environ["SMOKE_RUN_KEY"],
               "vast_label": os.environ["VAST_LABEL"],
               "offer_id": int(os.environ["VAST_OFFER_ID"]),
               "expected_image": os.environ["EXPECTED_IMAGE"],
+              "source_git_sha": os.environ["SOURCE_GIT_SHA"],
               "hostname": socket.gethostname(),
               "platform": platform.platform(),
               "gpu_name": gpu_name,
@@ -378,40 +226,230 @@ jobs:
           )
           PY
           printf '%s\n' "$SMOKE_RUN_KEY" > "$work/_SUCCESS"
+
+          python - <<'PY'
+          import hmac
+          import os
+          from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+          from pathlib import Path
+
+          root = Path("/workspace/state/artifacts/vast-hf-smoke")
+          token = os.environ["JPA_CF_RELAY_TOKEN"]
+          port = int(os.environ["JPA_CF_RELAY_PORT"])
+          allowed = {
+              "/runtime-verify.txt": root / "runtime-verify.txt",
+              "/result.json": root / "result.json",
+              "/_SUCCESS": root / "_SUCCESS",
+          }
+
+          class Handler(BaseHTTPRequestHandler):
+              def _authorized(self) -> bool:
+                  supplied = self.headers.get("Authorization", "")
+                  expected = f"Bearer {token}"
+                  return hmac.compare_digest(supplied, expected)
+
+              def do_GET(self) -> None:
+                  if not self._authorized():
+                      self.send_response(401)
+                      self.send_header("Content-Length", "0")
+                      self.end_headers()
+                      return
+                  if self.path == "/health":
+                      body = b"ready\n"
+                      self.send_response(200)
+                      self.send_header("Content-Type", "text/plain")
+                      self.send_header("Content-Length", str(len(body)))
+                      self.end_headers()
+                      self.wfile.write(body)
+                      return
+                  path = allowed.get(self.path)
+                  if path is None or not path.is_file():
+                      self.send_response(404)
+                      self.send_header("Content-Length", "0")
+                      self.end_headers()
+                      return
+                  body = path.read_bytes()
+                  self.send_response(200)
+                  self.send_header("Content-Type", "application/octet-stream")
+                  self.send_header("Content-Length", str(len(body)))
+                  self.end_headers()
+                  self.wfile.write(body)
+
+              def log_message(self, fmt: str, *args: object) -> None:
+                  return
+
+          ThreadingHTTPServer(("0.0.0.0", port), Handler).serve_forever()
+          PY
           REMOTE
 
-          q_run="$(printf '%q' "$SMOKE_RUN_KEY")"
-          q_label="$(printf '%q' "$VAST_LABEL")"
-          q_offer="$(printf '%q' "$VAST_OFFER_ID")"
-          q_image="$(printf '%q' "$RUNTIME_IMAGE")"
-          timeout 300s ssh \
-            -i "$VAST_SSH_KEY" \
-            -p "$VAST_SSH_PORT" \
-            -o BatchMode=yes \
-            -o ConnectTimeout=10 \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            "root@${VAST_SSH_HOST}" \
-            "SMOKE_RUN_KEY=${q_run} VAST_LABEL=${q_label} VAST_OFFER_ID=${q_offer} EXPECTED_IMAGE=${q_image} bash -s" \
-            < "$RUNNER_TEMP/vast-gpu-smoke.sh" \
-            | tee dist/vast-smoke/ssh-workload.txt
+          sha256sum "$RUNNER_TEMP/vast-headless-smoke.sh" > dist/vast-smoke/headless-script.sha256
+          headless_b64="$(base64 -w0 "$RUNNER_TEMP/vast-headless-smoke.sh")"
+          echo "VAST_HEADLESS_SCRIPT_B64=${headless_b64}" >> "$GITHUB_ENV"
 
-      - name: SCP Vast-generated artifacts to GitHub runner
+      - name: Create entrypoint-mode Vast GPU instance
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker_env="-p ${RELAY_PORT}:${RELAY_PORT} -e JPA_CF_RELAY_PORT=${RELAY_PORT} -e JPA_CF_RELAY_TOKEN=${JPA_CF_RELAY_TOKEN} -e VAST_HEADLESS_SCRIPT_B64=${VAST_HEADLESS_SCRIPT_B64} -e SMOKE_RUN_KEY=${SMOKE_RUN_KEY} -e VAST_LABEL=${VAST_LABEL} -e VAST_OFFER_ID=${VAST_OFFER_ID} -e EXPECTED_IMAGE=${RUNTIME_IMAGE} -e SOURCE_GIT_SHA=${GITHUB_SHA}"
+          create_response="$(
+            uv run --locked vastai create instance "$VAST_OFFER_ID" \
+              --api-key "$VAST_API_KEY" \
+              --raw \
+              --image "$RUNTIME_IMAGE" \
+              --disk "$STORAGE_GB" \
+              --label "$VAST_LABEL" \
+              --login "-u ${GITHUB_ACTOR} -p ${GHCR_TOKEN} ghcr.io" \
+              --env "$docker_env" \
+              --cancel-unavail \
+              --args /bin/bash -lc 'echo "$VAST_HEADLESS_SCRIPT_B64" | base64 -d | bash'
+          )"
+          printf '%s\n' "$create_response" > dist/vast-smoke/create-response.json
+          instance_id="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path("dist/vast-smoke/create-response.json").read_text())
+          value = payload.get("new_contract")
+          if value is None:
+              raise SystemExit("Vast create response did not contain new_contract")
+          print(int(value))
+          PY
+          )"
+          printf '%s\n' "$instance_id" > "$RUNNER_TEMP/vast-instance-id"
+          echo "VAST_INSTANCE_ID=$instance_id" >> "$GITHUB_ENV"
+          echo "Created Vast entrypoint instance ${instance_id} from offer ${VAST_OFFER_ID}."
+
+      - name: Wait for image pull, GPU workload, and HTTP relay
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready=0
+          : > dist/vast-smoke/instance-status.jsonl
+          for attempt in $(seq 1 "$STARTUP_MAX_ATTEMPTS"); do
+            raw="$(uv run --locked vastai show instance "$VAST_INSTANCE_ID" \
+              --api-key "$VAST_API_KEY" --raw 2>/dev/null || true)"
+            if [[ -n "$raw" ]]; then
+              printf '%s\n' "$raw" > "$RUNNER_TEMP/vast-instance-status-raw.json"
+              python - "$attempt" "$RELAY_PORT" <<'PY' >> dist/vast-smoke/instance-status.jsonl
+          import json, sys
+          from pathlib import Path
+          try:
+              row = json.loads(Path("/tmp/does-not-exist").read_text())
+          except Exception:
+              try:
+                  row = json.loads(Path("${RUNNER_TEMP}/vast-instance-status-raw.json").read_text())
+              except Exception:
+                  raise SystemExit(0)
+          port_key = f"{sys.argv[2]}/tcp"
+          print(json.dumps({
+              "attempt": int(sys.argv[1]),
+              "actual_status": row.get("actual_status"),
+              "intended_status": row.get("intended_status"),
+              "status_msg": row.get("status_msg"),
+              "dph_total": row.get("dph_total"),
+              "inet_down": row.get("inet_down"),
+              "public_ipaddr": row.get("public_ipaddr"),
+              "relay_port": row.get("ports", {}).get(port_key),
+          }, sort_keys=True))
+          PY
+              python - "$RELAY_PORT" <<'PY' > dist/vast-smoke/instance-status-latest.json
+          import json, sys
+          from pathlib import Path
+          row = json.loads(Path("${RUNNER_TEMP}/vast-instance-status-raw.json").read_text())
+          port_key = f"{sys.argv[1]}/tcp"
+          print(json.dumps({
+              "actual_status": row.get("actual_status"),
+              "intended_status": row.get("intended_status"),
+              "status_msg": row.get("status_msg"),
+              "dph_total": row.get("dph_total"),
+              "inet_down": row.get("inet_down"),
+              "public_ipaddr": row.get("public_ipaddr"),
+              "relay_port": row.get("ports", {}).get(port_key),
+          }, sort_keys=True))
+          PY
+            fi
+
+            readarray -t state < <(python - <<'PY'
+          import json
+          from pathlib import Path
+          try:
+              row = json.loads(Path("dist/vast-smoke/instance-status-latest.json").read_text())
+          except Exception:
+              print("")
+              print("")
+              print("")
+              print("")
+              print("")
+          else:
+              print(row.get("actual_status") or "")
+              value = str(row.get("status_msg") or "")
+              print(" | ".join(part.strip() for part in value.splitlines() if part.strip()))
+              value = row.get("dph_total")
+              print("" if value is None else value)
+              print(row.get("public_ipaddr") or "")
+              ports = row.get("relay_port") or []
+              if isinstance(ports, dict):
+                  ports = [ports]
+              host_port = ""
+              for item in ports:
+                  if isinstance(item, dict) and item.get("HostPort"):
+                      host_port = str(item["HostPort"])
+                      break
+              print(host_port)
+          PY
+            )
+            actual="${state[0]:-}"
+            status_msg="${state[1]:-}"
+            actual_dph="${state[2]:-}"
+            relay_host="${state[3]:-}"
+            relay_external_port="${state[4]:-}"
+
+            if [[ "$actual" =~ ^(exited|offline|stopped)$ ]]; then
+              echo "Vast entered terminal status: ${actual}: ${status_msg}" >&2
+              exit 1
+            fi
+
+            if [[ "$actual" == "running" ]]; then
+              if [[ -n "$actual_dph" ]]; then
+                python - "$VAST_DPH_TOTAL" "$actual_dph" <<'PY'
+          import math, sys
+          quoted, actual = map(float, sys.argv[1:])
+          if not math.isclose(quoted, actual, rel_tol=0.08, abs_tol=0.02):
+              raise SystemExit(f"Vast price mismatch: quoted={quoted:.6f}/h actual={actual:.6f}/h")
+          PY
+              fi
+              if [[ -n "$relay_host" && -n "$relay_external_port" ]]; then
+                relay_base="http://${relay_host}:${relay_external_port}"
+                if response="$(curl -fsS --connect-timeout 5 --max-time 10 \
+                  -H "Authorization: Bearer ${JPA_CF_RELAY_TOKEN}" \
+                  "${relay_base}/health" 2>/dev/null)" && [[ "$response" == "ready" ]]; then
+                  echo "VAST_RELAY_BASE=${relay_base}" >> "$GITHUB_ENV"
+                  printf '%s\n' "$relay_base" > dist/vast-smoke/relay-endpoint.txt
+                  ready=1
+                  break
+                fi
+              fi
+            fi
+            echo "Vast relay not ready (${attempt}/${STARTUP_MAX_ATTEMPTS}, actual_status=${actual:-unknown}, status=${status_msg:-none})."
+            sleep 5
+          done
+
+          if [[ "$ready" != 1 ]]; then
+            echo "Vast instance did not reach running+HTTP-relay-ready state inside bounded startup window." >&2
+            tail -30 dist/vast-smoke/instance-status.jsonl >&2 || true
+            exit 1
+          fi
+
+      - name: Download Vast-generated artifacts over one-time relay
         shell: bash
         run: |
           set -euo pipefail
           local_dir="dist/vast-smoke/from-vast"
           mkdir -p "$local_dir"
           for name in runtime-verify.txt result.json _SUCCESS; do
-            scp \
-              -i "$VAST_SSH_KEY" \
-              -P "$VAST_SSH_PORT" \
-              -o BatchMode=yes \
-              -o ConnectTimeout=10 \
-              -o StrictHostKeyChecking=no \
-              -o UserKnownHostsFile=/dev/null \
-              "root@${VAST_SSH_HOST}:/workspace/state/artifacts/vast-hf-smoke/${name}" \
-              "$local_dir/${name}"
+            curl -fsS --retry 3 --retry-delay 2 --connect-timeout 10 --max-time 60 \
+              -H "Authorization: Bearer ${JPA_CF_RELAY_TOKEN}" \
+              "${VAST_RELAY_BASE}/${name}" \
+              -o "$local_dir/${name}"
           done
           test -s "$local_dir/result.json"
           test -s "$local_dir/_SUCCESS"
@@ -447,11 +485,12 @@ jobs:
           from pathlib import Path
           result = json.loads(Path("dist/vast-smoke/from-hf/result.json").read_text())
           assert result["provider"] == "vast"
-          assert result["transport"] == "ephemeral-ssh-relay"
+          assert result["transport"] == "entrypoint-http-relay"
           assert result["run_key"] == os.environ["SMOKE_RUN_KEY"]
           assert result["vast_label"] == os.environ["VAST_LABEL"]
           assert result["offer_id"] == int(os.environ["VAST_OFFER_ID"])
           assert result["expected_image"] == os.environ["RUNTIME_IMAGE"]
+          assert result["source_git_sha"] == os.environ["GITHUB_SHA"]
           assert result["gpu_name"] == "NVIDIA GeForce RTX 4090"
           assert result["cuda_available"] is True
           assert result["cuda_device_count"] >= 1
@@ -459,29 +498,39 @@ jobs:
           print(json.dumps(result, indent=2, sort_keys=True))
           PY
           {
-            echo "### Vast → GitHub relay → HF Bucket smoke"
+            echo "### Vast entrypoint → HTTP relay → GitHub → HF Bucket smoke"
             echo
             echo "- offer: ${VAST_OFFER_ID}"
             echo "- GPU: ${VAST_GPU_NAME}"
             echo "- quoted on-demand rate: \$${VAST_DPH_TOTAL}/h"
             echo "- host download: ${VAST_INET_DOWN} Mbps"
-            echo "- predicted ${PREDICTED_MINUTES} min cost: \$${VAST_PREDICTED_COST}"
+            echo "- predicted ${PREDICTED_MINUTES} min running cost: \$${VAST_PREDICTED_COST}"
             echo "- runtime: \`${RUNTIME_IMAGE}\`"
             echo "- bucket: \`hf://buckets/${HF_BUCKET}/runs/${SMOKE_RUN_KEY}/vast-smoke\`"
-            echo "- transport: ephemeral SSH/SCP; HF_TOKEN stayed on GitHub runner"
+            echo "- transport: Vast args/entrypoint mode + one-time bearer HTTP relay"
+            echo "- SSH/Jupyter injection: disabled"
+            echo "- HF_TOKEN stayed on GitHub runner"
             echo "- result: GPU artifact round-tripped through HF Bucket"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Capture Vast state/logs on failure
+      - name: Capture sanitized Vast state/logs on failure
         if: ${{ failure() }}
         shell: bash
         run: |
           set +e
           if [[ -s "$RUNNER_TEMP/vast-instance-id" ]]; then
             id="$(cat "$RUNNER_TEMP/vast-instance-id")"
-            uv run --locked vastai show instance "$id" \
-              --api-key "$VAST_API_KEY" --raw \
-              > dist/vast-smoke/instance-failure.json 2>&1 || true
+            raw="$(uv run --locked vastai show instance "$id" --api-key "$VAST_API_KEY" --raw 2>/dev/null)"
+            printf '%s' "$raw" | python -c '
+          import json, sys
+          try:
+              row=json.load(sys.stdin)
+          except Exception:
+              raise SystemExit(0)
+          for key in ("extra_env", "image_login", "login", "env"):
+              row.pop(key, None)
+          print(json.dumps(row, indent=2, sort_keys=True))
+          ' > dist/vast-smoke/instance-failure.json 2>/dev/null || true
             uv run --locked vastai logs "$id" \
               --api-key "$VAST_API_KEY" --tail 300 \
               > dist/vast-smoke/vast-container.log 2>&1 || true
@@ -512,7 +561,6 @@ jobs:
             echo "Destroying Vast instance ${id}."
             uv run --locked vastai destroy instance "$id" --api-key "$VAST_API_KEY" -y || true
           done
-          rm -f "${VAST_SSH_KEY:-/nonexistent}" "${VAST_SSH_KEY:-/nonexistent}.pub"
 
       - name: Upload smoke evidence to GitHub Actions
         if: ${{ always() }}
@@ -529,12 +577,11 @@ jobs:
             dist/vast-smoke/hf-preflight.txt
             dist/vast-smoke/hf-preflight-roundtrip.txt
             dist/vast-smoke/create-response.json
-            dist/vast-smoke/attach-ssh.txt
+            dist/vast-smoke/headless-script.sha256
             dist/vast-smoke/instance-status.jsonl
             dist/vast-smoke/instance-status-latest.json
             dist/vast-smoke/instance-failure.json
-            dist/vast-smoke/ssh-url.txt
-            dist/vast-smoke/ssh-workload.txt
+            dist/vast-smoke/relay-endpoint.txt
             dist/vast-smoke/vast-container.log
             dist/vast-smoke/from-vast/
             dist/vast-smoke/from-hf/
