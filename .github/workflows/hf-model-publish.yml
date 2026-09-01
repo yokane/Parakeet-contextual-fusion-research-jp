@@ -8,6 +8,12 @@ on:
         required: true
         default: false
         type: boolean
+  push:
+    branches: [fix/model-publish-and-ci]
+    paths:
+      - "hf_model/**"
+      - "scripts/publish_hf_model.py"
+      - ".github/workflows/hf-model-publish.yml"
 
 permissions:
   contents: read
@@ -46,7 +52,7 @@ jobs:
             --folder hf_model
             --commit-message "Sync J-PACF-YOMI-TDT scaffold from GitHub ${GITHUB_SHA}"
           )
-          if [[ "${{ inputs.private }}" == "true" ]]; then
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.private }}" == "true" ]]; then
             args+=(--private)
           fi
           python scripts/publish_hf_model.py "${args[@]}"
