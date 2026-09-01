@@ -1,5 +1,17 @@
 #!/usr/bin/env bash
 
+HF_HELPER_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+HF_REPOSITORY_ROOT="$(cd -- "${HF_HELPER_DIR}/../.." >/dev/null 2>&1 && pwd)"
+HF_TRANSPORT_PROJECT="${HF_TRANSPORT_PROJECT:-${HF_REPOSITORY_ROOT}/tools/hf-bucket}"
+
+hf_bucket_cli() {
+    command -v uv >/dev/null 2>&1 || {
+        printf '[hf-cli] ERROR: uv is required; enter through mise\n' >&2
+        return 127
+    }
+    uv run --project "${HF_TRANSPORT_PROJECT}" --locked -- hf "$@"
+}
+
 hf_normalize_bucket_id() {
     local value="$1" namespace name
     value="${value#hf://buckets/}"
