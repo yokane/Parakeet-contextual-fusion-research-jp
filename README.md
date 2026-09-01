@@ -77,11 +77,7 @@ pip install -e '.[dev,g2p]'
 pytest
 ```
 
-GPU experiments additionally require NVIDIA NeMo and CUDA. E07a additionally uses the `llm` optional dependency set; in the locked GPU environment use:
-
-```bash
-uv sync --extra gpu --extra llm
-```
+GPU experiments additionally require NVIDIA NeMo and CUDA. E07a keeps the repository's authoritative `uv.lock` unchanged and layers versioned Transformers packages onto the locked GPU runtime with `uv run --with`.
 
 ## Build and publish the fixed Dataset
 
@@ -183,7 +179,12 @@ The canonical E07a arm consumes the E05 N-best/reranked JSONL and does not expos
 ```bash
 export INPUT=results/E05_phone_rerank.jsonl
 export BENCHMARK_INDEX=data/generated/bench_index.jsonl
-uv run --extra gpu --extra llm bash experiments/E07a_shisa_select.sh
+uv run --locked \
+  --extra gpu \
+  --with 'transformers==4.57.3' \
+  --with 'accelerate>=1.10,<2' \
+  --with 'safetensors>=0.5' \
+  bash experiments/E07a_shisa_select.sh
 ```
 
 Outputs:
