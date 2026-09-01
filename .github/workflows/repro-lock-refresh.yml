@@ -14,7 +14,7 @@ on:
       - ".github/workflows/repro-lock-refresh.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: repro-lock-refresh-${{ github.ref }}
@@ -29,6 +29,8 @@ jobs:
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
 
       - name: Install exact mise toolchain
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
@@ -56,6 +58,21 @@ jobs:
 
       - name: Generate SPDX inventory
         run: uv run --locked python scripts/repro/generate_spdx.py --output sbom/reproducibility.spdx.json
+
+      - name: Commit resolved lock snapshot
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mise.lock uv.lock locks/hf-revisions.lock.json locks/containers.lock.json sbom/reproducibility.spdx.json
+          if git diff --cached --quiet; then
+            echo "Lock snapshot already current"
+            exit 0
+          fi
+          git commit -m "build: refresh immutable environment locks"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Upload resolved lock snapshot
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
