@@ -27,7 +27,7 @@ env:
   PREDICTED_MINUTES: "30"
   MAX_COST_USD: "0.35"
   OFFER_LIMIT: "50"
-  WAIT_MAX_ATTEMPTS: "420"
+  WAIT_MAX_ATTEMPTS: "240"
 
 jobs:
   build:
@@ -113,7 +113,7 @@ jobs:
   verify-vast:
     needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 70
+    timeout-minutes: 45
     env:
       VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
       GHCR_TOKEN: ${{ github.token }}
@@ -144,6 +144,7 @@ jobs:
           test -n "${GHCR_TOKEN:-}"
           [[ "$RUNTIME_IMAGE" =~ @sha256:[0-9a-f]{64}$ ]]
           [[ "$RUNTIME_BASE_IMAGE" =~ @sha256:[0-9a-f]{64}$ ]]
+          test -x scripts/container/vast_verify.sh
 
       - name: Select fast budget-compliant on-demand RTX 4090
         shell: bash
@@ -158,7 +159,7 @@ jobs:
             --output-json dist/providers/canonical-search-query.json \
             > dist/providers/canonical-search-query.txt
           query="$(cat dist/providers/canonical-search-query.txt)"
-          uv run --locked vastai search offers \
+          timeout 30s uv run --locked vastai search offers \
             --api-key "$VAST_API_KEY" --raw --no-default --type on-demand \
             --order 'inet_down-,dph_total' --storage "$STORAGE_GB" --limit "$OFFER_LIMIT" \
             "$query" > dist/providers/canonical-raw.json
@@ -193,12 +194,12 @@ jobs:
         run: |
           set -euo pipefail
           echo "::add-mask::${GHCR_TOKEN}"
-          response="$(uv run --locked vastai create instance "$VAST_OFFER_ID" \
+          response="$(timeout 30s uv run --locked vastai create instance "$VAST_OFFER_ID" \
             --api-key "$VAST_API_KEY" --raw --image "$RUNTIME_IMAGE" \
             --disk "$STORAGE_GB" --label "$VAST_LABEL" \
             --login "-u ${GITHUB_ACTOR} -p ${GHCR_TOKEN} ghcr.io" \
             --cancel-unavail \
-            --args 'bash -lc '\''python /opt/jpacf/scripts/container/verify_runtime.py --require-gpu; rc=$?; echo JPA_CF_CANONICAL_VERIFY rc=$rc; sleep infinity'\''')"
+            --args /opt/jpacf/scripts/container/vast_verify.sh)"
           printf '%s\n' "$response" > dist/runtime/create-response.json
           id="$(python -c "import json; print(int(json.load(open('dist/runtime/create-response.json'))['new_contract']))")"
           printf '%s\n' "$id" > "$RUNNER_TEMP/vast-instance-id"
@@ -212,24 +213,31 @@ jobs:
           : > dist/runtime/vast-container.log
           complete=0
           for attempt in $(seq 1 "$WAIT_MAX_ATTEMPTS"); do
-            raw="$(uv run --locked vastai show instance "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --raw 2>/dev/null || true)"
+            raw="$(timeout 20s uv run --locked vastai show instance "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --raw 2>/dev/null || true)"
+            actual_status=""
             if [[ -n "$raw" ]]; then
               printf '%s\n' "$raw" > "$RUNNER_TEMP/vast-status.json"
-              python - "$attempt" "$RUNNER_TEMP/vast-status.json" <<'PY' >> dist/runtime/instance-status.jsonl
+              actual_status="$(python - "$attempt" "$RUNNER_TEMP/vast-status.json" <<'PY' | tee -a dist/runtime/instance-status.jsonl | python -c 'import json,sys; print(json.load(sys.stdin).get("actual_status", ""))'
           import json, sys
           from pathlib import Path
           row=json.loads(Path(sys.argv[2]).read_text())
           msg=' | '.join(x.strip() for x in str(row.get('status_msg') or '').splitlines() if x.strip())
           print(json.dumps({'attempt': int(sys.argv[1]), 'actual_status': row.get('actual_status') or '', 'status_msg': msg, 'dph_total': row.get('dph_total')}, sort_keys=True))
           PY
+              )"
             fi
-            uv run --locked vastai logs "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --tail 3000 > dist/runtime/vast-container.log 2>&1 || true
+            timeout 20s uv run --locked vastai logs "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --tail 3000 > dist/runtime/vast-container.log 2>&1 || true
             if grep -q 'JPA_CF_CANONICAL_VERIFY rc=0' dist/runtime/vast-container.log; then
               complete=1
               break
             fi
-            if grep -q 'JPA_CF_CANONICAL_VERIFY rc=[1-9]' dist/runtime/vast-container.log; then
+            if grep -Eq 'JPA_CF_CANONICAL_VERIFY rc=[1-9][0-9]*' dist/runtime/vast-container.log; then
               cat dist/runtime/vast-container.log
+              exit 1
+            fi
+            if [[ "$actual_status" == "exited" ]]; then
+              echo "Vast container exited before producing a successful proof marker" >&2
+              cat dist/runtime/vast-container.log >&2
               exit 1
             fi
             sleep 5
@@ -282,7 +290,7 @@ jobs:
           set +e
           if [[ -s "$RUNNER_TEMP/vast-instance-id" ]]; then
             id="$(cat "$RUNNER_TEMP/vast-instance-id")"
-            uv run --locked vastai destroy instance "$id" --api-key "$VAST_API_KEY" -y || true
+            timeout 30s uv run --locked vastai destroy instance "$id" --api-key "$VAST_API_KEY" -y || true
           fi
 
       - name: Upload fallback evidence
