@@ -15,6 +15,12 @@ export UV_CACHE_DIR="${UV_CACHE_DIR:-$STATE_ROOT/uv}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$STATE_ROOT/xdg}"
 export TORCH_HOME="${TORCH_HOME:-$STATE_ROOT/torch}"
 export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-/opt/jpacf/.venv}"
+# NGC base images may prepend their own Python environment from the inherited
+# entrypoint. Reassert the repository-owned locked environment immediately
+# before executing any research command.
+export VIRTUAL_ENV="$UV_PROJECT_ENVIRONMENT"
+export PATH="$VIRTUAL_ENV/bin:$PATH"
+hash -r
 export HF_TRANSPORT_PROJECT="${HF_TRANSPORT_PROJECT:-/opt/jpacf/tools/hf-bucket}"
 
 export EVAL_DIR="${EVAL_DIR:-$STATE_ROOT/generated/eval}"

@@ -5,6 +5,7 @@ import argparse
 import json
 import os
 import platform
+import sys
 import tempfile
 from importlib import metadata
 from pathlib import Path
@@ -36,11 +37,18 @@ def main() -> None:
     if platform.system().lower() != "linux" or platform.machine().lower() not in {"x86_64", "amd64"}:
         raise SystemExit("portable runtime requires Linux x86_64")
 
+    expected_venv = "/opt/jpacf/.venv/"
+    if not sys.executable.startswith(expected_venv):
+        raise SystemExit(
+            f"expected repository-owned Python under {expected_venv}, got {sys.executable}"
+        )
+
     import torch
 
     result: dict[str, object] = {
         "platform": "linux/amd64",
         "python": platform.python_version(),
+        "python_executable": sys.executable,
         "torch": torch.__version__,
         "torch_compiled_cuda": torch.version.cuda,
         "nemo_toolkit": version("nemo-toolkit"),
