@@ -1,0 +1,178 @@
+name: homophone8-audio-publish
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/hf-bucket-ghcr-cache]
+    paths:
+      - "data/seed/semantic_homophones.example.tsv"
+      - "data/seed/permissive_phonetic_core.tsv"
+      - "scripts/build_jp_homophone_bench.py"
+      - "scripts/augment_permissive_core8.py"
+      - "scripts/publish_hf_dataset.py"
+      - "scripts/build_homophone8_audio.py"
+      - "scripts/materialize_hf_eval.py"
+      - "scripts/validate_audio_coverage.py"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "mise.lock"
+      - ".github/workflows/homophone8-audio-publish.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homophone8-audio-publish
+  cancel-in-progress: true
+
+env:
+  HF_REPO_ID: saeeew/JP-HomophoneBench
+  BASE_CONFIG: homophone8
+  AUDIO_CONFIG: homophone8-audio
+  RELEASE_DIR: dist/homophone8-base
+  AUDIO_DIR: dist/homophone8-audio
+  VERIFY_DIR: dist/homophone8-audio-verify
+
+jobs:
+  build-publish-verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install repository toolchain from immutable lock
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: true
+
+      - name: Require Hugging Face Dataset write token
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN}" || {
+            echo "Repository secret HF_TOKEN with Dataset write permission is required" >&2
+            exit 2
+          }
+
+      - name: Materialize locked CPU audio environment
+        run: uv sync --locked --extra dev --extra audio
+
+      - name: Build current permissive homophone8 base config
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf "${RELEASE_DIR}"
+          uv run --locked python scripts/build_jp_homophone_bench.py \
+            --output-dir "${RELEASE_DIR}" \
+            --semantic-tsv data/seed/semantic_homophones.example.tsv \
+            --near-threshold 1.0 \
+            --require-core8
+          uv run --locked python scripts/augment_permissive_core8.py \
+            --release-dir "${RELEASE_DIR}" \
+            --seed data/seed/permissive_phonetic_core.tsv
+          uv run --locked python scripts/validate_jp_homophone_release.py \
+            --release-dir "${RELEASE_DIR}" \
+            --schema schemas/benchmark.schema.json \
+            --require-core8
+
+      - name: Publish refreshed homophone8 source config
+        run: |
+          uv run --locked python scripts/publish_hf_dataset.py \
+            --release-dir "${RELEASE_DIR}" \
+            --repo-id "${HF_REPO_ID}" \
+            --config-name "${BASE_CONFIG}" \
+            --license-policy permissive
+
+      - name: Resolve immutable source revision
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision="$(uv run --locked python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          value = str(HfApi(token=os.environ['HF_TOKEN']).dataset_info(os.environ['HF_REPO_ID']).sha or '')
+          if len(value) != 40:
+              raise SystemExit(f'invalid HF revision: {value!r}')
+          print(value)
+          PY
+          )"
+          echo "revision=${revision}" >> "${GITHUB_OUTPUT}"
+          echo "homophone8 source revision: ${revision}" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Build and publish embedded homophone8-audio test projection
+        run: |
+          rm -rf "${AUDIO_DIR}"
+          uv run --locked python scripts/build_homophone8_audio.py \
+            --repo-id "${HF_REPO_ID}" \
+            --source-config "${BASE_CONFIG}" \
+            --source-revision "${{ steps.source.outputs.revision }}" \
+            --config-name "${AUDIO_CONFIG}" \
+            --per-category 32 \
+            --min-exact 5 \
+            --min-near 5 \
+            --sample-rate 16000 \
+            --work-dir "${AUDIO_DIR}" \
+            --summary "${AUDIO_DIR}/summary.json" \
+            --publish
+
+      - name: Resolve published audio revision
+        id: audio
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision="$(uv run --locked python - <<'PY'
+          import os
+          from huggingface_hub import HfApi
+          value = str(HfApi(token=os.environ['HF_TOKEN']).dataset_info(os.environ['HF_REPO_ID']).sha or '')
+          if len(value) != 40:
+              raise SystemExit(f'invalid HF revision: {value!r}')
+          print(value)
+          PY
+          )"
+          echo "revision=${revision}" >> "${GITHUB_OUTPUT}"
+          echo "homophone8-audio revision: ${revision}" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Rehydrate published audio config from Hub
+        run: |
+          rm -rf "${VERIFY_DIR}"
+          uv run --locked python scripts/materialize_hf_eval.py \
+            --repo-id "${HF_REPO_ID}" \
+            --revision "${{ steps.audio.outputs.revision }}" \
+            --config "${AUDIO_CONFIG}" \
+            --split test \
+            --output-dir "${VERIFY_DIR}" \
+            --rehydrate-audio \
+            --require-audio
+          uv run --locked python scripts/validate_eval_manifest.py \
+            "${VERIFY_DIR}/nemo_eval.jsonl" \
+            --require-audio
+
+      - name: Enforce exact and near post-publication coverage gate
+        run: |
+          uv run --locked python scripts/validate_audio_coverage.py \
+            --provenance "${VERIFY_DIR}/eval_provenance.json" \
+            --required-category exact_homophone \
+            --required-category near_homophone \
+            --min-per-category 5 \
+            --min-total 10 \
+            --output "${VERIFY_DIR}/coverage.json"
+          cat "${VERIFY_DIR}/coverage.json" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload publication evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: homophone8-audio-${{ github.sha }}
+          path: |
+            ${{ env.RELEASE_DIR }}
+            ${{ env.AUDIO_DIR }}/summary.json
+            ${{ env.VERIFY_DIR }}/bench_index.jsonl
+            ${{ env.VERIFY_DIR }}/nemo_eval.jsonl
+            ${{ env.VERIFY_DIR }}/eval_provenance.json
+            ${{ env.VERIFY_DIR }}/coverage.json
+          if-no-files-found: error
+          retention-days: 30
