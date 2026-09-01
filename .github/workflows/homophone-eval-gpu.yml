@@ -44,6 +44,7 @@ jobs:
     timeout-minutes: 180
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
       MODEL_NAME: nvidia/parakeet-tdt_ctc-0.6b-ja
       NEMO_ROOT: /opt/NeMo
       MANIFEST: data/generated/eval/nemo_eval.jsonl
@@ -52,7 +53,14 @@ jobs:
       NGPU_LM: ${{ inputs.ngpu_lm_path }}
       RESULTS_DIR: results/${{ inputs.results_name }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      - name: Restore pip download cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/pip
+          key: homophone-eval-pip-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pyproject.toml') }}
+
       - name: Check GPU and NeMo environment
         shell: bash
         run: |
@@ -68,10 +76,12 @@ jobs:
               raise SystemExit("CUDA is not available on this self-hosted runner")
           PY
           test -f "${NEMO_ROOT}/examples/asr/speech_to_text_eval.py"
+
       - name: Install evaluation-only Python dependencies
         run: |
-          python -m pip install 'datasets>=4,<5' 'huggingface-hub>=1,<2' soundfile pyarrow
+          python -m pip install 'datasets>=4,<5' 'huggingface-hub>=1.9,<2' soundfile pyarrow
           python -m pip install --no-deps -e .
+
       - name: Rehydrate published benchmark audio
         run: |
           python scripts/materialize_hf_eval.py \
@@ -82,12 +92,14 @@ jobs:
             --rehydrate-audio \
             --require-audio
           python scripts/validate_eval_manifest.py "${MANIFEST}" --require-audio
+
       - name: Record acoustic category coverage
         run: |
           python scripts/validate_audio_coverage.py \
             --provenance data/generated/eval/eval_provenance.json \
             --min-total 1 \
             --output data/generated/eval/audio_coverage.json
+
       - name: Record reproducibility environment
         shell: bash
         run: |
@@ -121,6 +133,7 @@ jobs:
               handle.write("\n")
           print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
           PY
+
       - name: Run selected experiments
         shell: bash
         run: |
@@ -140,6 +153,7 @@ jobs:
               *) echo "Unknown experiment: ${experiment}" >&2; exit 2 ;;
             esac
           done
+
       - name: Collect category-aware metrics
         shell: bash
         run: |
@@ -167,8 +181,25 @@ jobs:
             "${args[@]}" \
             --parquet "${RESULTS_DIR}/metrics.parquet" \
             --summary "${RESULTS_DIR}/summary.json"
+
+      - name: Persist immutable run evidence to HF Bucket
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id="gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-eval"
+          run_dir="dist/hf-runs/${run_id}"
+          python scripts/hf/build_run_bundle.py \
+            --results-dir "${RESULTS_DIR}" \
+            --output-dir "${run_dir}" \
+            --run-id "${run_id}" \
+            --workflow-kind homophone-eval \
+            --benchmark-index "${BENCH_INDEX}" \
+            --execution-manifest "${MANIFEST}"
+          bash scripts/hf/hf-push-run.sh "${run_dir}"
+          echo "HF Bucket run: hf://buckets/${HF_BUCKET}/runs/${run_id}" >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Upload experiment artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: homophone-eval-${{ inputs.results_name }}-${{ inputs.config_name }}-${{ inputs.split }}
           path: |
