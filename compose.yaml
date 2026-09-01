@@ -1,0 +1,26 @@
+services:
+  research:
+    image: ${JPA_CF_IMAGE:?Set JPA_CF_IMAGE to a GHCR tag or preferably an @sha256 digest}
+    entrypoint: ["/opt/jpacf/scripts/container/inside.sh"]
+    command: ["bash"]
+    working_dir: /workspace/project
+    stdin_open: true
+    tty: true
+    ipc: host
+    shm_size: ${JPA_CF_SHM_SIZE:-8gb}
+    user: "${JPA_CF_UID:-0}:${JPA_CF_GID:-0}"
+    environment:
+      HF_TOKEN: ${HF_TOKEN:-}
+      HF_BUCKET: ${HF_BUCKET:-saeeew/J-PACF-YOMI-tdt-bucket}
+      JPA_CF_STATE_ROOT: /workspace/state
+      JPA_CF_RESULTS_NAME: ${JPA_CF_RESULTS_NAME:-staged}
+    volumes:
+      - .:/workspace/project
+      - ${JPA_CF_STATE_ROOT:-./.jpacf-state}:/workspace/state
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
