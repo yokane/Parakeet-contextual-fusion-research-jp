@@ -41,15 +41,18 @@ def main() -> None:
     model.eval()
     model.change_decoding_strategy(decoder_type="ctc")
     ctc_outputs = model.transcribe(audio_paths, batch_size=1, return_hypotheses=True)
-    blank_id = int(model.ctc_decoder.num_classes_with_blank - 1)
+    blank_id = int(getattr(model.ctc_decoding, "blank_id", model.ctc_decoder.num_classes_with_blank - 1))
     args.output.parent.mkdir(parents=True, exist_ok=True)
 
     with args.output.open("w", encoding="utf-8") as sink:
         for row, raw_hyp in zip(rows, ctc_outputs, strict=True):
             hyp = extract_ctc_hypothesis(raw_hyp)
-            log_probs = hyp.y_sequence
-            if not isinstance(log_probs, torch.Tensor) or log_probs.ndim != 2:
-                raise RuntimeError("CTC hypothesis did not expose [T,V] y_sequence log probabilities")
+            alignments = getattr(hyp, "alignments", None)
+            if alignments is None:
+                raise RuntimeError("CTC hypothesis did not expose frame alignments/log probabilities")
+            log_probs = alignments if isinstance(alignments, torch.Tensor) else torch.as_tensor(alignments)
+            if log_probs.ndim != 2:
+                raise RuntimeError(f"CTC alignments must be [T,V], got {tuple(log_probs.shape)}")
             total_frames = log_probs.shape[0]
             for candidate in row["candidates"]:
                 token_ids = model.tokenizer.text_to_ids(candidate["text"])
@@ -77,7 +80,8 @@ def main() -> None:
                 )
                 candidate["ctc_local"] = float(score.cpu())
                 candidate.setdefault("metadata", {})["ctc_window"] = [window.start, window.end]
-                candidate["fused_score"] = float(candidate.get("tdt", 0.0)) + args.alpha * float(score)
+                base = float(candidate.get("fused_score", candidate.get("tdt", 0.0)))
+                candidate["fused_score"] = base + args.alpha * float(score)
             row["candidates"].sort(key=lambda item: item["fused_score"], reverse=True)
             sink.write(json.dumps(row, ensure_ascii=False) + "\n")
 
