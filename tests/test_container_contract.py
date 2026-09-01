@@ -1,13 +1,9 @@
-from __future__ import annotations
-
-from pathlib import Path
-
-
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = __file__.rsplit("/tests/", 1)[0]
 
 
 def read(path: str) -> str:
-    return (ROOT / path).read_text(encoding="utf-8")
+    with open(f"{ROOT}/{path}", encoding="utf-8") as handle:
+        return handle.read()
 
 
 def test_dockerfile_bakes_gpu_environment_outside_source_mount() -> None:
