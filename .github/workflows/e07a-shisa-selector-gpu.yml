@@ -78,7 +78,7 @@ jobs:
           [[ "${SHISA_TOP_K}" =~ ^[1-9][0-9]*$ ]] || { echo "top_k must be a positive integer" >&2; exit 2; }
           [[ "${SHISA_SEED}" =~ ^[0-9]+$ ]] || { echo "seed must be a non-negative integer" >&2; exit 2; }
           source scripts/hf/hf-identity.sh
-          hf_bucket_cli auth whoami --token "${HF_TOKEN}"
+          hf_bucket_cli auth whoami
 
       - name: Fetch immutable E05 source run from HF Bucket
         shell: bash
