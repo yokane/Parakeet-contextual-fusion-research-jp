@@ -126,22 +126,25 @@ def test_bucket_layout_rejects_missing_root() -> None:
 
 def test_dockerfile_caches_dependencies_before_copying_source() -> None:
     text = Path("Dockerfile").read_text(encoding="utf-8")
-    metadata_copy = text.index("COPY pyproject.toml ./")
-    dependency_install = text.index('project = tomllib.loads(Path("pyproject.toml")')
+    metadata_copy = text.index("COPY pyproject.toml uv.lock ./")
+    dependency_install = text.index("--no-install-project")
     source_copy = text.index("COPY src ./src")
-    editable_install = text.index("python -m pip install --no-deps -e .")
+    project_install = text.rindex("uv sync")
 
-    assert metadata_copy < dependency_install < source_copy < editable_install
-    assert "--mount=type=cache,target=/root/.cache/pip" in text
+    assert metadata_copy < dependency_install < source_copy < project_install
+    assert "--mount=type=cache,target=/root/.cache/uv" in text
     assert "--mount=type=cache,target=/var/cache/apt,sharing=locked" in text
     assert "--mount=type=cache,target=/var/lib/apt,sharing=locked" in text
 
 
-def test_ghcr_build_exports_both_gha_and_registry_caches() -> None:
+def test_ghcr_build_uses_runner_selected_buildkit_cache_contract() -> None:
     text = Path(".github/workflows/ghcr-runtime.yml").read_text(encoding="utf-8")
-    assert "type=gha,scope=${{ env.CACHE_SCOPE }}" in text
-    assert "type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache" in text
-    assert "type=raw,value=sha-${{ github.sha }}" in text
+    assert "run: bash scripts/ci/setup_actions_cache.sh" in text
+    assert "cache-from: ${{ env.BUILDKIT_CACHE_FROM }}" in text
+    assert "cache-to: ${{ env.BUILDKIT_CACHE_TO }}" in text
+    assert "if: ${{ env.SELF_CACHE_PERSISTENT == 'true' }}" in text
+    assert "mv \"${BUILDKIT_CACHE_DIR}-next\" \"${BUILDKIT_CACHE_DIR}\"" in text
+    assert "tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}" in text
 
 
 def test_candidate_roundtrip_detects_tampering(tmp_path: Path) -> None:
