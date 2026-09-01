@@ -19,7 +19,7 @@ on:
       - ".github/workflows/homophone8-audio-publish.yml"
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: homophone8-audio-publish
@@ -41,6 +41,8 @@ jobs:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
 
       - name: Install repository toolchain from immutable lock
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
@@ -163,6 +165,33 @@ jobs:
             --output "${VERIFY_DIR}/coverage.json"
           cat "${VERIFY_DIR}/coverage.json" >> "${GITHUB_STEP_SUMMARY}"
 
+      - name: Lock verified Hub revision into repository
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run --locked python scripts/repro/resolve_hf_revisions.py --write locks/hf-revisions.lock.json
+          locked="$(uv run --locked python - <<'PY'
+          import json
+          from pathlib import Path
+          print(json.loads(Path('locks/hf-revisions.lock.json').read_text(encoding='utf-8'))['repositories']['benchmark']['revision'])
+          PY
+          )"
+          [[ "${locked}" == "${{ steps.audio.outputs.revision }}" ]] || {
+            echo "HF lock did not resolve the verified audio revision: ${locked}" >&2
+            exit 2
+          }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add locks/hf-revisions.lock.json
+          if git diff --cached --quiet; then
+            echo "HF benchmark lock already points at verified revision"
+            exit 0
+          fi
+          git commit -m "data: lock verified homophone8-audio revision"
+          git fetch origin "${GITHUB_REF_NAME}"
+          git rebase "origin/${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
       - name: Upload publication evidence
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -174,5 +203,6 @@ jobs:
             ${{ env.VERIFY_DIR }}/nemo_eval.jsonl
             ${{ env.VERIFY_DIR }}/eval_provenance.json
             ${{ env.VERIFY_DIR }}/coverage.json
+            locks/hf-revisions.lock.json
           if-no-files-found: error
           retention-days: 30
