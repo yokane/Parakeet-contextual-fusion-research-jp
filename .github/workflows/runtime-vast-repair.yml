@@ -1,0 +1,332 @@
+name: runtime-vast-repair
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: runtime-vast-repair-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  BASE_RUNTIME_IMAGE: ghcr.io/yokane/jpacf-yomi-tdt-runtime@sha256:f289935222c9cf6a6db15b3b02bd6f47b94148b7e21d26e5c33cf228147b635e
+  BASE_RUNTIME_SOURCE_SHA: 1f47e565344236c53470857dcf881ddf2790462b
+  THIN_IMAGE_NAME: ${{ github.repository_owner }}/jpacf-yomi-tdt-runtime-repair-shell
+  REPAIRED_IMAGE_NAME: ${{ github.repository_owner }}/jpacf-yomi-tdt-runtime
+  CRANE_VERSION: v0.21.9
+  CRANE_LINUX_X86_64_SHA256: 5c16d8ddb971cb1d5e6ed8b1e743da8224414eeba2c2762d8f1a61b2f095699e
+  STORAGE_GB: "80"
+  GPU_RAM_GB: "24"
+  GPU_ALLOWLIST: RTX_4090
+  MIN_INET_DOWN_MBPS: "1000"
+  MIN_RELIABILITY: "0.98"
+  PREDICTED_MINUTES: "30"
+  MAX_COST_USD: "0.35"
+  OFFER_LIMIT: "50"
+  WAIT_MAX_ATTEMPTS: "420"
+
+jobs:
+  repair:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    env:
+      VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+      GHCR_TOKEN: ${{ github.token }}
+      VAST_LABEL: jpacf-runtime-repair-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Create metadata-only repair shell Dockerfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/jpacf-runtime-repair-shell"
+          cat > "${RUNNER_TEMP}/jpacf-runtime-repair-shell/Dockerfile" <<'DOCKERFILE'
+          ARG BASE_IMAGE
+          FROM ${BASE_IMAGE}
+          ENTRYPOINT ["/bin/bash", "-lc"]
+          CMD ["sleep infinity"]
+          DOCKERFILE
+
+      - name: Build and push thin repair shell
+        id: shell_build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ${{ runner.temp }}/jpacf-runtime-repair-shell
+          file: ${{ runner.temp }}/jpacf-runtime-repair-shell/Dockerfile
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          sbom: false
+          tags: ${{ env.REGISTRY }}/${{ env.THIN_IMAGE_NAME }}:run-${{ github.run_id }}-${{ github.run_attempt }}
+          build-args: |
+            BASE_IMAGE=${{ env.BASE_RUNTIME_IMAGE }}
+
+      - name: Record repair shell identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          digest='${{ steps.shell_build.outputs.digest }}'
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          echo "REPAIR_SHELL_IMAGE=${REGISTRY}/${THIN_IMAGE_NAME}@${digest}" >> "$GITHUB_ENV"
+          echo "REPAIRED_TARGET=${REGISTRY}/${REPAIRED_IMAGE_NAME}:vast-repair-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+          mkdir -p dist/runtime-repair
+
+      - name: Install exact mise toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: true
+
+      - name: Materialize Vast CLI environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mise run deps:sync-vast
+          command -v jq >/dev/null
+          test -n "${VAST_API_KEY:-}"
+          test -n "${GHCR_TOKEN:-}"
+
+      - name: Select fast budget-compliant on-demand RTX 4090
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/providers
+          uv run --locked python scripts/providers/vast/build_search_query.py \
+            --gpu-name "$GPU_ALLOWLIST" --num-gpus 1 \
+            --gpu-ram ">=${GPU_RAM_GB}" \
+            --inet-down ">=${MIN_INET_DOWN_MBPS}" \
+            --reliability ">=${MIN_RELIABILITY}" \
+            --output-json dist/providers/runtime-repair-search-query.json \
+            > dist/providers/runtime-repair-search-query.txt
+          query="$(cat dist/providers/runtime-repair-search-query.txt)"
+          uv run --locked vastai search offers \
+            --api-key "$VAST_API_KEY" --raw --no-default --type on-demand \
+            --order 'inet_down-,dph_total' --storage "$STORAGE_GB" --limit "$OFFER_LIMIT" \
+            "$query" > dist/providers/runtime-repair-raw.json
+          uv run --locked python scripts/providers/vast/rank_offers.py \
+            --input dist/providers/runtime-repair-raw.json \
+            --predicted-minutes "$PREDICTED_MINUTES" \
+            --max-cost-usd "$MAX_COST_USD" \
+            --min-inet-down-mbps "$MIN_INET_DOWN_MBPS" \
+            --output dist/providers/runtime-repair-inventory.json \
+            > dist/providers/runtime-repair-inventory.md
+          cat dist/providers/runtime-repair-inventory.md >> "$GITHUB_STEP_SUMMARY"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload=json.loads(Path('dist/providers/runtime-repair-inventory.json').read_text())
+          offers=[row for row in payload.get('offers', []) if not row.get('is_bid')]
+          if not offers:
+              raise SystemExit('no budget-compliant on-demand RTX 4090 offer')
+          selected=max(offers, key=lambda row:(float(row.get('inet_down_mbps') or 0), -float(row.get('dph_total') or 999)))
+          Path('dist/providers/runtime-repair-selected.json').write_text(json.dumps(selected, indent=2, sort_keys=True)+'\n')
+          with open('/tmp/runtime-repair.env','w') as h:
+              h.write(f"VAST_OFFER_ID={selected['offer_id']}\n")
+              h.write(f"VAST_GPU_NAME={selected['gpu_name']}\n")
+              h.write(f"VAST_DPH_TOTAL={selected['dph_total']}\n")
+              h.write(f"VAST_INET_DOWN={selected['inet_down_mbps']}\n")
+              h.write(f"VAST_PREDICTED_COST={selected['predicted_cost_usd']}\n")
+          PY
+          cat /tmp/runtime-repair.env >> "$GITHUB_ENV"
+
+      - name: Build daemonless repair payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/runtime-repair.sh" <<'REMOTE'
+          #!/usr/bin/env bash
+          set -euxo pipefail
+          cd /opt/jpacf
+          echo '=== before repair ==='
+          ls -l /opt/jpacf/.venv/bin/python* || true
+          cat /opt/jpacf/.venv/pyvenv.cfg || true
+          old_python="$(readlink -f /opt/jpacf/.venv/bin/python 2>/dev/null || true)"
+          printf 'old_python=%s\n' "$old_python"
+
+          export UV_PYTHON_INSTALL_DIR=/opt/jpacf/.uv-python
+          export UV_PROJECT_ENVIRONMENT=/opt/jpacf/.venv
+          unset VIRTUAL_ENV || true
+          rm -rf /opt/jpacf/.uv-python /tmp/jpacf-venv-template
+          uv python install 3.12.3
+          base_python="$(find /opt/jpacf/.uv-python -type f -path '*/bin/python3.12' -print -quit)"
+          [[ -x "$base_python" ]]
+          uv venv --python "$base_python" /tmp/jpacf-venv-template
+
+          # Only replace interpreter metadata. Keep the already-baked site-packages
+          # layer intact so the repair upload stays small.
+          cp /tmp/jpacf-venv-template/pyvenv.cfg /opt/jpacf/.venv/pyvenv.cfg
+          rm -f /opt/jpacf/.venv/bin/python /opt/jpacf/.venv/bin/python3 /opt/jpacf/.venv/bin/python3.12
+          cp -a /tmp/jpacf-venv-template/bin/python /opt/jpacf/.venv/bin/python
+          cp -a /tmp/jpacf-venv-template/bin/python3 /opt/jpacf/.venv/bin/python3
+          cp -a /tmp/jpacf-venv-template/bin/python3.12 /opt/jpacf/.venv/bin/python3.12
+
+          echo '=== after metadata repair ==='
+          ls -l /opt/jpacf/.venv/bin/python*
+          cat /opt/jpacf/.venv/pyvenv.cfg
+          resolved="$(readlink -f /opt/jpacf/.venv/bin/python)"
+          [[ "$resolved" == /opt/jpacf/.uv-python/* ]]
+
+          # Existing project packages must already be present in the baked venv;
+          # otherwise a metadata-only repair is unsafe and we stop here.
+          /opt/jpacf/.venv/bin/python - <<'PY'
+          import json
+          import nemo
+          import torch
+          print(json.dumps({
+              'torch': torch.__version__,
+              'torch_compiled_cuda': torch.version.cuda,
+              'nemo': getattr(nemo, '__version__', None),
+              'cuda_available': torch.cuda.is_available(),
+              'gpu_name': torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
+          }, indent=2, sort_keys=True))
+          if not torch.cuda.is_available():
+              raise SystemExit('CUDA unavailable after metadata repair')
+          PY
+
+          # Simulate runtime state replacement by deleting the old HOME-managed
+          # interpreter tree. The repaired venv must remain fully executable.
+          rm -rf /workspace/state/home/.local/share/uv/python || true
+          bash /opt/jpacf/scripts/container/inside.sh \
+            python /opt/jpacf/scripts/container/verify_runtime.py --require-gpu
+
+          echo '=== install pinned crane ==='
+          archive=/tmp/go-containerregistry.tar.gz
+          curl -fsSL \
+            "https://github.com/google/go-containerregistry/releases/download/${CRANE_VERSION}/go-containerregistry_Linux_x86_64.tar.gz" \
+            -o "$archive"
+          printf '%s  %s\n' "$CRANE_LINUX_X86_64_SHA256" "$archive" | sha256sum -c -
+          tar -xzf "$archive" -C /usr/local/bin crane
+          crane version
+          crane auth login -u "$GHCR_USER" -p "$GHCR_TOKEN" ghcr.io
+
+          echo '=== append minimal repair layer ==='
+          tar --numeric-owner --owner=0 --group=0 -C / -cf /tmp/jpacf-runtime-repair.tar \
+            opt/jpacf/.uv-python \
+            opt/jpacf/.venv/pyvenv.cfg \
+            opt/jpacf/.venv/bin/python \
+            opt/jpacf/.venv/bin/python3 \
+            opt/jpacf/.venv/bin/python3.12
+          du -h /tmp/jpacf-runtime-repair.tar
+          crane append -b "$BASE_RUNTIME_IMAGE" -f /tmp/jpacf-runtime-repair.tar -t "$REPAIRED_TARGET"
+          digest="$(crane digest "$REPAIRED_TARGET")"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          printf 'JPA_CF_REPAIR_COMPLETE digest=%s target=%s\n' "$digest" "$REPAIRED_TARGET"
+          REMOTE
+          sha256sum "$RUNNER_TEMP/runtime-repair.sh" > dist/runtime-repair/payload.sha256
+          echo "VAST_PAYLOAD_B64=$(base64 -w0 "$RUNNER_TEMP/runtime-repair.sh")" >> "$GITHUB_ENV"
+
+      - name: Create Vast repair instance
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::add-mask::${GHCR_TOKEN}"
+          docker_env="-e VAST_PAYLOAD_B64=${VAST_PAYLOAD_B64} -e BASE_RUNTIME_IMAGE=${BASE_RUNTIME_IMAGE} -e REPAIRED_TARGET=${REPAIRED_TARGET} -e GHCR_USER=${GITHUB_ACTOR} -e GHCR_TOKEN=${GHCR_TOKEN} -e CRANE_VERSION=${CRANE_VERSION} -e CRANE_LINUX_X86_64_SHA256=${CRANE_LINUX_X86_64_SHA256}"
+          response="$(uv run --locked vastai create instance "$VAST_OFFER_ID" \
+            --api-key "$VAST_API_KEY" --raw --image "$REPAIR_SHELL_IMAGE" \
+            --disk "$STORAGE_GB" --label "$VAST_LABEL" \
+            --login "-u ${GITHUB_ACTOR} -p ${GHCR_TOKEN} ghcr.io" \
+            --env "$docker_env" --cancel-unavail \
+            --args 'echo "$VAST_PAYLOAD_B64" | base64 -d > /tmp/jpacf-runtime-repair.sh; bash /tmp/jpacf-runtime-repair.sh; rc=$?; echo "JPA_CF_REPAIR_EXIT rc=$rc"; sleep infinity')"
+          printf '%s\n' "$response" > dist/runtime-repair/create-response.json
+          id="$(python -c "import json; print(int(json.load(open('dist/runtime-repair/create-response.json'))['new_contract']))")"
+          printf '%s\n' "$id" > "$RUNNER_TEMP/vast-instance-id"
+          echo "VAST_INSTANCE_ID=$id" >> "$GITHUB_ENV"
+
+      - name: Wait for repair and capture immutable digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > dist/runtime-repair/instance-status.jsonl
+          : > dist/runtime-repair/vast-container.log
+          complete=0
+          for attempt in $(seq 1 "$WAIT_MAX_ATTEMPTS"); do
+            raw="$(uv run --locked vastai show instance "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --raw 2>/dev/null || true)"
+            if [[ -n "$raw" ]]; then
+              printf '%s\n' "$raw" > "$RUNNER_TEMP/vast-status.json"
+              python - "$attempt" "$RUNNER_TEMP/vast-status.json" <<'PY' >> dist/runtime-repair/instance-status.jsonl
+          import json, sys
+          from pathlib import Path
+          row=json.loads(Path(sys.argv[2]).read_text())
+          msg=' | '.join(x.strip() for x in str(row.get('status_msg') or '').splitlines() if x.strip())
+          print(json.dumps({'attempt': int(sys.argv[1]), 'actual_status': row.get('actual_status') or '', 'status_msg': msg, 'dph_total': row.get('dph_total')}, sort_keys=True))
+          PY
+              actual="$(jq -r '.actual_status // empty' "$RUNNER_TEMP/vast-status.json")"
+              if [[ "$actual" =~ ^(exited|offline|stopped)$ ]]; then
+                uv run --locked vastai logs "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --tail 3000 > dist/runtime-repair/vast-container.log 2>&1 || true
+                cat dist/runtime-repair/vast-container.log
+                echo "Vast repair instance entered terminal state: $actual" >&2
+                exit 1
+              fi
+            fi
+            uv run --locked vastai logs "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --tail 3000 > dist/runtime-repair/vast-container.log 2>&1 || true
+            if grep -q 'JPA_CF_REPAIR_COMPLETE digest=' dist/runtime-repair/vast-container.log; then
+              complete=1
+              break
+            fi
+            if grep -q 'JPA_CF_REPAIR_EXIT rc=[1-9]' dist/runtime-repair/vast-container.log; then
+              cat dist/runtime-repair/vast-container.log
+              exit 1
+            fi
+            if (( attempt % 12 == 0 )); then
+              echo "runtime repair wait ${attempt}/${WAIT_MAX_ATTEMPTS}"
+              tail -40 dist/runtime-repair/vast-container.log || true
+            fi
+            sleep 5
+          done
+          [[ "$complete" == 1 ]] || { tail -300 dist/runtime-repair/vast-container.log >&2; exit 1; }
+          cat dist/runtime-repair/vast-container.log
+          digest="$(sed -n 's/.*JPA_CF_REPAIR_COMPLETE digest=\(sha256:[0-9a-f]\{64\}\).*/\1/p' dist/runtime-repair/vast-container.log | tail -1)"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          reference="${REGISTRY}/${REPAIRED_IMAGE_NAME}@${digest}"
+          printf '%s\n' "$digest" > dist/runtime-repair/repaired-digest.txt
+          cat > dist/runtime-repair/runtime-repair.json <<JSON
+          {
+            "schema_version": 1,
+            "base_runtime": "${BASE_RUNTIME_IMAGE}",
+            "base_source_git_sha": "${BASE_RUNTIME_SOURCE_SHA}",
+            "repair_source_git_sha": "${GITHUB_SHA}",
+            "repaired_tag": "${REPAIRED_TARGET}",
+            "repaired_digest": "${digest}",
+            "repaired_reference": "${reference}",
+            "repair_kind": "managed-python-metadata-layer",
+            "gpu_verified_before_append": true
+          }
+          JSON
+          cat dist/runtime-repair/runtime-repair.json
+
+      - name: Destroy Vast instance
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set +e
+          if [[ -s "$RUNNER_TEMP/vast-instance-id" ]]; then
+            id="$(cat "$RUNNER_TEMP/vast-instance-id")"
+            uv run --locked vastai destroy instance "$id" --api-key "$VAST_API_KEY" -y || true
+          fi
+
+      - name: Upload repair evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: runtime-vast-repair-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/providers/runtime-repair-*
+            dist/runtime-repair/
+          if-no-files-found: warn
+          retention-days: 30
