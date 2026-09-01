@@ -34,22 +34,30 @@ jobs:
         with:
           ref: ${{ github.ref_name }}
 
-      - name: Install exact mise toolchain
+      - name: Install mise CLI without stale project tools
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           version: 2026.8.16
-          install: true
-          cache: true
+          install: false
+          cache: false
 
-      - name: Resolve Linux x86_64 tool and Python locks
+      - name: Refresh Linux x86_64 mise lock and install exact tools
         shell: bash
         run: |
           set -euo pipefail
           mise lock --platforms linux-x64
+          mise install --locked
+          python --version
+          uv --version
+
+      - name: Resolve Linux x86_64 Python dependency locks
+        shell: bash
+        run: |
+          set -euo pipefail
           uv lock
           uv lock --project tools/hf-bucket
           uv sync --locked --extra dev
-          uv sync --project tools/hf-bucket --locked
+          env -u UV_PROJECT_ENVIRONMENT uv sync --project tools/hf-bucket --locked
 
       - name: Resolve Hugging Face revisions and model file hashes
         run: uv run --locked python scripts/repro/resolve_hf_revisions.py --write locks/hf-revisions.lock.json
