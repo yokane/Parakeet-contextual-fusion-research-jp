@@ -32,7 +32,7 @@ jobs:
       - name: Materialize isolated HF Bucket transport
         run: mise run hf:transport:sync
 
-      - name: Inspect token metadata without printing credentials
+      - name: Inspect token identity without printing credentials
         shell: bash
         run: |
           set -euo pipefail
@@ -48,21 +48,18 @@ jobs:
           from pathlib import Path
 
           raw = json.loads(Path("dist/hf-auth/whoami-raw.json").read_text(encoding="utf-8"))
-          access = ((raw.get("auth") or {}).get("accessToken") or {}) if isinstance(raw, dict) else {}
-          safe = {
-              "name": raw.get("name") if isinstance(raw, dict) else None,
-              "type": raw.get("type") if isinstance(raw, dict) else None,
-              "auth_type": (raw.get("auth") or {}).get("type") if isinstance(raw, dict) else None,
-              "token_display_name": access.get("displayName"),
-              "token_role": access.get("role"),
-              "fine_grained": access.get("fineGrained"),
-          }
+          safe = {"authenticated": bool(raw)}
+          if isinstance(raw, dict):
+              for key in ("name", "type", "fullname"):
+                  if key in raw:
+                      safe[key] = raw[key]
           Path("dist/hf-auth/whoami-safe.json").write_text(
               json.dumps(safe, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
               encoding="utf-8",
           )
           print(json.dumps(safe, ensure_ascii=False, indent=2, sort_keys=True))
           PY
+          rm -f dist/hf-auth/whoami-raw.json
 
       - name: Prove write access with a disposable Bucket object
         shell: bash
@@ -89,8 +86,15 @@ jobs:
           hf_bucket cp "$remote" dist/hf-auth/roundtrip.txt --token "$HF_TOKEN" \
             >> dist/hf-auth/write-probe.log 2>&1
           cmp "$probe" dist/hf-auth/roundtrip.txt
-          hf_bucket rm "$remote" --token "$HF_TOKEN" \
+          hf_bucket rm "$remote" -y --token "$HF_TOKEN" \
             >> dist/hf-auth/write-probe.log 2>&1
+
+          # One-time cleanup from the first preflight run, which stopped at the
+          # confirmation prompt before -y was added. Missing paths are harmless.
+          hf_bucket rm \
+            "hf://buckets/${HF_BUCKET}/_auth-probe/github-actions/33523841485-1.txt" \
+            -y --token "$HF_TOKEN" \
+            >> dist/hf-auth/write-probe.log 2>&1 || true
 
           {
             echo "### HF Bucket write preflight"
