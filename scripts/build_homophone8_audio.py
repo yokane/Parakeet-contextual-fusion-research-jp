@@ -12,7 +12,7 @@ from typing import Any
 
 import numpy as np
 import soundfile as sf
-from datasets import Audio, Dataset, DatasetDict, concatenate_datasets, load_dataset
+from datasets import Audio, Dataset, concatenate_datasets, load_dataset
 from huggingface_hub import HfApi
 
 FULL_REVISION = re.compile(r"^[0-9a-f]{40}$")
@@ -191,14 +191,14 @@ def main() -> None:
         source_revision=revision,
         synth_meta=synth_meta,
     )
-    output = DatasetDict({"test": audio_dataset})
     published_revision: str | None = None
     if args.publish:
         if not args.token:
             raise SystemExit("HF_TOKEN is required with --publish")
-        output.push_to_hub(
+        audio_dataset.push_to_hub(
             args.repo_id,
             config_name=args.config_name,
+            split="test",
             token=args.token,
             max_shard_size="500MB",
             embed_external_files=True,
