@@ -103,19 +103,11 @@ jobs:
         run: |
           set -euo pipefail
           image="${REGISTRY}/${IMAGE_NAME}@${{ steps.build.outputs.digest }}"
-          mkdir -p .jpacf-state/{hf,uv,xdg,torch}
+          mkdir -p .jpacf-state
           docker pull "$image"
           docker run --rm --gpus all --ipc=host --shm-size 8g \
-            -e HF_HOME=/cache/huggingface \
-            -e UV_CACHE_DIR=/cache/uv \
-            -e XDG_CACHE_HOME=/cache/xdg \
-            -e TORCH_HOME=/cache/torch \
-            -v "$PWD/.jpacf-state/hf:/cache/huggingface" \
-            -v "$PWD/.jpacf-state/uv:/cache/uv" \
-            -v "$PWD/.jpacf-state/xdg:/cache/xdg" \
-            -v "$PWD/.jpacf-state/torch:/cache/torch" \
-            "$image" \
-            python /opt/jpacf/scripts/container/verify_runtime.py --require-gpu
+            -v "$PWD/.jpacf-state:/workspace/state" \
+            "$image"
 
       - name: Record immutable runtime identity
         shell: bash
@@ -136,7 +128,8 @@ jobs:
             "reference": "${REGISTRY}/${IMAGE_NAME}@$digest",
             "published_tag": "sha-${{ github.sha }}",
             "gpu_verified": true,
-            "execution_contract": "docker-nvidia-runtime"
+            "execution_contract": "docker-nvidia-runtime",
+            "state_mount": "/workspace/state"
           }
           EOF
           cat dist/runtime/runtime-image.json
@@ -153,11 +146,12 @@ jobs:
             -e HF_TOKEN \
             -e HF_BUCKET \
             -e GITHUB_SHA \
-            -e HF_TRANSPORT_PROJECT=/opt/jpacf/tools/hf-bucket \
             -v "$PWD:/workspace/project" \
+            -v "$PWD/.jpacf-state:/workspace/state" \
             -w /workspace/project \
             "$image" \
-            bash -lc 'source scripts/hf/hf-identity.sh; hf_bucket_cli buckets sync dist/runtime "hf://buckets/${HF_BUCKET}/runtime/sha-${GITHUB_SHA}" --token "$HF_TOKEN"'
+            /opt/jpacf/scripts/container/inside.sh bash -lc \
+            'source scripts/hf/hf-identity.sh; hf_bucket_cli buckets sync dist/runtime "hf://buckets/${HF_BUCKET}/runtime/sha-${GITHUB_SHA}" --token "$HF_TOKEN"'
 
       - name: Upload runtime identity
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
