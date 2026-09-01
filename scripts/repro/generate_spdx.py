@@ -87,8 +87,8 @@ def mise_packages() -> list[dict[str, Any]]:
     return packages
 
 
-def uv_packages() -> list[dict[str, Any]]:
-    lock = tomllib.loads((ROOT / "uv.lock").read_text(encoding="utf-8"))
+def uv_packages(lock_path: Path, scope: str) -> list[dict[str, Any]]:
+    lock = tomllib.loads(lock_path.read_text(encoding="utf-8"))
     packages: list[dict[str, Any]] = []
     for entry in lock.get("package", []):
         name = str(entry["name"])
@@ -101,7 +101,7 @@ def uv_packages() -> list[dict[str, Any]]:
         packages.append(
             package(
                 kind="pypi",
-                name=name,
+                name=f"{scope}:{name}",
                 version=version,
                 download_location=str(url or registry or "NOASSERTION"),
                 purl=f"pkg:pypi/{name}@{version}",
@@ -174,7 +174,14 @@ def build_document() -> dict[str, Any]:
         version=str(pyproject["version"]),
         download_location="https://github.com/yokane/Parakeet-contextual-fusion-research-jp",
     )
-    dependencies = mise_packages() + uv_packages() + action_packages() + hf_packages() + container_packages()
+    dependencies = (
+        mise_packages()
+        + uv_packages(ROOT / "uv.lock", "asr")
+        + uv_packages(ROOT / "tools/hf-bucket/uv.lock", "hf-bucket")
+        + action_packages()
+        + hf_packages()
+        + container_packages()
+    )
     dependencies.sort(key=lambda item: (item["name"], item["versionInfo"], item["SPDXID"]))
     relationships = [
         {
