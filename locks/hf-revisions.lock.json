@@ -1,0 +1,15 @@
+{
+  "repositories": {
+    "base_model": {
+      "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+      "repo_type": "model",
+      "revision": "44edb27eea9317daf89333e75eb830db4b1cc298"
+    },
+    "benchmark": {
+      "repo_id": "saeeew/JP-HomophoneBench",
+      "repo_type": "dataset",
+      "revision": "06b8501ae5d0afa98496f7d37a63de9c1c2ba6bb"
+    }
+  },
+  "schema_version": 1
+}

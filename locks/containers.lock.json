@@ -1,0 +1,11 @@
+{
+  "images": {
+    "nvidia_pytorch": {
+      "digest": "sha256:ace9a848c0ae543317e3c4763b6b4248961c47902625abfe3c77a0fb931c50fb",
+      "reference": "nvcr.io/nvidia/pytorch@sha256:ace9a848c0ae543317e3c4763b6b4248961c47902625abfe3c77a0fb931c50fb",
+      "repository": "nvcr.io/nvidia/pytorch",
+      "source_version_tag": "25.08-py3"
+    }
+  },
+  "schema_version": 1
+}
