@@ -19,7 +19,7 @@ def main() -> None:
     identity = load_locked_model_identity(args.lock)
     source = materialize_locked_model(identity)
     args.output.parent.mkdir(parents=True, exist_ok=True)
-    if args.output.lexists() if hasattr(args.output, "lexists") else args.output.exists() or args.output.is_symlink():
+    if args.output.exists() or args.output.is_symlink():
         args.output.unlink()
     if args.copy:
         shutil.copy2(source, args.output)
