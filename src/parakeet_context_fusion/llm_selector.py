@@ -6,7 +6,6 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-
 SYSTEM_PROMPT = """あなたは日本語ASRのN-best候補選択器です。
 与えられた候補の中から、発話として最も妥当なものを必ず1つだけ選んでください。
 候補を書き換えたり、新しい文を生成したりしてはいけません。
