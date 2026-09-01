@@ -26,7 +26,7 @@ if [[ ! -x "${KENLM_BIN_DIR}/lmplz" || ! -x "${KENLM_BIN_DIR}/build_binary" ]]; 
   exit 2
 fi
 
-python "${TRAIN_SCRIPT}" \
+uv run --locked python "${TRAIN_SCRIPT}" \
   nemo_model_file="${MODEL_NEMO}" \
   train_paths="[${LM_CORPUS}]" \
   kenlm_bin_path="${KENLM_BIN_DIR}" \
