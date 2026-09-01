@@ -13,7 +13,7 @@ fail(){ printf '[hf-push-run] ERROR: %s\n' "$*" >&2; exit 1; }
 RUN_DIRECTORY="${1:-}"
 [[ $# -eq 1 && -d "$RUN_DIRECTORY" ]] || fail "Usage: $0 <run-directory>"
 [[ -n "${HF_TOKEN:-}" ]] || fail "HF_TOKEN is required"
-command -v hf >/dev/null 2>&1 || fail "hf CLI is unavailable"
+command -v uv >/dev/null 2>&1 || fail "uv is unavailable; enter through mise"
 
 if [[ -z "${HF_BUCKET:-}" ]]; then
   HF_BUCKET="$(python - <<'PY'
@@ -32,12 +32,12 @@ REMOTE="hf://buckets/${BUCKET}/runs/${RUN_ID}"
 
 # Runs are append-only evidence. Any existing object under this run ID means a
 # rerun would mutate history, so fail before creating a plan.
-EXISTING="$(hf buckets list "${BUCKET}/runs/${RUN_ID}" -R -q --token "$HF_TOKEN" || true)"
+EXISTING="$(hf_bucket_cli buckets list "${BUCKET}/runs/${RUN_ID}" -R -q --token "$HF_TOKEN" || true)"
 [[ -z "$EXISTING" ]] || fail "run already exists in Bucket: ${RUN_ID}"
 
 PLAN="$(mktemp -t jpacf-run-plan.XXXXXX.jsonl)"
 trap 'rm -f "$PLAN"' EXIT
-hf buckets sync \
+hf_bucket_cli buckets sync \
   --token "$HF_TOKEN" \
   "$RUN_DIRECTORY" \
   "$REMOTE" \
@@ -48,6 +48,6 @@ UPLOAD_COUNT="$(printf '%s\n' "$SUMMARY" | sed -n 's/^upload_count=//p')"
 [[ "$UPLOAD_COUNT" =~ ^[1-9][0-9]*$ ]] || fail "sync plan did not contain a positive upload count"
 log "Validated append-only run plan: ${UPLOAD_COUNT} uploads"
 
-hf buckets sync --token "$HF_TOKEN" --apply "$PLAN"
+hf_bucket_cli buckets sync --token "$HF_TOKEN" --apply "$PLAN"
 log "Published run: $REMOTE"
 printf '%s\n' "$RUN_ID"
