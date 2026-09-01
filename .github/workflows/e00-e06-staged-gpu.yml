@@ -1,28 +1,6 @@
 name: e00-e06-staged-gpu
 
 on:
-  workflow_dispatch:
-    inputs:
-      run_e05:
-        description: "E05 policy after the E04 evidence gate"
-        required: true
-        default: "auto"
-        type: choice
-        options: [auto, never, force]
-      run_e06:
-        description: "Run version-specific E06 after E05"
-        required: true
-        default: false
-        type: boolean
-      e06_driver:
-        description: "Repository-relative NeMo-3.0.0 E06 driver path; required only when run_e06=true"
-        required: false
-        type: string
-      results_name:
-        description: "Result directory suffix"
-        required: true
-        default: "staged"
-        type: string
   push:
     branches:
       - run/e00-e06-selfhosted-20260901
@@ -31,21 +9,13 @@ permissions:
   contents: read
 
 concurrency:
-  group: e00-e06-staged-${{ github.ref }}
-  cancel-in-progress: false
+  group: e00-e06-cuda-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   research:
     runs-on: [self-hosted, linux, x64, cuda13]
-    timeout-minutes: 360
-    env:
-      HF_TOKEN: ${{ secrets.HF_TOKEN }}
-      HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
-      EVAL_DIR: data/generated/eval
-      RESULTS_DIR: results/${{ github.event_name == 'push' && 'selfhosted-first' || inputs.results_name }}
-      RUN_E05: ${{ github.event_name == 'push' && 'auto' || (inputs.run_e05 == 'never' && '0' || inputs.run_e05) }}
-      RUN_E06: ${{ github.event_name == 'push' && '0' || (inputs.run_e06 && '1' || '0') }}
-      E06_DRIVER: ${{ github.event_name == 'push' && '' || inputs.e06_driver }}
+    timeout-minutes: 60
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -71,44 +41,38 @@ jobs:
         with:
           version: 2026.8.16
           install: true
-          cache: ${{ steps.cache.outputs.persistent != 'true' }}
+          cache: false
 
-      - name: Validate runner and prepare E00-E04 prerequisites
+      - name: Materialize canonical GPU environment
         shell: bash
-        run: bash scripts/research/prepare_e00_e04.sh
+        run: mise run deps:sync-gpu
 
-      - name: Run staged E00-E06 experiment ladder
-        shell: bash
-        run: bash experiments/run_staged_e00_e06.sh
-
-      - name: Persist immutable evidence to HF Bucket
-        if: ${{ always() }}
+      - name: Diagnose CUDA library selection
         shell: bash
         run: |
-          set -euo pipefail
-          test -d "${RESULTS_DIR}" || exit 0
-          run_id="gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-e00-e06"
-          run_dir="dist/hf-runs/${run_id}"
-          uv run --locked --no-sync python scripts/hf/build_run_bundle.py \
-            --results-dir "${RESULTS_DIR}" \
-            --output-dir "${run_dir}" \
-            --run-id "${run_id}" \
-            --workflow-kind e00-e06-staged \
-            --benchmark-index "${EVAL_DIR}/bench_index.jsonl" \
-            --execution-manifest "${EVAL_DIR}/nemo_eval.jsonl"
-          bash scripts/hf/hf-push-run.sh "${run_dir}"
-          echo "HF Bucket run: hf://buckets/${HF_BUCKET}/runs/${run_id}" >> "${GITHUB_STEP_SUMMARY}"
-
-      - name: Upload short-lived GitHub artifact
-        if: ${{ always() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: e00-e06-${{ github.event_name == 'push' && 'selfhosted-first' || inputs.results_name }}-${{ github.sha }}
-          path: |
-            data/generated/eval/eval_provenance.json
-            data/generated/eval/audio_coverage.json
-            data/generated/eval/bench_index.jsonl
-            data/generated/eval/nemo_eval.jsonl
-            ${{ env.RESULTS_DIR }}
-          if-no-files-found: warn
-          retention-days: 30
+          set +e
+          echo '=== GPU ==='
+          nvidia-smi
+          echo '=== installed NVIDIA/CUDA packages ==='
+          dpkg -l | grep -E 'nvidia|cuda' | head -200 || true
+          echo '=== libcuda candidates ==='
+          ls -l /usr/lib/wsl/lib/libcuda.so* 2>/dev/null || true
+          ls -l /usr/lib/x86_64-linux-gnu/libcuda.so* 2>/dev/null || true
+          readlink -f /usr/lib/wsl/lib/libcuda.so.1 2>/dev/null || true
+          readlink -f /usr/lib/x86_64-linux-gnu/libcuda.so.1 2>/dev/null || true
+          echo '=== torch import, no CUDA init ==='
+          uv run --locked --no-sync python -c 'import torch; print(torch.__version__, torch.version.cuda)'
+          echo "import_rc=$?"
+          echo '=== CUDA check with existing library order ==='
+          uv run --locked --no-sync python -c 'import torch; print(torch.cuda.is_available())'
+          echo "default_check_rc=$?"
+          echo '=== CUDA check prioritizing WSL stub ==='
+          LD_LIBRARY_PATH=/usr/lib/wsl/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH-} \
+            uv run --locked --no-sync python -c 'import torch; print(torch.cuda.is_available()); print(torch.cuda.device_count()); print(torch.cuda.get_device_name(0) if torch.cuda.device_count() else "no-device")'
+          echo "wsl_first_rc=$?"
+          echo '=== NVML check prioritizing WSL stub ==='
+          PYTORCH_NVML_BASED_CUDA_CHECK=1 \
+          LD_LIBRARY_PATH=/usr/lib/wsl/lib:/usr/local/cuda/lib64:${LD_LIBRARY_PATH-} \
+            uv run --locked --no-sync python -c 'import torch; print(torch.cuda.is_available())'
+          echo "nvml_wsl_first_rc=$?"
+          exit 0
