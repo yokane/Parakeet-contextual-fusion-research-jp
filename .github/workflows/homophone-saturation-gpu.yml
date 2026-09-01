@@ -31,7 +31,7 @@ on:
         default: "5"
         type: string
       ngpu_lm_path:
-        description: "NGPU-LM model path on the self-hosted runner"
+        description: "NGPU-LM model path on the runner"
         required: true
         default: "artifacts/lm/ja-6gram.nemo"
         type: string
@@ -50,52 +50,60 @@ concurrency:
 
 jobs:
   sweep:
-    runs-on: [self-hosted, linux, gpu]
-    timeout-minutes: 240
+    runs-on: [self-hosted, linux, x64, cuda13]
+    timeout-minutes: 300
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
-      MODEL_NAME: nvidia/parakeet-tdt_ctc-0.6b-ja
-      NEMO_ROOT: /opt/NeMo
       MANIFEST: data/generated/saturation/nemo_eval.jsonl
       BENCH_INDEX: data/generated/saturation/bench_index.jsonl
       CONTEXT_PHRASES: data/generated/saturation/context_phrases.txt
       NGPU_LM: ${{ inputs.ngpu_lm_path }}
       SWEEP_ROOT: results/saturation
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Restore pip download cache
-        uses: actions/cache@v6
+      - name: Install exact mise toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          path: ~/.cache/pip
-          key: homophone-saturation-pip-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pyproject.toml') }}
+          version: 2026.8.16
+          install: true
+          cache: true
 
-      - name: Check GPU and NeMo environment
+      - name: Restore uv and HF caches
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            .cache/uv
+            ~/.cache/huggingface
+          key: jpacf-saturation-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('uv.lock', 'tools/hf-bucket/uv.lock', 'locks/hf-revisions.lock.json') }}
+
+      - name: Materialize exact GPU and Bucket environments
         shell: bash
         run: |
           set -euo pipefail
-          nvidia-smi
-          python - <<'PY'
-          import nemo
-          import torch
+          mise run deps:sync-gpu
+          mise run hf:transport:sync
+          echo "${GITHUB_WORKSPACE}/tools/hf-bucket/.venv/bin" >> "$GITHUB_PATH"
 
-          print("nemo", getattr(nemo, "__version__", "unknown"))
-          print("torch", torch.__version__)
-          print("cuda", torch.cuda.is_available())
-          if not torch.cuda.is_available():
-              raise SystemExit("CUDA is not available")
-          PY
-          test -f "${NEMO_ROOT}/examples/asr/speech_to_text_eval.py"
-          test -f "${NGPU_LM}" || {
-            echo "NGPU-LM file not found: ${NGPU_LM}" >&2
-            exit 2
-          }
-
-      - name: Install evaluation dependencies
+      - name: Verify authoritative CUDA13 platform
         run: |
-          python -m pip install 'datasets>=4,<5' 'huggingface-hub>=1.9,<2' soundfile pyarrow
-          python -m pip install --no-deps -e .
+          uv run --locked python scripts/repro/verify_platform.py --require-gpu
+          test -f "${NGPU_LM}" || { echo "NGPU-LM file not found: ${NGPU_LM}" >&2; exit 2; }
+
+      - name: Resolve immutable benchmark revision
+        id: benchmark
+        shell: bash
+        run: |
+          revision="$(uv run --locked python - <<'PY'
+          import json
+          from pathlib import Path
+          lock = json.loads(Path('locks/hf-revisions.lock.json').read_text(encoding='utf-8'))
+          print(lock['repositories']['benchmark']['revision'])
+          PY
+          )"
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || exit 2
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
 
       - name: Normalize PB alpha sweep
         shell: bash
@@ -104,16 +112,9 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p "${SWEEP_ROOT}"
-          python - <<'PY' > "${SWEEP_ROOT}/alpha_values.txt"
+          uv run --locked python - <<'PY' > "${SWEEP_ROOT}/alpha_values.txt"
           import os
-
-          values = sorted(
-              {
-                  float(value.strip())
-                  for value in os.environ["RAW_PB_ALPHAS"].split(",")
-                  if value.strip()
-              }
-          )
+          values = sorted({float(value.strip()) for value in os.environ["RAW_PB_ALPHAS"].split(",") if value.strip()})
           if len(values) < 2:
               raise SystemExit("At least two distinct PB alpha values are required")
           if not any(abs(value) < 1e-12 for value in values):
@@ -121,18 +122,18 @@ jobs:
           for value in values:
               print(f"{value:.12g}")
           PY
-          cat "${SWEEP_ROOT}/alpha_values.txt"
 
-      - name: Rehydrate fixed evaluation set
+      - name: Rehydrate fixed immutable evaluation set
         run: |
-          python scripts/materialize_hf_eval.py \
+          uv run --locked python scripts/materialize_hf_eval.py \
             --repo-id saeeew/JP-HomophoneBench \
+            --revision "${{ steps.benchmark.outputs.revision }}" \
             --config "${{ inputs.config_name }}" \
             --split "${{ inputs.split }}" \
             --output-dir data/generated/saturation \
             --rehydrate-audio \
             --require-audio
-          python scripts/validate_eval_manifest.py "${MANIFEST}" --require-audio
+          uv run --locked python scripts/validate_eval_manifest.py "${MANIFEST}" --require-audio
 
       - name: Enforce acoustic category coverage
         shell: bash
@@ -149,7 +150,7 @@ jobs:
             category="${raw//[[:space:]]/}"
             [[ -z "${category}" ]] || args+=(--required-category "${category}")
           done
-          python scripts/validate_audio_coverage.py "${args[@]}"
+          uv run --locked python scripts/validate_audio_coverage.py "${args[@]}"
 
       - name: Record sweep environment
         shell: bash
@@ -158,14 +159,12 @@ jobs:
           SPLIT_NAME: ${{ inputs.split }}
         run: |
           set -euo pipefail
-          mkdir -p "${SWEEP_ROOT}"
-          python - <<'PY'
+          uv run --locked python - <<'PY'
           import json
           import os
           import platform
           import subprocess
-
-          import nemo
+          from importlib import metadata
           import torch
 
           def command(*args):
@@ -173,41 +172,41 @@ jobs:
 
           with open(os.path.join(os.environ["SWEEP_ROOT"], "alpha_values.txt"), encoding="utf-8") as handle:
               alphas = [float(line) for line in handle if line.strip()]
+          lock = json.load(open("locks/hf-revisions.lock.json", encoding="utf-8"))
           report = {
               "git_sha": command("git", "rev-parse", "HEAD"),
+              "platform_contract": "linux/amd64",
+              "cuda_major_contract": 13,
               "python": platform.python_version(),
               "torch": torch.__version__,
-              "nemo": getattr(nemo, "__version__", "unknown"),
+              "nemo": metadata.version("nemo-toolkit"),
               "cuda_runtime": torch.version.cuda,
               "gpu": torch.cuda.get_device_name(0),
               "config": os.environ["CONFIG_NAME"],
               "split": os.environ["SPLIT_NAME"],
               "pb_alphas": alphas,
+              "base_model_revision": lock["repositories"]["base_model"]["revision"],
+              "benchmark_revision": lock["repositories"]["benchmark"]["revision"],
           }
           with open(os.path.join(os.environ["SWEEP_ROOT"], "environment.json"), "w", encoding="utf-8") as handle:
               json.dump(report, handle, ensure_ascii=False, indent=2, sort_keys=True)
               handle.write("\n")
-          print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
           PY
 
-      - name: Run E03 GPU-PB alpha sweep
+      - name: Run E03 GPU-PB alpha sweep through mise
         shell: bash
         run: |
           set -euo pipefail
           : > "${SWEEP_ROOT}/result_specs.txt"
           while IFS= read -r alpha; do
             [[ -z "${alpha}" ]] && continue
-            label="$(python -c 'import sys; print(f"{float(sys.argv[1]):.2f}")' "${alpha}")"
+            label="$(uv run --locked python -c 'import sys; print(f"{float(sys.argv[1]):.2f}")' "${alpha}")"
             experiment="E03_pb_${label}"
             run_dir="${SWEEP_ROOT}/${experiment}"
             mkdir -p "${run_dir}"
-            echo "Running ${experiment}"
-            RESULTS_DIR="${run_dir}" PB_ALPHA="${alpha}" bash experiments/E03_gpu_pb.sh
-            result="${run_dir}/E03_gpu_pb.json"
-            test -f "${result}" || {
-              echo "Missing E03 result: ${result}" >&2
-              exit 2
-            }
+            RESULTS_DIR="${run_dir}" PB_ALPHA="${alpha}" mise run run:e03
+            result="${run_dir}/E03_gpu_pb.jsonl"
+            test -f "${result}" || { echo "Missing E03 result: ${result}" >&2; exit 2; }
             printf '%s=%s\n' "${experiment}" "${result}" >> "${SWEEP_ROOT}/result_specs.txt"
           done < "${SWEEP_ROOT}/alpha_values.txt"
           test -s "${SWEEP_ROOT}/result_specs.txt"
@@ -217,10 +216,8 @@ jobs:
         run: |
           set -euo pipefail
           args=()
-          while IFS= read -r spec; do
-            [[ -z "${spec}" ]] || args+=(--result "${spec}")
-          done < "${SWEEP_ROOT}/result_specs.txt"
-          python scripts/collect_experiment_metrics.py \
+          while IFS= read -r spec; do [[ -z "${spec}" ]] || args+=(--result "${spec}"); done < "${SWEEP_ROOT}/result_specs.txt"
+          uv run --locked python scripts/collect_experiment_metrics.py \
             --benchmark "${BENCH_INDEX}" \
             --execution-manifest "${MANIFEST}" \
             "${args[@]}" \
@@ -229,40 +226,20 @@ jobs:
             --summary "${SWEEP_ROOT}/summary.json"
 
       - name: Build sweep specification
-        shell: bash
         run: |
-          set -euo pipefail
-          python - <<'PY'
+          uv run --locked python - <<'PY'
           import json
           import os
-
           with open(os.path.join(os.environ["SWEEP_ROOT"], "alpha_values.txt"), encoding="utf-8") as handle:
               alphas = [float(line) for line in handle if line.strip()]
-          points = [
-              {"experiment": f"E03_pb_{alpha:.2f}", "value": alpha}
-              for alpha in alphas
-          ]
-          spec = {
-              "sweeps": [
-                  {
-                      "name": "gpu_pb_alpha",
-                      "parameter": "PB_ALPHA",
-                      "benefit_metric": "entity_accuracy",
-                      "risk_metric": "distractor_false_positive_rate",
-                      "categories": [
-                          "exact_homophone",
-                          "near_homophone",
-                          "voicing",
-                          "long_vowel",
-                          "geminate",
-                          "moraic_nasal",
-                          "pitch_accent",
-                          "semantic_only",
-                      ],
-                      "points": points,
-                  }
-              ]
-          }
+          spec = {"sweeps": [{
+              "name": "gpu_pb_alpha",
+              "parameter": "PB_ALPHA",
+              "benefit_metric": "entity_accuracy",
+              "risk_metric": "distractor_false_positive_rate",
+              "categories": ["exact_homophone", "near_homophone", "voicing", "long_vowel", "geminate", "moraic_nasal", "pitch_accent", "semantic_only"],
+              "points": [{"experiment": f"E03_pb_{alpha:.2f}", "value": alpha} for alpha in alphas],
+          }]}
           with open(os.path.join(os.environ["SWEEP_ROOT"], "sweep.json"), "w", encoding="utf-8") as handle:
               json.dump(spec, handle, ensure_ascii=False, indent=2, sort_keys=True)
               handle.write("\n")
@@ -270,7 +247,7 @@ jobs:
 
       - name: Detect TurboBias saturation
         run: |
-          python scripts/analyze_saturation.py \
+          uv run --locked python scripts/analyze_saturation.py \
             --metrics "${SWEEP_ROOT}/metrics.parquet" \
             --sweep "${SWEEP_ROOT}/sweep.json" \
             --output "${SWEEP_ROOT}/saturation.json" \
@@ -286,7 +263,7 @@ jobs:
           set -euo pipefail
           run_id="gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-saturation"
           run_dir="dist/hf-runs/${run_id}"
-          python scripts/hf/build_run_bundle.py \
+          uv run --locked python scripts/hf/build_run_bundle.py \
             --results-dir "${SWEEP_ROOT}" \
             --output-dir "${run_dir}" \
             --run-id "${run_id}" \
@@ -294,12 +271,11 @@ jobs:
             --benchmark-index "${BENCH_INDEX}" \
             --execution-manifest "${MANIFEST}"
           bash scripts/hf/hf-push-run.sh "${run_dir}"
-          echo "HF Bucket run: hf://buckets/${HF_BUCKET}/runs/${run_id}" >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Upload saturation artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: homophone-saturation-${{ inputs.artifact_suffix }}-${{ inputs.config_name }}-${{ inputs.split }}
+          name: homophone-saturation-${{ inputs.artifact_suffix }}-${{ inputs.config_name }}-${{ inputs.split }}-${{ github.sha }}
           path: |
             data/generated/saturation/eval_provenance.json
             data/generated/saturation/audio_coverage.json
