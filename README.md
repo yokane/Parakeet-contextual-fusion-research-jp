@@ -4,7 +4,7 @@
 
 # Parakeet Contextual Fusion Research JP
 
-Japanese contextual-ASR research suite for `nvidia/parakeet-tdt_ctc-0.6b-ja`, with a reproducible `JP-HomophoneBench` builder, Hugging Face publication pipeline, and category-aware E00-E06 evaluation flow.
+Japanese contextual-ASR research suite for `nvidia/parakeet-tdt_ctc-0.6b-ja`, with a reproducible `JP-HomophoneBench` builder, Hugging Face publication pipeline, category-aware E00-E07a evaluation flow, and append-only experiment evidence in `saeeew/J-PACF-YOMI-tdt-bucket`.
 
 ## Experiment ladder
 
@@ -16,9 +16,12 @@ E00 TDT greedy
  -> E04 + local hybrid-CTC N-best rerank
  -> E05 + frozen-encoder phoneme CTC rerank
  -> E06 optional in-beam scorer integration
+ -> E07a Shisa V2 deterministic N-best selection
 ```
 
-The Parakeet checkpoint remains frozen through E04. E05 trains only a small phoneme CTC projection over cached FastConformer encoder states.
+The Parakeet checkpoint remains frozen through E04. E05 trains only a small phoneme CTC projection over cached FastConformer encoder states. E07a does not modify the ASR model or generate replacement text: `shisa-ai/shisa-v2-qwen2.5-7b` selects exactly one hypothesis that already exists in the upstream N-best list.
+
+See [`docs/e07a-shisa-nbest-selector.md`](docs/e07a-shisa-nbest-selector.md) for the leakage controls, canonical run procedure, metrics, decision rules, and HF Bucket evidence workflow.
 
 ## JP-HomophoneBench core8
 
@@ -74,7 +77,7 @@ pip install -e '.[dev,g2p]'
 pytest
 ```
 
-GPU experiments additionally require NVIDIA NeMo and CUDA.
+GPU experiments additionally require NVIDIA NeMo and CUDA. E07a keeps the repository's authoritative `uv.lock` unchanged and layers versioned Transformers packages onto the locked GPU runtime with `uv run --with`.
 
 ## Build and publish the fixed Dataset
 
@@ -169,9 +172,46 @@ E05 additionally requires a trained phone head and cached encoder features. E06 
 
 The GPU-PB configuration follows current NeMo `malsd_batch` paths: `rnnt_decoding.malsd.boosting_tree.*`. NGPU-LM remains under `rnnt_decoding.beam.*`.
 
+## Run E07a Shisa N-best selection
+
+The canonical E07a arm consumes the E05 N-best/reranked JSONL and does not expose the benchmark reference or ASR scores to Shisa. Candidate prompt order is deterministically shuffled to reduce rank-position bias.
+
+```bash
+export INPUT=results/E05_phone_rerank.jsonl
+export BENCHMARK_INDEX=data/generated/bench_index.jsonl
+uv run --locked \
+  --extra gpu \
+  --with 'transformers==4.57.3' \
+  --with 'accelerate>=1.10,<2' \
+  --with 'safetensors>=0.5' \
+  bash experiments/E07a_shisa_select.sh
+```
+
+Outputs:
+
+```text
+results/E07a_shisa_select.jsonl
+results/E07a_metrics.parquet
+results/E07a_summary.json
+```
+
+Publish immutable evidence to the project Bucket:
+
+```bash
+export HF_TOKEN=hf_...
+RUN_ID="e07a-shisa7b-k8-seed7-$(git rev-parse --short=8 HEAD)"
+bash scripts/hf/publish_e07a_run.sh "${RUN_ID}"
+```
+
+Remote evidence lives under:
+
+```text
+hf://buckets/saeeew/J-PACF-YOMI-tdt-bucket/runs/<RUN_ID>
+```
+
 ## Collect E00-E06 metrics
 
-The result collector accepts NeMo single-best manifests and the repository's N-best/reranked JSONL files, joins them to the immutable benchmark IDs, and writes Zstd Parquet plus a JSON summary.
+The general result collector accepts NeMo single-best manifests and the repository's N-best/reranked JSONL files, joins them to the immutable benchmark IDs, and writes Zstd Parquet plus a JSON summary.
 
 ```bash
 make metrics \
@@ -197,16 +237,21 @@ Currently aggregated metrics include:
 - paired CER/entity-accuracy deltas versus E00
 - the same aggregates per core8 category
 
+E07a has a selector-specific evaluator because it returns one selected hypothesis while preserving the original N-best list as evidence. It reports source-vs-selected CER/entity accuracy, wins/losses/ties, parse/fallback rates, and category breakdowns.
+
 This makes the main contextual-ASR diagnostic explicit:
 
 - high Oracle@K + low Acc@1 -> scoring/ranking bottleneck;
 - low Oracle@K -> search/acoustic hypothesis bottleneck;
 - near-homophone gains after E05 -> phoneme scorer is helping where it should;
-- exact-homophone/semantic-only remaining hard after E05 -> add linguistic/document/entity context rather than increasing phoneme weight.
+- exact-homophone/semantic-only remaining hard after E05 -> linguistic/entity context is the remaining bottleneck;
+- E07a gains on exact-homophone/semantic-only with low damage -> second-pass semantic selection is justified.
 
 ## GitHub Actions
 
-Three workflows have distinct responsibilities:
+The repository keeps CPU checks, GPU evaluation, dataset/model publication and HF Bucket evidence flows separate. The HF Bucket is configured as `saeeew/J-PACF-YOMI-tdt-bucket`; immutable run evidence is stored below `runs/`.
+
+Existing core workflows include:
 
 ```text
 parakeet-context-fusion-ci.yml
@@ -219,26 +264,25 @@ homophone-eval-smoke.yml
   -> metrics.parquet + summary.json
 
 homophone-eval-gpu.yml
-  manual only, runs-on [self-hosted, linux, gpu]
-  -> rehydrate source audio
-  -> selected E00..E06
-  -> category-aware Parquet metrics
-```
+  manual self-hosted GPU evaluation
 
-The GPU workflow defaults to `E00,E01`. E02-E04 need the NGPU-LM file available on the runner; E05/E06 additionally require their experiment-specific artifacts.
+hf-bucket-candidate-publish.yml
+  validated candidate artifact publication
+```
 
 ## Repository layout
 
 ```text
 .github/workflows/    CPU CI, HF publication, smoke and GPU evaluation
-configs/              experiment/evaluation defaults
+configs/              experiment/evaluation/storage defaults
 data/                 benchmark metadata and CC0 seeds
-experiments/          E00-E06 runners
+docs/                 research protocols and release provenance
+experiments/          E00-E07a runners
 patches/              E06 NeMo integration contract
 schemas/              benchmark JSON Schema
-scripts/              builders, materializers, validators, decoders and metrics
+scripts/              builders, selectors, materializers, validators and metrics
 src/                  reusable Python package
 tests/                CPU regression tests
 ```
 
-See `docs/jp-homophone-bench.md`, `docs/phone-head.md`, and `docs/releases/v0.1.0.md` for deeper contracts and provenance.
+See `docs/jp-homophone-bench.md`, `docs/phone-head.md`, `docs/hf-storage.md`, `docs/e07a-shisa-nbest-selector.md`, and `docs/releases/v0.1.0.md` for deeper contracts and provenance.
