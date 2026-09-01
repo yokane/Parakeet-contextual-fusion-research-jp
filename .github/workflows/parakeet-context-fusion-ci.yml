@@ -12,6 +12,8 @@ on:
       - "schemas/**"
       - "Makefile"
       - "pyproject.toml"
+      - "Dockerfile"
+      - ".dockerignore"
       - ".github/workflows/**"
   push:
     branches: [main]
@@ -24,6 +26,8 @@ on:
       - "schemas/**"
       - "Makefile"
       - "pyproject.toml"
+      - "Dockerfile"
+      - ".dockerignore"
       - ".github/workflows/**"
 
 permissions:
@@ -33,25 +37,63 @@ jobs:
   cpu-checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+
+      - id: python
+        uses: actions/setup-python@v7
         with:
           python-version: "3.11"
-          cache: pip
-          cache-dependency-path: pyproject.toml
-      - name: Install CPU test dependencies
+
+      # Cache the installed dependency environment, not the source tree. The
+      # key changes only when dependency metadata/Python changes.
+      - name: Restore dependency environment
+        id: dependency-cache
+        uses: actions/cache@v6
+        with:
+          path: .venv
+          key: >-
+            jpacf-ci-venv-${{ runner.os }}-${{ runner.arch }}-py${{ steps.python.outputs.python-version }}-${{ hashFiles('pyproject.toml') }}
+
+      - name: Install CPU dependencies on cache miss
+        if: steps.dependency-cache.outputs.cache-hit != 'true'
+        shell: bash
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
-          python -m pip install \
-            'datasets>=4,<5' 'huggingface-hub>=0.34,<2' jsonschema numpy \
-            omegaconf pydantic pyyaml soundfile pyarrow pytest ruff
-          python -m pip install --no-deps -e .
+          set -euo pipefail
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip setuptools wheel
+          .venv/bin/python -m pip install --index-url https://download.pytorch.org/whl/cpu torch
+          .venv/bin/python - <<'PY'
+          import subprocess
+          import sys
+          import tomllib
+          from pathlib import Path
+
+          project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))["project"]
+          requirements = [
+              requirement
+              for requirement in project.get("dependencies", [])
+              if not requirement.lower().startswith("torch")
+          ]
+          requirements.extend(project.get("optional-dependencies", {}).get("dev", []))
+          subprocess.check_call([sys.executable, "-m", "pip", "install", *requirements])
+          PY
+
+      - name: Activate cached dependency environment
+        shell: bash
+        run: echo "${GITHUB_WORKSPACE}/.venv/bin" >> "${GITHUB_PATH}"
+
+      # Source installation is intentionally separate from dependency caching.
+      - name: Install source only
+        run: python -m pip install --no-deps -e .
+
       - name: Lint
         run: ruff check src scripts tests
+
       - name: Unit tests
         run: pytest
+
       - name: Compile Python sources
         run: python -m compileall -q src scripts
+
       - name: Shell syntax
         run: find experiments scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n
