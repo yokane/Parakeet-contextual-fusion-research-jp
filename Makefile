@@ -8,8 +8,14 @@ GENERATED ?= data/generated
 RESULTS_DIR ?= results
 RESULT_SPECS ?=
 SATURATION_SPEC ?= configs/saturation.example.json
+COVERAGE_PROVENANCE ?= $(GENERATED)/eval_provenance.json
+REQUIRED_AUDIO_CATEGORIES ?= exact_homophone near_homophone
+MIN_AUDIO_PER_CATEGORY ?= 5
+DISTRACTOR_COUNTS ?= 0,10,100
+CONTEXT_STRESS_DIR ?= $(GENERATED)/context-stress
+CONTEXT_STRESS_RESULTS ?= $(RESULTS_DIR)/context-stress
 
-.PHONY: lint test validate bench bench-permissive bench-validate hf-publish hf-eval-index hf-eval-audio metrics saturation run-e00 run-e01 run-e02 run-e03 run-e04 run-e05 run-e06
+.PHONY: lint test validate bench bench-permissive bench-validate hf-publish hf-eval-index hf-eval-audio metrics saturation audio-coverage context-stress-lists context-stress-analyze run-e00 run-e01 run-e02 run-e03 run-e04 run-e05 run-e06
 
 lint:
 	ruff check src scripts tests
@@ -81,6 +87,28 @@ saturation:
 		--metrics $(RESULTS_DIR)/metrics.parquet \
 		--sweep $(SATURATION_SPEC) \
 		--output $(RESULTS_DIR)/saturation.json
+
+audio-coverage:
+	$(PYTHON) scripts/validate_audio_coverage.py \
+		--provenance $(COVERAGE_PROVENANCE) \
+		--min-per-category $(MIN_AUDIO_PER_CATEGORY) \
+		--min-total $(MIN_AUDIO_PER_CATEGORY) \
+		$(foreach category,$(REQUIRED_AUDIO_CATEGORIES),--required-category $(category)) \
+		--output $(RESULTS_DIR)/audio_coverage.json
+
+context-stress-lists:
+	$(PYTHON) scripts/build_context_stress.py \
+		--benchmark $(CONTEXT_STRESS_DIR)/bench_index.jsonl \
+		--execution-manifest $(CONTEXT_STRESS_DIR)/nemo_eval.jsonl \
+		--output-dir $(CONTEXT_STRESS_DIR)/lists \
+		--distractor-counts $(DISTRACTOR_COUNTS) \
+		--seed 20260901
+
+context-stress-analyze:
+	$(PYTHON) scripts/analyze_context_stress.py \
+		--metrics $(CONTEXT_STRESS_RESULTS)/metrics.parquet \
+		--stress-manifest $(CONTEXT_STRESS_DIR)/lists/context_stress_manifest.json \
+		--output $(CONTEXT_STRESS_RESULTS)/context_stress.json
 
 run-e00:
 	bash experiments/E00_tdt_greedy.sh
