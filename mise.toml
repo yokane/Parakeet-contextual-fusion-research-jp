@@ -23,7 +23,6 @@ sources = ["pyproject.toml", "uv.lock"]
 [tasks."deps:sync-gpu"]
 description = "Materialize the canonical NeMo 3 + CUDA 13 research environment; provider SDKs are intentionally excluded"
 run = "uv sync --locked --extra dev --extra gpu"
-sources = ["pyproject.toml", "uv.lock"]
 
 [tasks."deps:sync-runpod"]
 description = "Materialize RunPod control-plane SDK in isolation from Vast"
