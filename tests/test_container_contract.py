@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 
 
@@ -21,7 +23,7 @@ def test_dockerfile_bakes_gpu_environment_outside_source_mount() -> None:
 def test_host_runner_uses_single_state_mount_and_digest_contract() -> None:
     runner = read("scripts/container/run.sh")
     assert "@sha256:" in runner
-    assert '--gpus all' in runner
+    assert "--gpus all" in runner
     assert '-v "$STATE_ROOT:/workspace/state"' in runner
     assert "mise run" not in runner
     assert "uv sync" not in runner
@@ -29,7 +31,7 @@ def test_host_runner_uses_single_state_mount_and_digest_contract() -> None:
 
 def test_container_preparation_does_not_resync_gpu_environment() -> None:
     preparation = read("scripts/research/prepare_e00_e04.sh")
-    assert 'JPA_CF_CONTAINER_RUNTIME:-0' in preparation
+    assert "JPA_CF_CONTAINER_RUNTIME:-0" in preparation
     assert "python /opt/jpacf/scripts/container/verify_runtime.py --require-gpu" in preparation
     assert "uv run --locked --no-sync" in preparation
 
