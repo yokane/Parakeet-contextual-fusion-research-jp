@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "base_container": {
+    "repository": "nvcr.io/nvidia/pytorch",
+    "version_tag": "25.08-py3"
+  },
+  "hugging_face": {
+    "base_model": {
+      "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+      "repo_type": "model"
+    },
+    "benchmark": {
+      "repo_id": "saeeew/JP-HomophoneBench",
+      "repo_type": "dataset"
+    }
+  }
+}
