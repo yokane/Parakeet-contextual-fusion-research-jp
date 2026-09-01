@@ -1,0 +1,32 @@
+schema: 1
+platform: "linux/amd64"
+python: "3.12.3"
+uv: "0.12.1"
+nemo_toolkit: "3.0.0"
+nemo_extras: ["asr", "cu13"]
+torch: "2.12.0+cu132"
+torch_index: "https://download.pytorch.org/whl/cu132"
+cuda:
+  major: 13
+  baseline: "13.3.1"
+ngc_pytorch:
+  discovery_tag: "26.07-py3"
+  documented_python: "3.12"
+  documented_cuda: "13.3.1"
+  documented_pytorch: "2.13.0a0+9186a08b2c"
+validation:
+  authoritative: "gpu"
+  cpu_role: "static-preflight-only"
+  os: "linux"
+  architecture: "x86_64"
+  excluded_backends: ["coreml", "directml"]
+providers:
+  interchangeable_gpu_execution: ["self-hosted", "vast", "runpod", "hf-jobs"]
+  shared_image_digest_required: true
+policy:
+  image_digest_required_before_gpu_run: true
+  model_revision_required: true
+  dataset_revision_required: true
+  lockfiles_required: true
+  spdx_inventory_required: true
+  moving_runtime_aliases_forbidden: true

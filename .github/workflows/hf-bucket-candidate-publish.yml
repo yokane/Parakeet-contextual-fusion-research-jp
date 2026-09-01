@@ -1,0 +1,153 @@
+name: hf-bucket-candidate-publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_name:
+        description: "Candidate release label, e.g. e05-phone-head-001"
+        required: true
+        type: string
+      checkpoint_path:
+        description: "Optional local .nemo path on self-hosted runner"
+        required: false
+        default: ""
+        type: string
+      phone_head_path:
+        description: "Optional local .pt/.pth phoneme-head path"
+        required: false
+        default: ""
+        type: string
+      metrics_path:
+        description: "Optional metrics JSON path"
+        required: false
+        default: ""
+        type: string
+      saturation_path:
+        description: "Optional saturation JSON path"
+        required: false
+        default: ""
+        type: string
+      environment_path:
+        description: "Optional runtime environment JSON path"
+        required: false
+        default: ""
+        type: string
+      notes_path:
+        description: "Optional Markdown release notes path"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: hf-bucket-candidate-publish-${{ inputs.release_name }}
+  cancel-in-progress: false
+
+jobs:
+  candidate:
+    runs-on: [self-hosted, linux, x64, cuda13]
+    timeout-minutes: 90
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_ROOT: dist/hf-candidate-release
+      CANDIDATE_ROOT: dist/hf-candidate
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Configure self-hosted cache contract
+        id: cache
+        shell: bash
+        run: bash scripts/ci/setup_actions_cache.sh
+
+      - name: Install repository toolchain from mise.lock
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: ${{ steps.cache.outputs.persistent != 'true' }}
+
+      - name: Restore uv artifact cache
+        if: ${{ steps.cache.outputs.persistent != 'true' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: hf-candidate-uv-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('uv.lock', 'tools/hf-bucket/uv.lock') }}
+
+      - name: Materialize locked Python environments
+        run: |
+          mise run deps:sync-gpu
+          mise run hf:transport:sync
+
+      - name: Verify authoritative CUDA13 platform
+        run: uv run --locked python scripts/repro/verify_platform.py --require-gpu
+
+      - name: Validate inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || { echo "HF_TOKEN is missing" >&2; exit 2; }
+          command -v gh >/dev/null 2>&1 || { echo "gh CLI is required" >&2; exit 2; }
+          [[ "${{ inputs.release_name }}" =~ ^[A-Za-z0-9._-]+$ ]] || {
+            echo "release_name must be path-safe" >&2
+            exit 2
+          }
+          for path in \
+            "${{ inputs.checkpoint_path }}" \
+            "${{ inputs.phone_head_path }}" \
+            "${{ inputs.metrics_path }}" \
+            "${{ inputs.saturation_path }}" \
+            "${{ inputs.environment_path }}" \
+            "${{ inputs.notes_path }}"; do
+            [[ -z "${path}" ]] || test -f "${path}" || { echo "Missing input: ${path}" >&2; exit 2; }
+          done
+
+      - name: Validate optional NeMo checkpoint
+        if: ${{ inputs.checkpoint_path != '' }}
+        env:
+          CHECKPOINT_PATH: ${{ inputs.checkpoint_path }}
+        run: |
+          uv run --locked python - <<'PY'
+          import os
+          import nemo.collections.asr as nemo_asr
+          model = nemo_asr.models.ASRModel.restore_from(os.environ["CHECKPOINT_PATH"], map_location="cpu")
+          print(type(model).__name__)
+          PY
+
+      - name: Build release-shaped candidate source
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(--release "${{ inputs.release_name }}" --output-root "${RELEASE_ROOT}")
+          [[ -z "${{ inputs.checkpoint_path }}" ]] || args+=(--checkpoint "${{ inputs.checkpoint_path }}")
+          [[ -z "${{ inputs.phone_head_path }}" ]] || args+=(--phone-head "${{ inputs.phone_head_path }}")
+          [[ -z "${{ inputs.metrics_path }}" ]] || args+=(--metrics "${{ inputs.metrics_path }}")
+          [[ -z "${{ inputs.saturation_path }}" ]] || args+=(--saturation "${{ inputs.saturation_path }}")
+          [[ -z "${{ inputs.environment_path }}" ]] || args+=(--environment "${{ inputs.environment_path }}")
+          [[ -z "${{ inputs.notes_path }}" ]] || args+=(--notes "${{ inputs.notes_path }}")
+          uv run --locked python scripts/build_hf_model_release.py "${args[@]}"
+          uv run --locked python scripts/hf/prepare_candidate.py \
+            --release-dir "${RELEASE_ROOT}/${{ inputs.release_name }}" \
+            --output-dir "${CANDIDATE_ROOT}/${{ inputs.release_name }}"
+
+      - name: Allocate and publish immutable candidate
+        id: publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_id="$(bash scripts/hf/hf-push-candidate.sh "${CANDIDATE_ROOT}/${{ inputs.release_name }}" | tail -n 1)"
+          echo "candidate_id=${candidate_id}" >> "${GITHUB_OUTPUT}"
+          echo "### HF Bucket candidate" >> "${GITHUB_STEP_SUMMARY}"
+          echo "\`${candidate_id}\` → \`hf://buckets/${HF_BUCKET}/candidates/${candidate_id}\`" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload short-lived GitHub copy
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: jpacf-${{ steps.publish.outputs.candidate_id }}
+          path: ${{ env.CANDIDATE_ROOT }}/${{ inputs.release_name }}
+          retention-days: 14
+          if-no-files-found: error

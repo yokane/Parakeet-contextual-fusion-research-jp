@@ -1,0 +1,77 @@
+name: hf-bucket-maintenance
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "Bucket operation"
+        required: true
+        default: "validate"
+        type: choice
+        options: [validate, bootstrap]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-bucket-maintenance
+  cancel-in-progress: false
+
+jobs:
+  bucket:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Configure cache contract
+        id: cache
+        shell: bash
+        run: bash scripts/ci/setup_actions_cache.sh
+
+      - name: Install repository toolchain from mise.lock
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: ${{ steps.cache.outputs.persistent != 'true' }}
+
+      - name: Restore uv and HF caches
+        if: ${{ steps.cache.outputs.persistent != 'true' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ env.UV_CACHE_DIR }}
+            ${{ env.HF_HUB_CACHE }}
+            ${{ env.HF_XET_CACHE }}
+          key: hf-bucket-maintenance-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('uv.lock', 'tools/hf-bucket/uv.lock') }}
+
+      - name: Materialize locked Bucket environment
+        run: |
+          mise run deps:sync
+          mise run hf:transport:sync
+
+      - name: Bootstrap canonical layout
+        if: ${{ inputs.operation == 'bootstrap' }}
+        run: bash scripts/hf/hf-bootstrap-bucket.sh
+
+      - name: Validate canonical layout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || { echo "HF_TOKEN is missing" >&2; exit 2; }
+          source scripts/hf/hf-identity.sh
+          hf_bucket_cli buckets info "${HF_BUCKET}" --token "${HF_TOKEN}"
+          hf_bucket_cli buckets list "${HF_BUCKET}" -R -q --token "${HF_TOKEN}" > bucket-listing.txt
+          uv run --locked python scripts/hf/validate_bucket_layout.py --listing bucket-listing.txt
+
+      - name: Upload layout evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-bucket-layout-${{ github.run_id }}
+          path: bucket-listing.txt
+          retention-days: 7
+          if-no-files-found: error

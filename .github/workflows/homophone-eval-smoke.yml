@@ -7,6 +7,10 @@ on:
       - "scripts/materialize_hf_eval.py"
       - "scripts/collect_experiment_metrics.py"
       - "scripts/validate_eval_manifest.py"
+      - "locks/hf-revisions.lock.json"
+      - "mise.toml"
+      - "mise.lock"
+      - "uv.lock"
       - "tests/test_eval_pipeline.py"
       - ".github/workflows/homophone-eval-smoke.yml"
   push:
@@ -15,6 +19,10 @@ on:
       - "scripts/materialize_hf_eval.py"
       - "scripts/collect_experiment_metrics.py"
       - "scripts/validate_eval_manifest.py"
+      - "locks/hf-revisions.lock.json"
+      - "mise.toml"
+      - "mise.lock"
+      - "uv.lock"
       - "tests/test_eval_pipeline.py"
       - ".github/workflows/homophone-eval-smoke.yml"
 
@@ -23,32 +31,57 @@ permissions:
 
 jobs:
   hf-index-and-metrics:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install exact mise toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: pyproject.toml
-      - name: Install evaluation dependencies
+          version: 2026.8.16
+          install: true
+          cache: true
+
+      - name: Restore uv artifact cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/uv
+          key: jpacf-smoke-uv-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('uv.lock') }}
+
+      - name: Materialize locked static environment
+        run: mise run deps:sync
+
+      - name: Resolve locked benchmark revision
+        id: benchmark
+        shell: bash
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install 'datasets>=4,<5' 'huggingface-hub>=1,<2' soundfile pyarrow pytest
-          python -m pip install --no-deps -e .
-      - name: Pull published HF benchmark index
+          revision="$(uv run --locked python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path('locks/hf-revisions.lock.json').read_text(encoding='utf-8'))
+          print(payload['repositories']['benchmark']['revision'])
+          PY
+          )"
+          [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || exit 2
+          echo "revision=$revision" >> "$GITHUB_OUTPUT"
+
+      - name: Pull immutable HF benchmark index
         run: |
-          python scripts/materialize_hf_eval.py \
+          uv run --locked python scripts/materialize_hf_eval.py \
             --repo-id saeeew/JP-HomophoneBench \
+            --revision "${{ steps.benchmark.outputs.revision }}" \
             --config homophone8 \
             --split test \
             --output-dir data/generated/smoke \
             --no-rehydrate-audio
+
       - name: Validate benchmark index
-        run: python scripts/validate_eval_manifest.py data/generated/smoke/bench_index.jsonl
+        run: uv run --locked python scripts/validate_eval_manifest.py data/generated/smoke/bench_index.jsonl
+
       - name: Build identity smoke predictions
         run: |
-          python - <<'PY'
+          uv run --locked python - <<'PY'
           import json
           from pathlib import Path
 
@@ -62,19 +95,22 @@ jobs:
                   row = json.loads(line)
                   sink.write(json.dumps({"benchmark_id": row["id"], "pred_text": row["text"]}, ensure_ascii=False) + "\n")
           PY
+
       - name: Collect smoke metrics
         run: |
-          python scripts/collect_experiment_metrics.py \
+          uv run --locked python scripts/collect_experiment_metrics.py \
             --benchmark data/generated/smoke/bench_index.jsonl \
             --result E00=results/smoke_identity.jsonl \
             --parquet results/smoke_metrics.parquet \
             --summary results/smoke_summary.json
+
       - name: Run focused regression test
-        run: pytest -q tests/test_eval_pipeline.py
+        run: uv run --locked pytest -q tests/test_eval_pipeline.py
+
       - name: Upload smoke artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: homophone-eval-smoke
+          name: homophone-eval-smoke-${{ github.sha }}
           path: |
             data/generated/smoke/bench_index.jsonl
             data/generated/smoke/context_phrases.txt

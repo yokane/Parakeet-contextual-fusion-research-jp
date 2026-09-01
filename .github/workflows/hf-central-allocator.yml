@@ -1,0 +1,118 @@
+name: HF Central Sequence Allocator
+run-name: HF allocate ${{ inputs.request_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: "Globally unique request identifier supplied by the caller"
+        required: true
+        type: string
+      hf_bucket:
+        description: "Hugging Face Bucket in namespace/bucket format"
+        required: true
+        default: "saeeew/J-PACF-YOMI-tdt-bucket"
+        type: string
+      collection:
+        description: "Sequence collection"
+        required: true
+        type: choice
+        options: [candidates, experiments, config]
+      metadata_json:
+        description: "Optional allocation provenance JSON"
+        required: false
+        default: "{}"
+        type: string
+
+permissions:
+  contents: read
+
+# Global lock is intentional. Input normalization occurs inside the job, so a
+# bucket-dependent expression here could allow equivalent spellings to race.
+concurrency:
+  group: hf-central-sequence
+  cancel-in-progress: false
+
+jobs:
+  allocate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_BUCKET: ${{ inputs.hf_bucket }}
+      HF_ALLOCATOR_INTERNAL: "1"
+      HF_ALLOCATION_METADATA_JSON: ${{ inputs.metadata_json }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Configure cache contract
+        id: cache
+        shell: bash
+        run: bash scripts/ci/setup_actions_cache.sh
+
+      - name: Install repository toolchain from mise.lock
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: ${{ steps.cache.outputs.persistent != 'true' }}
+
+      - name: Restore uv and HF caches
+        if: ${{ steps.cache.outputs.persistent != 'true' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ env.UV_CACHE_DIR }}
+            ${{ env.HF_HUB_CACHE }}
+            ${{ env.HF_XET_CACHE }}
+          key: hf-central-allocator-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('uv.lock', 'tools/hf-bucket/uv.lock') }}
+
+      - name: Materialize locked Bucket environment
+        run: |
+          mise run deps:sync
+          mise run hf:transport:sync
+
+      - name: Allocate sequence
+        id: allocate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || { echo "HF_TOKEN is missing" >&2; exit 2; }
+          ID="$(bash scripts/hf/hf-allocate-id.sh "${{ inputs.collection }}")"
+          echo "id=${ID}" >> "${GITHUB_OUTPUT}"
+
+      - name: Write allocation response
+        shell: bash
+        env:
+          ALLOCATION_ID: ${{ steps.allocate.outputs.id }}
+        run: |
+          uv run --locked python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          Path("allocation.json").write_text(
+              json.dumps(
+                  {
+                      "schema_version": 1,
+                      "request_id": "${{ inputs.request_id }}",
+                      "allocation_id": os.environ["ALLOCATION_ID"],
+                      "bucket": os.environ["HF_BUCKET"],
+                      "collection": "${{ inputs.collection }}",
+                  },
+                  ensure_ascii=False,
+                  indent=2,
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Publish allocation response
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-allocation-${{ inputs.request_id }}
+          path: allocation.json
+          retention-days: 1
+          if-no-files-found: error

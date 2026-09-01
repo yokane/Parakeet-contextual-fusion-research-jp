@@ -1,0 +1,33 @@
+{
+  "schema_version": 2,
+  "platform": "linux/amd64",
+  "cuda_major": 13,
+  "base_container": {
+    "repository": "nvcr.io/nvidia/pytorch",
+    "version_tag": "26.07-py3",
+    "role": "maintenance-resolution-input-only"
+  },
+  "hugging_face": {
+    "base_model": {
+      "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+      "repo_type": "model",
+      "required_file": "parakeet-tdt_ctc-0.6b-ja.nemo"
+    },
+    "benchmark": {
+      "repo_id": "saeeew/JP-HomophoneBench",
+      "repo_type": "dataset"
+    },
+    "accepted_model": {
+      "repo_id": "saeeew/J-PACF-YOMI-tdt",
+      "repo_type": "model"
+    }
+  },
+  "policy": {
+    "runtime_requires_full_hf_revision": true,
+    "runtime_requires_oci_digest": true,
+    "mutable_tags_are_discovery_only": true,
+    "supported_os": "linux",
+    "supported_arch": "x86_64",
+    "supported_cuda_major": 13
+  }
+}

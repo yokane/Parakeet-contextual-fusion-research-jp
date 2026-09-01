@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "model_family": "J-PACF-YOMI-TDT",
+  "bucket": "saeeew/J-PACF-YOMI-tdt-bucket",
+  "model_repo": "saeeew/J-PACF-YOMI-tdt",
+  "benchmark_repo": "saeeew/JP-HomophoneBench",
+  "base_model": "nvidia/parakeet-tdt_ctc-0.6b-ja",
+  "ghcr_image": "ghcr.io/yokane/jpacf-yomi-tdt-runtime",
+  "collections": {
+    "candidates": "candidate",
+    "experiments": "experiment",
+    "config": "config"
+  },
+  "mutable_paths": [
+    "README.md",
+    "config/current.json"
+  ],
+  "immutable_by_policy_prefixes": [
+    "config/versions/config-",
+    "candidates/candidate-",
+    "experiments/experiment-",
+    "runs/",
+    "benchmarks/"
+  ],
+  "required_roots": [
+    "config",
+    "candidates",
+    "experiments",
+    "runs",
+    "benchmarks",
+    "reference",
+    "scripts",
+    "tmp"
+  ]
+}

@@ -1,31 +1,61 @@
 [build-system]
-requires = ["setuptools>=75", "wheel"]
+requires = ["setuptools==84.0.0", "wheel==0.48.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "parakeet-context-fusion"
 version = "0.1.0"
 description = "Japanese TDT/CTC contextual ASR fusion experiments for Parakeet"
-requires-python = ">=3.10,<3.13"
+requires-python = "==3.12.3"
 dependencies = [
   "datasets>=4.0,<5",
-  "huggingface-hub>=0.34,<2",
+  "huggingface-hub==1.28.0",
+  "jiwer==4.0.0",
   "jsonschema>=4.23",
-  "numpy>=1.26",
+  "numpy==2.3.2",
   "omegaconf>=2.3",
+  "pandas==2.3.2",
   "pyarrow>=15",
-  "pydantic>=2.8",
-  "pyyaml>=6.0",
+  "pydantic==2.11.7",
+  "pyyaml==6.0.2",
   "soundfile>=0.12",
-  "torch>=2.4",
 ]
 
 [project.optional-dependencies]
-nemo = ["nemo_toolkit[asr]>=2.4,<3"]
-g2p = ["pyopenjtalk>=0.4"]
+gpu = [
+  "nemo-toolkit[asr,cu13]==3.0.0",
+  "torch==2.12.0+cu132",
+]
+runpod = ["runpod==1.12.0"]
+vast = ["vastai==1.5.6"]
+g2p = ["pyopenjtalk-plus==0.4.1.post9"]
+audio = ["pyopenjtalk-plus==0.4.1.post9"]
 dev = [
-  "pytest>=8.3",
-  "ruff>=0.8",
+  "hypothesis==6.165.10",
+  "pytest>=8.3,<9",
+  "ruff==0.12.11",
+]
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu132" }
+
+[[tool.uv.index]]
+name = "pytorch-cu132"
+url = "https://download.pytorch.org/whl/cu132"
+explicit = true
+
+[tool.uv]
+environments = [
+  "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+required-environments = [
+  "sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+conflicts = [
+  [
+    { extra = "runpod" },
+    { extra = "vast" },
+  ],
 ]
 
 [tool.setuptools]
@@ -37,10 +67,13 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+  "gpu: requires the authoritative Linux x86_64 CUDA13 NeMo runtime",
+]
 
 [tool.ruff]
 line-length = 100
-target-version = "py310"
+target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

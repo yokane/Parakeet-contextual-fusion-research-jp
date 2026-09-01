@@ -1,0 +1,140 @@
+name: homophone-gpu-cache-smoke
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/hf-bucket-ghcr-cache]
+    paths:
+      - "locks/hf-revisions.lock.json"
+      - ".github/workflows/homophone-gpu-cache-smoke.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: homophone-gpu-cache-smoke
+  cancel-in-progress: true
+
+jobs:
+  gpu-cache-audio:
+    runs-on: [self-hosted, linux, x64, cuda13]
+    timeout-minutes: 120
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      SMOKE_DIR: data/generated/gpu-cache-smoke
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Require runner-provided persistent cache
+        id: cache
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/ci/setup_actions_cache.sh
+          test -n "${SELF_ACTIONS_CACHE_ROOT:-}" || {
+            echo "SELF_ACTIONS_CACHE_ROOT is not present in the self-hosted runner process environment" >&2
+            exit 2
+          }
+
+      - name: Install exact mise toolchain into persistent cache
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: false
+
+      - name: Assert physical cache mode is active
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "${SELF_CACHE_PERSISTENT}" == "true" ]] || {
+            echo "self-hosted physical cache contract did not activate" >&2
+            exit 2
+          }
+          [[ "${UV_CACHE_DIR}" == "${SELF_ACTIONS_CACHE_ROOT}/${GITHUB_REPOSITORY}/uv" ]] || exit 2
+          [[ "${HF_HUB_CACHE}" == "${SELF_ACTIONS_CACHE_ROOT}/${GITHUB_REPOSITORY}/huggingface/hub" ]] || exit 2
+          [[ "${MISE_DATA_DIR}" == "${SELF_ACTIONS_CACHE_ROOT}/${GITHUB_REPOSITORY}/mise/data" ]] || exit 2
+          echo "Self-hosted physical cache contract: ACTIVE" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Materialize exact CUDA13 NeMo environment
+        run: mise run deps:sync-gpu
+
+      - name: Verify self-hosted GPU runtime
+        run: uv run --locked python scripts/repro/verify_platform.py --require-gpu
+
+      - name: Resolve exact benchmark revision
+        id: benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          revision="$(uv run --locked python - <<'PY'
+          import json
+          from pathlib import Path
+          lock = json.loads(Path('locks/hf-revisions.lock.json').read_text(encoding='utf-8'))
+          print(lock['repositories']['benchmark']['revision'])
+          PY
+          )"
+          [[ "${revision}" =~ ^[0-9a-f]{40}$ ]] || exit 2
+          echo "revision=${revision}" >> "${GITHUB_OUTPUT}"
+          echo "Benchmark revision: ${revision}" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Rehydrate verified homophone8-audio population
+        run: |
+          rm -rf "${SMOKE_DIR}"
+          uv run --locked python scripts/materialize_hf_eval.py \
+            --repo-id saeeew/JP-HomophoneBench \
+            --revision "${{ steps.benchmark.outputs.revision }}" \
+            --config homophone8-audio \
+            --split test \
+            --output-dir "${SMOKE_DIR}" \
+            --rehydrate-audio \
+            --require-audio
+          uv run --locked python scripts/validate_eval_manifest.py \
+            "${SMOKE_DIR}/nemo_eval.jsonl" \
+            --require-audio
+
+      - name: Enforce exact and near coverage on self-hosted runner
+        run: |
+          uv run --locked python scripts/validate_audio_coverage.py \
+            --provenance "${SMOKE_DIR}/eval_provenance.json" \
+            --required-category exact_homophone \
+            --required-category near_homophone \
+            --min-per-category 5 \
+            --min-total 10 \
+            --output "${SMOKE_DIR}/coverage.json"
+          cat "${SMOKE_DIR}/coverage.json" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Record GPU and cache evidence
+        run: |
+          uv run --locked python - <<'PY'
+          import json
+          import os
+          from importlib import metadata
+          from pathlib import Path
+          import torch
+
+          payload = {
+              "persistent_cache": os.environ.get("SELF_CACHE_PERSISTENT") == "true",
+              "platform_contract": "linux/amd64",
+              "cuda_major_contract": 13,
+              "gpu": torch.cuda.get_device_name(0),
+              "cuda_runtime": torch.version.cuda,
+              "torch": torch.__version__,
+              "nemo": metadata.version("nemo-toolkit"),
+              "benchmark_revision": "${{ steps.benchmark.outputs.revision }}",
+          }
+          path = Path(os.environ["SMOKE_DIR"]) / "environment.json"
+          path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          print(json.dumps(payload, indent=2, sort_keys=True))
+          PY
+
+      - name: Upload self-hosted smoke evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: homophone-gpu-cache-smoke-${{ github.sha }}
+          path: |
+            ${{ env.SMOKE_DIR }}/eval_provenance.json
+            ${{ env.SMOKE_DIR }}/coverage.json
+            ${{ env.SMOKE_DIR }}/environment.json
+          if-no-files-found: error
+          retention-days: 30

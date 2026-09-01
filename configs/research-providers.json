@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "platform": "linux/amd64",
+  "cuda_major": 13,
+  "authoritative_validation": "gpu",
+  "providers": {
+    "self-hosted": {
+      "mode": "direct",
+      "runner_labels": ["self-hosted", "linux", "x64", "cuda13"],
+      "requires_image_digest": true
+    },
+    "hf-jobs": {
+      "mode": "remote-job",
+      "default_flavor": "a10g-small",
+      "requires_image_digest": true,
+      "requires_hf_token": true,
+      "bucket_mount": "hf://buckets/saeeew/J-PACF-YOMI-tdt-bucket:/workspace/bucket"
+    },
+    "vast": {
+      "mode": "inventory-then-approved-run",
+      "verified": true,
+      "rentable": true,
+      "cuda_min": 13,
+      "storage_gb": 50,
+      "default_max_cost_usd": 0.5,
+      "requires_image_digest": true,
+      "requires_api_key": true
+    },
+    "runpod": {
+      "mode": "non-production-container-run",
+      "requires_image_digest": true,
+      "requires_api_key": true,
+      "production_endpoint_mutation": false
+    }
+  },
+  "policy": {
+    "same_image_digest_across_gpu_providers": true,
+    "full_model_revision_required": true,
+    "full_dataset_revision_required": true,
+    "cpu_results_are_non_authoritative": true,
+    "coreml_validation": false,
+    "directml_validation": false
+  }
+}

@@ -1,0 +1,142 @@
+name: research-vast-inventory
+
+on:
+  workflow_dispatch:
+    inputs:
+      experiment_id:
+        description: "Immutable experiment identifier"
+        required: true
+        type: string
+      image_reference:
+        description: "GHCR runtime in repository@sha256:<digest> form"
+        required: true
+        type: string
+      model_revision:
+        description: "Base model full 40-char revision"
+        required: true
+        type: string
+      dataset_revision:
+        description: "Benchmark full 40-char revision"
+        required: true
+        type: string
+      predicted_minutes:
+        description: "Predicted execution minutes"
+        required: true
+        type: number
+      max_cost_usd:
+        description: "Maximum predicted Vast research cost; hard-capped at 0.50"
+        required: true
+        default: 0.5
+        type: number
+      gpu_name:
+        description: "Optional Vast GPU name filter"
+        required: false
+        default: ""
+        type: string
+      command:
+        description: "Command that an approved Vast instance will run"
+        required: true
+        default: "python scripts/repro/verify_platform.py --require-gpu"
+        type: string
+      limit:
+        required: true
+        default: 25
+        type: number
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-vast-inventory-${{ inputs.experiment_id }}
+  cancel-in-progress: true
+
+jobs:
+  inventory:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install exact mise toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: true
+
+      - name: Materialize locked Vast provider environment
+        run: mise run deps:sync-vast
+
+      - name: Validate inventory policy
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${VAST_API_KEY:-}" || { echo "VAST_API_KEY is missing" >&2; exit 2; }
+          python - <<'PY'
+          value = float("${{ inputs.max_cost_usd }}")
+          if value <= 0 or value > 0.5:
+              raise SystemExit("max_cost_usd must be > 0 and <= 0.50")
+          if float("${{ inputs.predicted_minutes }}") <= 0:
+              raise SystemExit("predicted_minutes must be positive")
+          PY
+
+      - name: Build immutable Vast job contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run --locked python scripts/providers/build_job_spec.py \
+            --provider vast \
+            --experiment-id "${{ inputs.experiment_id }}" \
+            --image "${{ inputs.image_reference }}" \
+            --model-revision "${{ inputs.model_revision }}" \
+            --dataset-revision "${{ inputs.dataset_revision }}" \
+            --source-sha "${{ github.sha }}" \
+            --command "${{ inputs.command }}" \
+            --output dist/providers/vast-job-spec.json
+
+      - name: Build CUDA13 offer query
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run --locked python scripts/providers/vast/build_search_query.py \
+            --gpu-name "${{ inputs.gpu_name }}" \
+            --output-json dist/providers/vast-search-query.json \
+            > dist/providers/vast-search-query.txt
+
+      - name: Query Vast offers
+        shell: bash
+        run: |
+          set -euo pipefail
+          query="$(cat dist/providers/vast-search-query.txt)"
+          uv run --locked vastai search offers \
+            --api-key "$VAST_API_KEY" \
+            --raw \
+            --no-default \
+            --type bid \
+            --order dph_total \
+            --storage 50 \
+            --limit "${{ inputs.limit }}" \
+            "$query" \
+            > dist/providers/vast-raw.json
+
+      - name: Rank eligible offers by predicted total cost
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run --locked python scripts/providers/vast/rank_offers.py \
+            --input dist/providers/vast-raw.json \
+            --predicted-minutes "${{ inputs.predicted_minutes }}" \
+            --max-cost-usd "${{ inputs.max_cost_usd }}" \
+            --output dist/providers/vast-inventory.json \
+            | tee dist/providers/vast-inventory.md
+          cat dist/providers/vast-inventory.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload immutable inventory evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vast-inventory-${{ inputs.experiment_id }}-${{ github.sha }}
+          path: dist/providers/
+          if-no-files-found: error
+          retention-days: 30

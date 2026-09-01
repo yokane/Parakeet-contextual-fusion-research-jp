@@ -6,7 +6,7 @@ import hashlib
 import json
 import shutil
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -100,7 +100,7 @@ def main() -> None:
         "model_id": "saeeew/J-PACF-YOMI-tdt",
         "model_family": "J-PACF-YOMI-TDT",
         "release": args.release,
-        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_at": datetime.now(UTC).isoformat(),
         "source_git_sha": git_sha(),
         "base_model": "nvidia/parakeet-tdt_ctc-0.6b-ja",
         "base_model_license": "cc-by-4.0",

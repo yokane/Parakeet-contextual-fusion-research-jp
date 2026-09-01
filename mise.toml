@@ -1,0 +1,134 @@
+[settings]
+lockfile = true
+jobs = 4
+
+[tools]
+python = "3.12.3"
+uv = "0.12.1"
+
+[env]
+UV_PROJECT_ENVIRONMENT = ".venv"
+PYTHONUTF8 = "1"
+JPA_CF_PLATFORM = "linux/amd64"
+JPA_CF_CUDA_MAJOR = "13"
+HF_BUCKET = "saeeew/J-PACF-YOMI-tdt-bucket"
+HF_MODEL_REPO = "saeeew/J-PACF-YOMI-tdt"
+HF_BENCHMARK_REPO = "saeeew/JP-HomophoneBench"
+
+[tasks."deps:sync"]
+description = "Materialize the Linux/amd64 CPU/static environment from uv.lock"
+run = "uv sync --locked --extra dev"
+sources = ["pyproject.toml", "uv.lock"]
+
+[tasks."deps:sync-gpu"]
+description = "Materialize the canonical NeMo 3 + CUDA 13 research environment; provider SDKs are intentionally excluded"
+run = "uv sync --locked --extra dev --extra gpu"
+sources = ["pyproject.toml", "uv.lock"]
+
+[tasks."deps:sync-runpod"]
+description = "Materialize RunPod control-plane SDK in isolation from Vast"
+run = "uv sync --locked --extra dev --extra runpod"
+sources = ["pyproject.toml", "uv.lock"]
+
+[tasks."deps:sync-vast"]
+description = "Materialize Vast control-plane SDK in isolation from RunPod"
+run = "uv sync --locked --extra dev --extra vast"
+sources = ["pyproject.toml", "uv.lock"]
+
+[tasks."hf:transport:sync"]
+description = "Materialize the isolated HF Bucket CLI from its own uv.lock"
+run = "env -u UV_PROJECT_ENVIRONMENT uv sync --project tools/hf-bucket --locked"
+sources = ["tools/hf-bucket/pyproject.toml", "tools/hf-bucket/uv.lock"]
+
+[tasks."platform:verify"]
+description = "Reject unsupported OS/architecture/CUDA contracts"
+run = "uv run --locked python scripts/repro/verify_platform.py"
+
+[tasks.lint]
+description = "Run Python lint from the locked static environment"
+depends = ["deps:sync"]
+run = "uv run --locked ruff check src scripts tests"
+
+[tasks.test]
+description = "Run CPU-safe unit tests only; this is not an ASR research validation"
+depends = ["deps:sync"]
+run = "uv run --locked pytest -m 'not gpu'"
+
+[tasks.compile]
+description = "Compile Python sources"
+depends = ["deps:sync"]
+run = "uv run --locked python -m compileall -q src scripts"
+
+[tasks."shell:syntax"]
+description = "Validate shell syntax"
+run = "find experiments scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n"
+
+[tasks."locks:verify"]
+description = "Verify immutable references and required language lockfiles"
+depends = ["deps:sync"]
+run = "uv run --locked python scripts/repro/verify_reproducibility.py"
+
+[tasks."spdx:generate"]
+description = "Generate the deterministic SPDX reproducibility inventory"
+depends = ["deps:sync"]
+run = "uv run --locked python scripts/repro/generate_spdx.py --output sbom/reproducibility.spdx.json"
+
+[tasks."spdx:check"]
+description = "Require committed SPDX inventory to match all lockfiles"
+depends = ["deps:sync"]
+run = "uv run --locked python scripts/repro/generate_spdx.py --check sbom/reproducibility.spdx.json"
+
+[tasks.ci]
+description = "Canonical CPU/static CI; GPU validity is checked by provider workflows"
+depends = ["platform:verify", "lint", "test", "compile", "shell:syntax", "locks:verify", "spdx:check"]
+
+[tasks."versions:discover"]
+description = "Discover newer stable upstream versions; never changes runtime references"
+depends = ["deps:sync"]
+run = "uv run --locked python scripts/repro/discover_versions.py"
+
+[tasks."hf:resolve-revisions"]
+description = "Resolve configured Hugging Face repositories to full commit revisions"
+depends = ["deps:sync"]
+run = "uv run --locked python scripts/repro/resolve_hf_revisions.py --write locks/hf-revisions.lock.json"
+
+[tasks."container:resolve-base"]
+description = "Resolve the configured base container tag to an immutable OCI digest"
+run = "bash scripts/repro/resolve_container_digest.sh locks/upstream-sources.json locks/containers.lock.json"
+
+[tasks."provider:vast-query"]
+description = "Build the CUDA13/Linux-amd64 Vast offer query"
+depends = ["deps:sync", "platform:verify"]
+run = "uv run --locked python scripts/providers/vast/build_search_query.py --output-json dist/providers/vast-search.json"
+
+[tasks."lock:refresh"]
+description = "Intentional Linux x86_64 lock refresh; maintenance workflow only"
+run = [
+  "mise lock --platform linux-x64",
+  "uv lock",
+  "uv lock --project tools/hf-bucket",
+  "mise run hf:resolve-revisions",
+  "mise run container:resolve-base",
+  "mise run spdx:generate",
+]
+
+[tasks."run:e00"]
+run = "bash experiments/E00_tdt_greedy.sh"
+
+[tasks."run:e01"]
+run = "bash experiments/E01_tdt_beam.sh"
+
+[tasks."run:e02"]
+run = "bash experiments/E02_ngpulm.sh"
+
+[tasks."run:e03"]
+run = "bash experiments/E03_gpu_pb.sh"
+
+[tasks."run:e04"]
+run = "bash experiments/E04_ctc_rerank.sh"
+
+[tasks."run:e05"]
+run = "bash experiments/E05_phone_rerank.sh"
+
+[tasks."run:e06"]
+run = "bash experiments/E06_inbeam.sh"

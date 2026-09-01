@@ -1,0 +1,110 @@
+name: repro-lock-refresh
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/hf-bucket-ghcr-cache]
+    paths:
+      - "mise.toml"
+      - "pyproject.toml"
+      - "tools/hf-bucket/pyproject.toml"
+      - "stack.lock.yaml"
+      - "locks/actions.lock.json"
+      - "locks/upstream-sources.json"
+      - "locks/sbom.lock.json"
+      - "scripts/repro/**"
+      - ".github/workflows/repro-lock-refresh.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repro-lock-refresh-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Install mise CLI without stale project tools
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: false
+          cache: false
+
+      - name: Refresh Linux x86_64 mise lock and install exact tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          mise lock --platform linux-x64
+          mise install --locked
+          python --version
+          uv --version
+
+      - name: Resolve Linux x86_64 Python dependency locks
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv lock
+          uv lock --project tools/hf-bucket
+          uv sync --locked --extra dev
+          env -u UV_PROJECT_ENVIRONMENT uv sync --project tools/hf-bucket --locked
+
+      - name: Resolve Hugging Face revisions and model file hashes
+        run: uv run --locked python scripts/repro/resolve_hf_revisions.py --write locks/hf-revisions.lock.json
+
+      - name: Set up exact Buildx action
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Resolve CUDA13 base container digest
+        run: bash scripts/repro/resolve_container_digest.sh locks/upstream-sources.json locks/containers.lock.json
+
+      - name: Generate SPDX inventory
+        run: uv run --locked python scripts/repro/generate_spdx.py --output sbom/reproducibility.spdx.json
+
+      - name: Commit resolved lock snapshot
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            mise.lock \
+            uv.lock \
+            tools/hf-bucket/uv.lock \
+            locks/hf-revisions.lock.json \
+            locks/containers.lock.json \
+            sbom/reproducibility.spdx.json
+          if git diff --cached --quiet; then
+            echo "Lock snapshot already current"
+            exit 0
+          fi
+          git commit -m "build: refresh Linux CUDA13 immutable locks"
+          git fetch origin "${GITHUB_REF_NAME}"
+          git rebase "origin/${GITHUB_REF_NAME}"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
+
+      - name: Upload resolved lock snapshot
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: repro-lock-snapshot-${{ github.sha }}
+          path: |
+            mise.lock
+            uv.lock
+            tools/hf-bucket/uv.lock
+            locks/hf-revisions.lock.json
+            locks/containers.lock.json
+            sbom/reproducibility.spdx.json
+          if-no-files-found: error
+          retention-days: 7

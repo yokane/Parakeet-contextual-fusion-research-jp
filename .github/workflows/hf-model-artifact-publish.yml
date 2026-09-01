@@ -3,37 +3,16 @@ name: hf-model-artifact-publish
 on:
   workflow_dispatch:
     inputs:
-      release_name:
-        description: "Versioned artifact directory name, e.g. v0.1.0-e05"
+      candidate_id:
+        description: "HF Bucket candidate ID, e.g. candidate-000001"
         required: true
         type: string
-      checkpoint_path:
-        description: "Optional local .nemo path on the self-hosted runner"
-        required: false
-        default: ""
+      release_name:
+        description: "Model Repo release path; must match candidate release manifest"
+        required: true
         type: string
-      phone_head_path:
-        description: "Optional local .pt/.pth phoneme-head path"
-        required: false
-        default: ""
-        type: string
-      metrics_path:
-        description: "Optional metrics JSON path"
-        required: false
-        default: ""
-        type: string
-      saturation_path:
-        description: "Optional saturation JSON path"
-        required: false
-        default: ""
-        type: string
-      environment_path:
-        description: "Optional runtime environment JSON path"
-        required: false
-        default: ""
-        type: string
-      notes_path:
-        description: "Optional Markdown release notes path"
+      source_run_id:
+        description: "Optional Bucket run ID to receive promotion.json"
         required: false
         default: ""
         type: string
@@ -42,82 +21,159 @@ permissions:
   contents: read
 
 concurrency:
-  group: hf-model-artifact-publish-${{ inputs.release_name }}
+  group: hf-model-promotion-${{ inputs.release_name }}
   cancel-in-progress: false
 
 jobs:
-  publish:
-    runs-on: [self-hosted, linux, gpu]
-    timeout-minutes: 60
+  promote:
+    runs-on: [self-hosted, linux, x64, cuda13]
+    timeout-minutes: 90
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
       HF_MODEL_REPO: saeeew/J-PACF-YOMI-tdt
-      RELEASE_ROOT: dist/hf-model
+      FETCH_ROOT: artifacts/promotion-fetch
+      RELEASE_ROOT: dist/hf-model-promotion
     steps:
-      - uses: actions/checkout@v4
-      - name: Validate release inputs
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Configure self-hosted cache contract
+        id: cache
+        shell: bash
+        run: bash scripts/ci/setup_actions_cache.sh
+
+      - name: Install repository toolchain from mise.lock
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: ${{ steps.cache.outputs.persistent != 'true' }}
+
+      - name: Restore uv artifact cache
+        if: ${{ steps.cache.outputs.persistent != 'true' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: hf-promotion-uv-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('uv.lock', 'tools/hf-bucket/uv.lock') }}
+
+      - name: Materialize locked GPU and Bucket environments
+        run: |
+          mise run deps:sync-gpu
+          mise run hf:transport:sync
+
+      - name: Verify authoritative CUDA13 platform
+        run: uv run --locked python scripts/repro/verify_platform.py --require-gpu
+
+      - name: Validate promotion inputs
         shell: bash
         run: |
           set -euo pipefail
-          test -n "${HF_TOKEN:-}" || { echo "HF_TOKEN secret is missing" >&2; exit 2; }
-          [[ "${{ inputs.release_name }}" != */* ]] || { echo "release_name must not contain /" >&2; exit 2; }
-          for path in \
-            "${{ inputs.checkpoint_path }}" \
-            "${{ inputs.phone_head_path }}" \
-            "${{ inputs.metrics_path }}" \
-            "${{ inputs.saturation_path }}" \
-            "${{ inputs.environment_path }}" \
-            "${{ inputs.notes_path }}"; do
-            if [[ -n "${path}" ]]; then
-              test -f "${path}" || { echo "Missing release input: ${path}" >&2; exit 2; }
-            fi
-          done
-      - name: Validate optional NeMo checkpoint
-        if: ${{ inputs.checkpoint_path != '' }}
+          test -n "${HF_TOKEN:-}" || { echo "HF_TOKEN is missing" >&2; exit 2; }
+          [[ "${{ inputs.candidate_id }}" =~ ^candidate-[0-9]{6}$ ]] || {
+            echo "candidate_id must match candidate-NNNNNN" >&2
+            exit 2
+          }
+          [[ "${{ inputs.release_name }}" =~ ^[A-Za-z0-9._-]+$ ]] || {
+            echo "release_name must be path-safe" >&2
+            exit 2
+          }
+          if [[ -n "${{ inputs.source_run_id }}" ]]; then
+            [[ "${{ inputs.source_run_id }}" =~ ^[A-Za-z0-9._-]+$ ]] || {
+              echo "source_run_id must be path-safe" >&2
+              exit 2
+            }
+          fi
+
+      - name: Fetch and validate candidate
         shell: bash
-        env:
-          CHECKPOINT_PATH: ${{ inputs.checkpoint_path }}
         run: |
           set -euo pipefail
-          python - <<'PY'
+          destination="${FETCH_ROOT}/${{ inputs.candidate_id }}"
+          bash scripts/hf/hf-fetch-candidate.sh "${{ inputs.candidate_id }}" "${destination}"
+          candidate_release="$(uv run --locked python - "${destination}/release_manifest.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          print(json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))["release"])
+          PY
+          )"
+          [[ "${candidate_release}" == "${{ inputs.release_name }}" ]] || {
+            echo "candidate release ${candidate_release} does not match requested release ${{ inputs.release_name }}" >&2
+            exit 2
+          }
+
+      - name: Validate optional standalone checkpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          checkpoint="${FETCH_ROOT}/${{ inputs.candidate_id }}/J-PACF-YOMI-TDT.nemo"
+          if [[ -f "${checkpoint}" ]]; then
+            CHECKPOINT_PATH="${checkpoint}" uv run --locked python - <<'PY'
           import os
           import nemo.collections.asr as nemo_asr
-
-          path = os.environ["CHECKPOINT_PATH"]
-          model = nemo_asr.models.ASRModel.restore_from(path, map_location="cpu")
+          model = nemo_asr.models.ASRModel.restore_from(os.environ["CHECKPOINT_PATH"], map_location="cpu")
           print(type(model).__name__)
-          print("restored", path)
           PY
-      - name: Install Hub client
-        run: python -m pip install 'huggingface-hub>=1,<2'
-      - name: Build release bundle
+          fi
+
+      - name: Build clean promotion directory
         shell: bash
         run: |
           set -euo pipefail
-          args=(
-            --release "${{ inputs.release_name }}"
-            --output-root "${RELEASE_ROOT}"
-          )
-          [[ -z "${{ inputs.checkpoint_path }}" ]] || args+=(--checkpoint "${{ inputs.checkpoint_path }}")
-          [[ -z "${{ inputs.phone_head_path }}" ]] || args+=(--phone-head "${{ inputs.phone_head_path }}")
-          [[ -z "${{ inputs.metrics_path }}" ]] || args+=(--metrics "${{ inputs.metrics_path }}")
-          [[ -z "${{ inputs.saturation_path }}" ]] || args+=(--saturation "${{ inputs.saturation_path }}")
-          [[ -z "${{ inputs.environment_path }}" ]] || args+=(--environment "${{ inputs.environment_path }}")
-          [[ -z "${{ inputs.notes_path }}" ]] || args+=(--notes "${{ inputs.notes_path }}")
-          python scripts/build_hf_model_release.py "${args[@]}"
-      - name: Publish versioned release
-        shell: bash
+          source="${FETCH_ROOT}/${{ inputs.candidate_id }}"
+          release_dir="${RELEASE_ROOT}/${{ inputs.release_name }}"
+          rm -rf "${release_dir}"
+          mkdir -p "${release_dir}"
+          cp -a "${source}/." "${release_dir}/"
+          rm -f "${release_dir}/.candidate-id" "${release_dir}/metadata.json"
+          uv run --locked python - "${release_dir}/promotion.json" <<'PY'
+          import json
+          import os
+          import sys
+          from datetime import UTC, datetime
+          from pathlib import Path
+          payload = {
+              "schema_version": 1,
+              "candidate_id": "${{ inputs.candidate_id }}",
+              "release": "${{ inputs.release_name }}",
+              "model_repo": os.environ["HF_MODEL_REPO"],
+              "bucket": os.environ["HF_BUCKET"],
+              "source_run_id": "${{ inputs.source_run_id }}" or None,
+              "promoted_at": datetime.now(UTC).isoformat(),
+              "source_git_sha": os.environ.get("GITHUB_SHA"),
+          }
+          Path(sys.argv[1]).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+          PY
+
+      - name: Publish validated release to Model Repo
         run: |
-          set -euo pipefail
-          python scripts/publish_hf_model_release.py \
+          uv run --locked python scripts/publish_hf_model_release.py \
             --repo-id "${HF_MODEL_REPO}" \
             --release "${{ inputs.release_name }}" \
             --release-dir "${RELEASE_ROOT}/${{ inputs.release_name }}" \
-            --commit-message "Publish J-PACF-YOMI-TDT ${{ inputs.release_name }} from GitHub ${GITHUB_SHA}"
-      - name: Upload immutable GitHub copy
-        uses: actions/upload-artifact@v4
+            --commit-message "Promote ${{ inputs.candidate_id }} as J-PACF-YOMI-TDT ${{ inputs.release_name }}"
+
+      - name: Attach promotion record to source run
+        if: ${{ inputs.source_run_id != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/hf/hf-identity.sh
+          remote_path="runs/${{ inputs.source_run_id }}/promotion.json"
+          existing="$(hf_bucket_cli buckets list "${HF_BUCKET}/runs/${{ inputs.source_run_id }}" -R -q --token "${HF_TOKEN}" || true)"
+          if printf '%s\n' "${existing}" | grep -Eq '(^|/)promotion\.json$'; then
+            echo "promotion record already exists under runs/${{ inputs.source_run_id }}" >&2
+            exit 2
+          fi
+          hf_bucket_cli buckets cp \
+            --token "${HF_TOKEN}" \
+            "${RELEASE_ROOT}/${{ inputs.release_name }}/promotion.json" \
+            "hf://buckets/${HF_BUCKET}/${remote_path}"
+
+      - name: Upload promotion evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: j-pacf-yomi-tdt-${{ inputs.release_name }}
+          name: jpacf-promotion-${{ inputs.candidate_id }}-${{ inputs.release_name }}
           path: ${{ env.RELEASE_ROOT }}/${{ inputs.release_name }}
+          retention-days: 30
           if-no-files-found: error
-          retention-days: 90

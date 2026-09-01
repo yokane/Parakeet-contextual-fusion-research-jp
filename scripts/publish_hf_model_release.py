@@ -37,6 +37,13 @@ def main() -> None:
 
     api = HfApi(token=token)
     api.create_repo(repo_id=args.repo_id, repo_type="model", exist_ok=True)
+    prefix = f"artifacts/{args.release}/"
+    existing = [path for path in api.list_repo_files(args.repo_id, repo_type="model") if path.startswith(prefix)]
+    if existing:
+        raise SystemExit(
+            f"release path is immutable by policy and already exists: {prefix} ({len(existing)} files)"
+        )
+
     commit = api.upload_folder(
         repo_id=args.repo_id,
         repo_type="model",

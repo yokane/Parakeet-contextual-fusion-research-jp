@@ -4,8 +4,25 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT}"
 
-export MODEL_NAME="${MODEL_NAME:-nvidia/parakeet-tdt_ctc-0.6b-ja}"
-export NEMO_ROOT="${NEMO_ROOT:-/opt/NeMo}"
+read_hf_lock() {
+  local field="$1"
+  python - "$field" <<'PY'
+import json
+import sys
+from pathlib import Path
+entry = json.loads(Path("locks/hf-revisions.lock.json").read_text(encoding="utf-8"))["repositories"]["base_model"]
+print(entry[sys.argv[1]])
+PY
+}
+
+export MODEL_NAME="${MODEL_NAME:-$(read_hf_lock repo_id)}"
+LOCKED_MODEL_REVISION="$(read_hf_lock revision)"
+export MODEL_REVISION="${MODEL_REVISION:-${LOCKED_MODEL_REVISION}}"
+if [[ "${MODEL_REVISION}" != "${LOCKED_MODEL_REVISION}" ]]; then
+  echo "MODEL_REVISION must match locks/hf-revisions.lock.json" >&2
+  exit 2
+fi
+
 export MANIFEST="${MANIFEST:-data/generated/nemo_eval.jsonl}"
 export CONTEXT_PHRASES="${CONTEXT_PHRASES:-data/generated/context_phrases.txt}"
 export NGPU_LM="${NGPU_LM:-artifacts/lm/ja-6gram.nemo}"
@@ -26,8 +43,8 @@ require_file() {
   fi
 }
 
-nemo_eval() {
-  local eval_script="${NEMO_ROOT}/examples/asr/speech_to_text_eval.py"
-  require_file "${eval_script}"
-  python "${eval_script}" "$@"
+decode_tdt() {
+  python scripts/decode_nbest.py \
+    --model-revision "${MODEL_REVISION}" \
+    "$@"
 }
