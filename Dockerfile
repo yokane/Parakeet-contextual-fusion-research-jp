@@ -12,13 +12,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     JPA_CF_IMAGE_HOME=/opt/jpacf \
-    JPA_CF_WORKSPACE=/workspace/project \
-    HF_HOME=/cache/huggingface \
-    HF_HUB_CACHE=/cache/huggingface/hub \
-    HF_XET_CACHE=/cache/huggingface/xet \
-    UV_CACHE_DIR=/cache/uv \
-    XDG_CACHE_HOME=/cache/xdg \
-    TORCH_HOME=/cache/torch \
+    JPA_CF_WORKSPACE=/opt/jpacf \
+    JPA_CF_STATE_ROOT=/workspace/state \
+    HOME=/workspace/state/home \
+    HF_HOME=/workspace/state/hf \
+    HF_HUB_CACHE=/workspace/state/hf/hub \
+    HF_XET_CACHE=/workspace/state/hf/xet \
+    UV_CACHE_DIR=/workspace/state/uv \
+    XDG_CACHE_HOME=/workspace/state/xdg \
+    TORCH_HOME=/workspace/state/torch \
     HF_TRANSPORT_PROJECT=/opt/jpacf/tools/hf-bucket \
     UV_PROJECT_ENVIRONMENT=/opt/jpacf/.venv
 
@@ -40,13 +42,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 WORKDIR /opt/jpacf
 
-# uv + Python are part of the image contract. Host Python/mise is never used by
-# GPU experiments after the container has been built.
 RUN --mount=type=cache,target=/root/.cache/uv \
     python -m pip install --no-cache-dir uv==0.12.1 \
     && uv python install 3.12.3
 
-# Keep the expensive CUDA/NeMo dependency layer independent from source edits.
 COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/cache/uv \
     uv sync \
@@ -56,8 +55,6 @@ RUN --mount=type=cache,target=/cache/uv \
       --extra gpu \
       --no-install-project
 
-# Bucket transport has a deliberately isolated environment so bucket operations
-# can never re-resolve or mutate the NeMo GPU environment.
 COPY tools/hf-bucket ./tools/hf-bucket
 RUN --mount=type=cache,target=/cache/uv \
     env -u UV_PROJECT_ENVIRONMENT \
@@ -81,17 +78,10 @@ RUN --mount=type=cache,target=/cache/uv \
       --extra gpu
 
 ENV PATH="/opt/jpacf/.venv/bin:${PATH}" \
-    PYTHONPATH="/workspace/project/src:/opt/jpacf/src"
+    PYTHONPATH="/opt/jpacf/src"
 
-# Runtime state is always external. On WSL2 this is normally bind-mounted from
-# a Linux filesystem; on Vast.ai /workspace can be a persistent Vast Volume.
-RUN mkdir -p \
-      /workspace/project \
-      /cache/huggingface \
-      /cache/uv \
-      /cache/xdg \
-      /cache/torch
+RUN mkdir -p /workspace/state/{hf,uv,xdg,torch,home,artifacts,generated,results,dist,vendor}
 
-WORKDIR /workspace/project
+WORKDIR /opt/jpacf
 
-CMD ["python", "/opt/jpacf/scripts/container/verify_runtime.py", "--require-gpu"]
+CMD ["/opt/jpacf/scripts/container/inside.sh", "python", "/opt/jpacf/scripts/container/verify_runtime.py", "--require-gpu"]
