@@ -16,9 +16,19 @@ on:
         type: choice
         options: [test, validation]
       pb_alphas:
-        description: "Comma-separated GPU-PB alpha sweep"
+        description: "Comma-separated GPU-PB alpha sweep; must include 0"
         required: true
         default: "0.0,0.25,0.5,1.0,1.5,2.0"
+        type: string
+      required_audio_categories:
+        description: "Comma-separated categories that must have runnable audio"
+        required: true
+        default: "exact_homophone,near_homophone"
+        type: string
+      min_audio_per_category:
+        description: "Minimum runnable rows for every required category"
+        required: true
+        default: "5"
         type: string
       ngpu_lm_path:
         description: "NGPU-LM model path on the self-hosted runner"
@@ -80,6 +90,32 @@ jobs:
           python -m pip install 'datasets>=4,<5' 'huggingface-hub>=0.34,<2' soundfile pyarrow
           python -m pip install --no-deps -e .
 
+      - name: Normalize PB alpha sweep
+        shell: bash
+        env:
+          RAW_PB_ALPHAS: ${{ inputs.pb_alphas }}
+        run: |
+          set -euo pipefail
+          mkdir -p "${SWEEP_ROOT}"
+          python - <<'PY' > "${SWEEP_ROOT}/alpha_values.txt"
+          import os
+
+          values = sorted(
+              {
+                  float(value.strip())
+                  for value in os.environ["RAW_PB_ALPHAS"].split(",")
+                  if value.strip()
+              }
+          )
+          if len(values) < 2:
+              raise SystemExit("At least two distinct PB alpha values are required")
+          if not any(abs(value) < 1e-12 for value in values):
+              raise SystemExit("PB alpha sweep must include 0.0 as the no-boost baseline")
+          for value in values:
+              print(f"{value:.12g}")
+          PY
+          cat "${SWEEP_ROOT}/alpha_values.txt"
+
       - name: Rehydrate fixed evaluation set
         run: |
           python scripts/materialize_hf_eval.py \
@@ -91,13 +127,34 @@ jobs:
             --require-audio
           python scripts/validate_eval_manifest.py "${MANIFEST}" --require-audio
 
+      - name: Enforce acoustic category coverage
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            --provenance data/generated/saturation/eval_provenance.json
+            --min-per-category "${{ inputs.min_audio_per_category }}"
+            --min-total "${{ inputs.min_audio_per_category }}"
+            --output data/generated/saturation/audio_coverage.json
+          )
+          IFS=',' read -r -a categories <<< "${{ inputs.required_audio_categories }}"
+          for raw in "${categories[@]}"; do
+            category="${raw//[[:space:]]/}"
+            [[ -z "${category}" ]] || args+=(--required-category "${category}")
+          done
+          python scripts/validate_audio_coverage.py "${args[@]}"
+
       - name: Record sweep environment
         shell: bash
+        env:
+          CONFIG_NAME: ${{ inputs.config_name }}
+          SPLIT_NAME: ${{ inputs.split }}
         run: |
           set -euo pipefail
           mkdir -p "${SWEEP_ROOT}"
           python - <<'PY'
           import json
+          import os
           import platform
           import subprocess
 
@@ -107,6 +164,8 @@ jobs:
           def command(*args):
               return subprocess.check_output(args, text=True).strip()
 
+          with open(os.path.join(os.environ["SWEEP_ROOT"], "alpha_values.txt"), encoding="utf-8") as handle:
+              alphas = [float(line) for line in handle if line.strip()]
           report = {
               "git_sha": command("git", "rev-parse", "HEAD"),
               "python": platform.python_version(),
@@ -114,11 +173,11 @@ jobs:
               "nemo": getattr(nemo, "__version__", "unknown"),
               "cuda_runtime": torch.version.cuda,
               "gpu": torch.cuda.get_device_name(0),
-              "config": "${{ inputs.config_name }}",
-              "split": "${{ inputs.split }}",
-              "pb_alphas": "${{ inputs.pb_alphas }}",
+              "config": os.environ["CONFIG_NAME"],
+              "split": os.environ["SPLIT_NAME"],
+              "pb_alphas": alphas,
           }
-          with open("results/saturation/environment.json", "w", encoding="utf-8") as handle:
+          with open(os.path.join(os.environ["SWEEP_ROOT"], "environment.json"), "w", encoding="utf-8") as handle:
               json.dump(report, handle, ensure_ascii=False, indent=2, sort_keys=True)
               handle.write("\n")
           print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
@@ -129,10 +188,8 @@ jobs:
         run: |
           set -euo pipefail
           : > "${SWEEP_ROOT}/result_specs.txt"
-          IFS=',' read -r -a alphas <<< "${{ inputs.pb_alphas }}"
-          for raw_alpha in "${alphas[@]}"; do
-            alpha="${raw_alpha//[[:space:]]/}"
-            test -n "${alpha}" || continue
+          while IFS= read -r alpha; do
+            [[ -z "${alpha}" ]] && continue
             label="$(python -c 'import sys; print(f"{float(sys.argv[1]):.2f}")' "${alpha}")"
             experiment="E03_pb_${label}"
             run_dir="${SWEEP_ROOT}/${experiment}"
@@ -145,7 +202,7 @@ jobs:
               exit 2
             }
             printf '%s=%s\n' "${experiment}" "${result}" >> "${SWEEP_ROOT}/result_specs.txt"
-          done
+          done < "${SWEEP_ROOT}/alpha_values.txt"
           test -s "${SWEEP_ROOT}/result_specs.txt"
 
       - name: Collect paired sweep metrics
@@ -154,8 +211,7 @@ jobs:
           set -euo pipefail
           args=()
           while IFS= read -r spec; do
-            test -n "${spec}" || continue
-            args+=(--result "${spec}")
+            [[ -z "${spec}" ]] || args+=(--result "${spec}")
           done < "${SWEEP_ROOT}/result_specs.txt"
           python scripts/collect_experiment_metrics.py \
             --benchmark "${BENCH_INDEX}" \
@@ -171,18 +227,14 @@ jobs:
           set -euo pipefail
           python - <<'PY'
           import json
+          import os
 
-          alphas = [
-              float(value.strip())
-              for value in "${{ inputs.pb_alphas }}".split(",")
-              if value.strip()
-          ]
+          with open(os.path.join(os.environ["SWEEP_ROOT"], "alpha_values.txt"), encoding="utf-8") as handle:
+              alphas = [float(line) for line in handle if line.strip()]
           points = [
               {"experiment": f"E03_pb_{alpha:.2f}", "value": alpha}
-              for alpha in sorted(set(alphas))
+              for alpha in alphas
           ]
-          if len(points) < 2:
-              raise SystemExit("At least two distinct PB alpha values are required")
           spec = {
               "sweeps": [
                   {
@@ -204,7 +256,7 @@ jobs:
                   }
               ]
           }
-          with open("results/saturation/sweep.json", "w", encoding="utf-8") as handle:
+          with open(os.path.join(os.environ["SWEEP_ROOT"], "sweep.json"), "w", encoding="utf-8") as handle:
               json.dump(spec, handle, ensure_ascii=False, indent=2, sort_keys=True)
               handle.write("\n")
           PY
@@ -227,6 +279,7 @@ jobs:
           name: homophone-saturation-${{ inputs.artifact_suffix }}-${{ inputs.config_name }}-${{ inputs.split }}
           path: |
             data/generated/saturation/eval_provenance.json
+            data/generated/saturation/audio_coverage.json
             data/generated/saturation/bench_index.jsonl
             data/generated/saturation/nemo_eval.jsonl
             data/generated/saturation/context_phrases.txt
