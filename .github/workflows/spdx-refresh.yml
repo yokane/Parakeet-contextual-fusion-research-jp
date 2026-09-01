@@ -1,0 +1,56 @@
+name: spdx-refresh
+
+on:
+  push:
+    paths:
+      - "pyproject.toml"
+      - "mise.lock"
+      - "uv.lock"
+      - "tools/hf-bucket/uv.lock"
+      - "locks/actions.lock.json"
+      - "locks/hf-revisions.lock.json"
+      - "locks/containers.lock.json"
+      - "locks/sbom.lock.json"
+      - "scripts/repro/generate_spdx.py"
+      - ".github/workflows/spdx-refresh.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: spdx-refresh-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Install exact mise toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: true
+
+      - name: Generate deterministic SPDX inventory
+        run: uv run --locked python scripts/repro/generate_spdx.py --output sbom/reproducibility.spdx.json
+
+      - name: Commit refreshed SPDX when locks changed
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- sbom/reproducibility.spdx.json; then
+            echo "SPDX inventory already matches immutable locks" >> "${GITHUB_STEP_SUMMARY}"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sbom/reproducibility.spdx.json
+          git commit -m "chore: refresh reproducibility SPDX inventory"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
