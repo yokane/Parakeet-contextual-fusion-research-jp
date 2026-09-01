@@ -52,7 +52,7 @@ def test_persistent_cache_uses_runner_supplied_repo_namespace(tmp_path: Path) ->
     assert f"XDG_CACHE_HOME={namespace / 'xdg'}\n" in env_text
     assert f"MISE_DATA_DIR={namespace / 'mise' / 'data'}\n" in env_text
     assert f"BUILDKIT_CACHE_DIR={namespace / 'buildkit'}\n" in env_text
-    assert f"BUILDKIT_CACHE_FROM=\n" in env_text
+    assert "BUILDKIT_CACHE_FROM=\n" in env_text
     assert f"BUILDKIT_CACHE_TO=type=local,dest={namespace / 'buildkit'}-next,mode=max\n" in env_text
     assert "HF_HOME=" not in env_text
     assert "SELF_ACTIONS_CACHE_ROOT=" not in env_text
