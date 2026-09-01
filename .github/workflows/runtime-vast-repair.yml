@@ -2,6 +2,11 @@ name: runtime-vast-repair
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - fix/runtime-managed-python-vast
+    paths:
+      - .github/runtime-vast-repair.trigger
 
 permissions:
   contents: read
