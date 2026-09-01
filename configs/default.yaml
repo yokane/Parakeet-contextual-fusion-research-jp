@@ -4,19 +4,19 @@ model:
 
 data:
   hf_repo: saeeew/JP-HomophoneBench
-  hf_config: homophone8
+  hf_config: homophone8-audio
   hf_split: test
-  index_manifest: data/generated/bench_index.jsonl
-  manifest: data/generated/bench_index.jsonl
-  nemo_manifest: data/generated/nemo_eval.jsonl
-  context_phrases: data/generated/context_phrases.txt
-  lm_corpus: data/generated/lm_corpus.txt
-  provenance: data/generated/eval_provenance.json
+  index_manifest: data/generated/eval/bench_index.jsonl
+  manifest: data/generated/eval/bench_index.jsonl
+  nemo_manifest: data/generated/eval/nemo_eval.jsonl
+  context_phrases: data/generated/eval/context_phrases.txt
+  lm_corpus: data/generated/eval/lm_corpus.txt
+  provenance: data/generated/eval/eval_provenance.json
 
 output:
-  root: results
-  metrics_parquet: results/metrics.parquet
-  summary_json: results/summary.json
+  root: results/staged
+  metrics_parquet: results/staged/metrics_e00_e04.parquet
+  summary_json: results/staged/summary_e00_e04.json
 
 beam:
   size: 8
@@ -60,3 +60,10 @@ metrics:
     - mrr
   oracle_k: [1, 4, 8, 16, 32]
   bootstrap_samples: 10000
+
+gates:
+  e05:
+    category: near_homophone
+    oracle_k: 8
+    min_count: 10
+    min_oracle_headroom: 0.03

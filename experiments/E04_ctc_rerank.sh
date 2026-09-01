@@ -18,7 +18,7 @@ decode_tdt \
   --context-phrases "${CONTEXT_PHRASES}" \
   --boosting-tree-alpha "${PB_ALPHA}"
 
-python scripts/rerank_ctc.py \
+uv run --locked python scripts/rerank_ctc.py \
   --input "${NBEST}" \
   --output "${OUT}" \
   --model-revision "${MODEL_REVISION}" \

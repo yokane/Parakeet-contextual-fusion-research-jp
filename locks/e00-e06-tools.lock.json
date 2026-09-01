@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "nemo_speech": {
+    "repository": "https://github.com/NVIDIA-NeMo/Speech.git",
+    "tag": "v3.0.0",
+    "revision": "fd6a877539710e2b98f28c43272ff81312f83417"
+  },
+  "kenlm": {
+    "repository": "https://github.com/kpu/kenlm.git",
+    "revision": "4cb443e60b7bf2c0ddf3c745378f76cb59e254e5"
+  }
+}
