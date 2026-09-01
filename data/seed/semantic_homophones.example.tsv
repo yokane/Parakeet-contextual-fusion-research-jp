@@ -2,3 +2,10 @@ target_surface	target_reading	candidate_surface	candidate_reading	context	source
 気候	きこう	機構	きこう	今年の気候は例年より変化が大きい。	manual-cc0-example	cc0-1.0		semantic context selects 気候
 校正	こうせい	構成	こうせい	原稿の校正を終えてから公開する。	manual-cc0-example	cc0-1.0		semantic context selects 校正
 公演	こうえん	講演	こうえん	劇団の公演は午後七時に始まる。	manual-cc0-example	cc0-1.0		semantic context selects 公演
+成果	せいか	製菓	せいか	研究の成果を報告書にまとめた。	manual-cc0-example	cc0-1.0		semantic context selects 成果
+回答	かいとう	解答	かいとう	質問への回答を担当者へ送付した。	manual-cc0-example	cc0-1.0		semantic context selects 回答
+意向	いこう	移行	いこう	利用者の意向を確認してから方針を決める。	manual-cc0-example	cc0-1.0		semantic context selects 意向
+対象	たいしょう	対照	たいしょう	この調査の対象は成人の利用者である。	manual-cc0-example	cc0-1.0		semantic context selects 対象
+保証	ほしょう	保障	ほしょう	製品の保証期間は購入日から一年間である。	manual-cc0-example	cc0-1.0		semantic context selects 保証
+過程	かてい	家庭	かてい	学習の過程を段階ごとに記録する。	manual-cc0-example	cc0-1.0		semantic context selects 過程
+機会	きかい	機械	きかい	発表する機会を得て研究結果を共有した。	manual-cc0-example	cc0-1.0		semantic context selects 機会
