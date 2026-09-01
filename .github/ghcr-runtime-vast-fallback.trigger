@@ -1,3 +1,3 @@
-run-once: 2026-09-02-plain-docker-final
+run-once: 2026-09-02-prebuilt-base-thin-runtime
 source: previous-commit
-purpose: build canonical GHCR with plain Docker and verify immutable digest on Vast RTX 4090
+purpose: prebuild immutable CUDA NeMo dependency base once, then direct-push thin runtime and verify exact digest on Vast RTX 4090
