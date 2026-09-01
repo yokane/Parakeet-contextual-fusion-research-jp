@@ -97,14 +97,12 @@ jobs:
             BASE_IMAGE=${{ steps.base.outputs.reference }}
             SOURCE_REPOSITORY=${{ github.server_url }}/${{ github.repository }}
 
-      - name: Commit persistent BuildKit cache generation
+      - name: Validate persistent BuildKit cache
         if: ${{ env.SELF_CACHE_PERSISTENT == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
-          test -d "${BUILDKIT_CACHE_DIR}-next"
-          rm -rf "${BUILDKIT_CACHE_DIR}"
-          mv "${BUILDKIT_CACHE_DIR}-next" "${BUILDKIT_CACHE_DIR}"
+          test -f "${BUILDKIT_CACHE_DIR}/index.json"
 
       - name: Verify built image through NVIDIA container runtime
         shell: bash

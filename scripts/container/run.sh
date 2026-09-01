@@ -29,4 +29,8 @@ for name in \
   BEAM_SIZE LM_ALPHA PB_ALPHA CTC_ALPHA PHONE_ALPHA BATCH_SIZE; do
   [[ -n "${!name:-}" ]] && args+=( -e "$name" )
 done
-exec docker "${args[@]}" "$IMAGE" bash /opt/jpacf/scripts/container/inside.sh "$@"
+
+# The image owns scripts/container/inside.sh as its ENTRYPOINT. Passing the
+# wrapper again here would nest the startup contract and can bypass the locked
+# project interpreter. Forward only the requested command/CMD arguments.
+exec docker "${args[@]}" "$IMAGE" "$@"

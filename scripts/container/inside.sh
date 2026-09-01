@@ -15,12 +15,17 @@ export UV_CACHE_DIR="${UV_CACHE_DIR:-$STATE_ROOT/uv}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$STATE_ROOT/xdg}"
 export TORCH_HOME="${TORCH_HOME:-$STATE_ROOT/torch}"
 export UV_PROJECT_ENVIRONMENT="${UV_PROJECT_ENVIRONMENT:-/opt/jpacf/.venv}"
-# NGC base images may prepend their own Python environment from the inherited
-# entrypoint. Reassert the repository-owned locked environment immediately
-# before executing any research command.
+# Do not rely on the inherited NGC/PATH ordering for Python. The image is
+# built with a repository-owned, locked uv environment and Python entrypoints
+# must execute that interpreter explicitly.
 export VIRTUAL_ENV="$UV_PROJECT_ENVIRONMENT"
 export PATH="$VIRTUAL_ENV/bin:$PATH"
 hash -r
+VENV_PYTHON="$VIRTUAL_ENV/bin/python"
+[[ -x "$VENV_PYTHON" ]] || {
+  echo "repository-owned Python is missing or not executable: $VENV_PYTHON" >&2
+  exit 2
+}
 export HF_TRANSPORT_PROJECT="${HF_TRANSPORT_PROJECT:-/opt/jpacf/tools/hf-bucket}"
 
 export EVAL_DIR="${EVAL_DIR:-$STATE_ROOT/generated/eval}"
@@ -35,5 +40,12 @@ if [[ -d /workspace/project/src ]]; then
 else
   export PYTHONPATH="/opt/jpacf/src${PYTHONPATH:+:$PYTHONPATH}"
 fi
+
+case "${1:-}" in
+  python|python3)
+    shift
+    exec "$VENV_PYTHON" "$@"
+    ;;
+esac
 
 exec "$@"

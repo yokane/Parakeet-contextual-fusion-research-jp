@@ -2,14 +2,6 @@ name: ghcr-vast-cache-candidate
 
 on:
   workflow_dispatch:
-  push:
-    branches: [feat/portable-ghcr-gpu-runtime]
-    paths:
-      - "locks/vast-cache-base.lock.json"
-      - "Dockerfile.vast-cache"
-      - "scripts/container/inside.sh"
-      - "scripts/container/verify_runtime.py"
-      - ".github/workflows/ghcr-vast-cache-candidate.yml"
 
 permissions:
   contents: read
@@ -66,7 +58,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          base="$(python -c 'import json; print(json.load(open("locks/vast-cache-base.lock.json"))["images"]["vast_pytorch"]["reference"])')"
+          base="$(python -c 'import json; print(json.load(open("locks/vast-cache-base.lock.json"))["reference"])')"
           [[ "$base" =~ @sha256:[0-9a-f]{64}$ ]]
           echo "reference=$base" >> "$GITHUB_OUTPUT"
 
