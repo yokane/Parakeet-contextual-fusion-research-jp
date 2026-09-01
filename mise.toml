@@ -9,7 +9,6 @@ uv = "0.12.8"
 [env]
 UV_PROJECT_ENVIRONMENT = ".venv"
 UV_CACHE_DIR = ".cache/uv"
-UV_LOCKED = "1"
 HF_BUCKET = "saeeew/J-PACF-YOMI-tdt-bucket"
 HF_MODEL_REPO = "saeeew/J-PACF-YOMI-tdt"
 HF_BENCHMARK_REPO = "saeeew/JP-HomophoneBench"
