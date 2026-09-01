@@ -51,9 +51,23 @@ def test_persistent_cache_uses_runner_supplied_repo_namespace(tmp_path: Path) ->
     assert f"HF_XET_CACHE={namespace / 'huggingface' / 'xet'}\n" in env_text
     assert f"XDG_CACHE_HOME={namespace / 'xdg'}\n" in env_text
     assert f"MISE_DATA_DIR={namespace / 'mise' / 'data'}\n" in env_text
-    assert f"BUILDKIT_CACHE_FROM=type=local,src={namespace / 'buildkit'}\n" in env_text
+    assert f"BUILDKIT_CACHE_DIR={namespace / 'buildkit'}\n" in env_text
+    assert f"BUILDKIT_CACHE_FROM=\n" in env_text
+    assert f"BUILDKIT_CACHE_TO=type=local,dest={namespace / 'buildkit'}-next,mode=max\n" in env_text
     assert "HF_HOME=" not in env_text
     assert "SELF_ACTIONS_CACHE_ROOT=" not in env_text
+
+
+def test_persistent_buildkit_cache_is_imported_after_first_generation(tmp_path: Path) -> None:
+    root = tmp_path / "physical-cache"
+    buildkit = root / "example" / "parakeet-context-fusion" / "buildkit"
+    buildkit.mkdir(parents=True)
+    (buildkit / "index.json").write_text("{}\n", encoding="utf-8")
+
+    result, env_text, _ = run_setup(tmp_path, root=str(root))
+
+    assert result.returncode == 0, result.stderr
+    assert f"BUILDKIT_CACHE_FROM=type=local,src={buildkit}\n" in env_text
 
 
 def test_relative_persistent_cache_root_is_rejected(tmp_path: Path) -> None:
