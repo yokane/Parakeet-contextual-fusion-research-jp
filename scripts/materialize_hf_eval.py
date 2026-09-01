@@ -177,6 +177,37 @@ def copy_audio(value: Any, *, destination_stem: Path) -> tuple[Path, float]:
     return destination.resolve(), duration
 
 
+def make_nemo_row(
+    row: dict[str, Any],
+    *,
+    local_audio: Path,
+    duration: float,
+    benchmark_repo: str,
+    audio_origin: str,
+) -> dict[str, Any]:
+    bench_id = str(row.get("id") or "")
+    target = row.get("target") or {}
+    candidates = row.get("candidates") or []
+    source = row.get("source") or {}
+    return {
+        "audio_filepath": str(local_audio),
+        "duration": duration,
+        "text": str(row.get("text") or ""),
+        "benchmark_id": bench_id,
+        "group_id": row.get("group_id"),
+        "category": row.get("category"),
+        "target_surface": target.get("surface"),
+        "target_reading": target.get("reading"),
+        "candidate_surfaces": [item.get("surface") for item in candidates if item.get("surface")],
+        "source_dataset": source.get("dataset"),
+        "source_license": source.get("license"),
+        "audio_origin": audio_origin,
+        "audio_benchmark_repo": benchmark_repo,
+        "audio_voice_license": row.get("audio_voice_license"),
+        "benchmark_split": row.get("benchmark_split") or row.get("split"),
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Materialize JP-HomophoneBench into NeMo evaluation inputs"
@@ -184,18 +215,9 @@ def main() -> None:
     parser.add_argument("--repo-id", default="saeeew/JP-HomophoneBench")
     parser.add_argument("--revision", required=True)
     parser.add_argument("--config", default="homophone8")
-    parser.add_argument(
-        "--split",
-        action="append",
-        dest="splits",
-        help="repeatable; defaults to test",
-    )
+    parser.add_argument("--split", action="append", dest="splits", help="repeatable; defaults to test")
     parser.add_argument("--output-dir", type=Path, default=Path("data/generated"))
-    parser.add_argument(
-        "--rehydrate-audio",
-        action=argparse.BooleanOptionalAction,
-        default=True,
-    )
+    parser.add_argument("--rehydrate-audio", action=argparse.BooleanOptionalAction, default=True)
     parser.add_argument("--require-audio", action="store_true")
     args = parser.parse_args()
 
@@ -210,13 +232,32 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     audio_dir = args.output_dir / "audio"
     benchmark_rows: list[dict[str, Any]] = []
+    embedded_audio: dict[str, Any] = {}
     phrases: set[str] = set()
     corpus: list[str] = []
 
     for split in splits:
         dataset = load_dataset(args.repo_id, args.config, split=split, revision=revision)
+        audio_column = detect_audio_column(dataset)
+        if audio_column is not None:
+            dataset = dataset.cast_column(audio_column, Audio(decode=False))
         for raw in dataset:
             row = dict(raw)
+            bench_id = str(row.get("id") or "")
+            if not bench_id:
+                raise RuntimeError(f"benchmark row in split {split!r} has no id")
+            if audio_column is not None:
+                value = row.pop(audio_column, None)
+                if value:
+                    embedded_audio[bench_id] = value
+                    row["audio_asset"] = {
+                        "kind": "embedded_hf_audio",
+                        "column": audio_column,
+                        "repo_id": args.repo_id,
+                        "config": args.config,
+                        "split": split,
+                        "revision": revision,
+                    }
             row["hf_publication"] = {
                 "repo_id": args.repo_id,
                 "config": args.config,
@@ -235,24 +276,41 @@ def main() -> None:
     nemo_path = args.output_dir / "nemo_eval.jsonl"
     provenance_path = args.output_dir / "eval_provenance.json"
     write_jsonl(index_path, benchmark_rows)
-    context_path.write_text(
-        "\n".join(sorted(phrases)) + ("\n" if phrases else ""),
-        encoding="utf-8",
-    )
-    corpus_path.write_text(
-        "\n".join(corpus) + ("\n" if corpus else ""),
-        encoding="utf-8",
-    )
+    context_path.write_text("\n".join(sorted(phrases)) + ("\n" if phrases else ""), encoding="utf-8")
+    corpus_path.write_text("\n".join(corpus) + ("\n" if corpus else ""), encoding="utf-8")
 
     source_cache = SourceDatasetCache()
     nemo_rows: list[dict[str, Any]] = []
     skipped: list[dict[str, str]] = []
+    audio_origins: Counter[str] = Counter()
     if args.rehydrate_audio:
         for row in benchmark_rows:
             bench_id = str(row.get("id") or "")
+            if bench_id in embedded_audio:
+                try:
+                    local_audio, duration = copy_audio(
+                        embedded_audio[bench_id],
+                        destination_stem=audio_dir / safe_name(bench_id),
+                    )
+                except Exception as exc:
+                    skipped.append({"id": bench_id, "reason": f"embedded_audio_error:{type(exc).__name__}:{exc}"})
+                    continue
+                origin = str(row.get("audio_origin") or "embedded_hf_audio")
+                audio_origins[origin] += 1
+                nemo_rows.append(
+                    make_nemo_row(
+                        row,
+                        local_audio=local_audio,
+                        duration=duration,
+                        benchmark_repo=args.repo_id,
+                        audio_origin=origin,
+                    )
+                )
+                continue
+
             audio_ref = row.get("audio_ref") or {}
             if audio_ref.get("kind") != "hf_row":
-                skipped.append({"id": bench_id, "reason": "no_hf_audio_ref"})
+                skipped.append({"id": bench_id, "reason": "no_hf_or_embedded_audio"})
                 continue
             try:
                 source_row, audio_column = source_cache.source_row(row)
@@ -261,33 +319,18 @@ def main() -> None:
                     destination_stem=audio_dir / safe_name(bench_id),
                 )
             except Exception as exc:
-                skipped.append(
-                    {
-                        "id": bench_id,
-                        "reason": f"rehydrate_error:{type(exc).__name__}:{exc}",
-                    }
-                )
+                skipped.append({"id": bench_id, "reason": f"rehydrate_error:{type(exc).__name__}:{exc}"})
                 continue
-
-            target = row.get("target") or {}
-            candidates = row.get("candidates") or []
-            source = row.get("source") or {}
+            origin = "upstream_hf_audio"
+            audio_origins[origin] += 1
             nemo_rows.append(
-                {
-                    "audio_filepath": str(local_audio),
-                    "duration": duration,
-                    "text": str(row.get("text") or ""),
-                    "benchmark_id": bench_id,
-                    "group_id": row.get("group_id"),
-                    "category": row.get("category"),
-                    "target_surface": target.get("surface"),
-                    "target_reading": target.get("reading"),
-                    "candidate_surfaces": [
-                        item.get("surface") for item in candidates if item.get("surface")
-                    ],
-                    "source_dataset": source.get("dataset"),
-                    "source_license": source.get("license"),
-                }
+                make_nemo_row(
+                    row,
+                    local_audio=local_audio,
+                    duration=duration,
+                    benchmark_repo=args.repo_id,
+                    audio_origin=origin,
+                )
             )
     write_jsonl(nemo_path, nemo_rows)
 
@@ -304,9 +347,11 @@ def main() -> None:
         "splits": splits,
         "published_revision": revision,
         "records": len(benchmark_rows),
+        "embedded_audio_records": len(embedded_audio),
         "runnable_audio_records": len(nemo_rows),
         "categories": dict(sorted(category_counts.items())),
         "runnable_categories": dict(sorted(runnable_category_counts.items())),
+        "audio_origins": dict(sorted(audio_origins.items())),
         "context_phrases": len(phrases),
         "rehydrate_audio": args.rehydrate_audio,
         "source_revisions": dict(sorted(source_cache.revisions.items())),
