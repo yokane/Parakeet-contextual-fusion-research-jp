@@ -1,7 +1,6 @@
 [settings]
 lockfile = true
 jobs = 4
-yes = true
 
 [tools]
 python = "3.11.16"
@@ -22,17 +21,17 @@ sources = ["pyproject.toml", "uv.lock"]
 
 [tasks.lint]
 description = "Run Python lint from the locked environment"
-deps = ["deps:sync"]
+depends = ["deps:sync"]
 run = "uv run --locked ruff check src scripts tests"
 
 [tasks.test]
 description = "Run unit tests from the locked environment"
-deps = ["deps:sync"]
+depends = ["deps:sync"]
 run = "uv run --locked pytest"
 
 [tasks.compile]
 description = "Compile Python sources"
-deps = ["deps:sync"]
+depends = ["deps:sync"]
 run = "uv run --locked python -m compileall -q src scripts"
 
 [tasks."shell:syntax"]
@@ -41,17 +40,17 @@ run = "find experiments scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash
 
 [tasks."locks:verify"]
 description = "Verify immutable references and required language lockfiles"
-deps = ["deps:sync"]
+depends = ["deps:sync"]
 run = "uv run --locked python scripts/repro/verify_reproducibility.py"
 
 [tasks."spdx:generate"]
 description = "Generate the deterministic SPDX reproducibility inventory"
-deps = ["deps:sync"]
+depends = ["deps:sync"]
 run = "uv run --locked python scripts/repro/generate_spdx.py --output sbom/reproducibility.spdx.json"
 
 [tasks."spdx:check"]
 description = "Require committed SPDX inventory to match all lockfiles"
-deps = ["deps:sync"]
+depends = ["deps:sync"]
 run = "uv run --locked python scripts/repro/generate_spdx.py --check sbom/reproducibility.spdx.json"
 
 [tasks.ci]
@@ -60,12 +59,12 @@ depends = ["lint", "test", "compile", "shell:syntax", "locks:verify", "spdx:chec
 
 [tasks."versions:discover"]
 description = "Discover newer stable upstream versions; never changes runtime references"
-deps = ["deps:sync"]
+depends = ["deps:sync"]
 run = "uv run --locked python scripts/repro/discover_versions.py"
 
 [tasks."hf:resolve-revisions"]
 description = "Resolve configured Hugging Face repositories to full commit revisions"
-deps = ["deps:sync"]
+depends = ["deps:sync"]
 run = "uv run --locked python scripts/repro/resolve_hf_revisions.py --write locks/hf-revisions.lock.json"
 
 [tasks."container:resolve-base"]
