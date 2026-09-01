@@ -9,7 +9,10 @@ hf_bucket_cli() {
         printf '[hf-cli] ERROR: uv is required; enter through mise\n' >&2
         return 127
     }
-    uv run --project "${HF_TRANSPORT_PROJECT}" --locked -- hf "$@"
+    # Root mise.toml intentionally pins UV_PROJECT_ENVIRONMENT=.venv for the
+    # ASR environment. Unset it here so the Bucket transport lock materializes
+    # and runs in tools/hf-bucket/.venv instead of mutating the NeMo environment.
+    env -u UV_PROJECT_ENVIRONMENT uv run --project "${HF_TRANSPORT_PROJECT}" --locked -- hf "$@"
 }
 
 hf_normalize_bucket_id() {
