@@ -28,11 +28,12 @@ jobs:
               ".github/workflows/homophone-saturation-gpu.yml": "Upload saturation artifact",
               ".github/workflows/homophone-context-stress-gpu.yml": "Upload context-stress artifact",
           }
+          always_expr = "$" + "{{ always() }}"
           for filename, step_name in workflows.items():
               path = Path(filename)
               text = path.read_text(encoding="utf-8")
               old = f"      - name: {step_name}\n        uses: actions/upload-artifact@"
-              new = f"      - name: {step_name}\n        if: ${{{{ always() }}}}\n        uses: actions/upload-artifact@"
+              new = f"      - name: {step_name}\n        if: {always_expr}\n        uses: actions/upload-artifact@"
               if old not in text:
                   raise SystemExit(f"expected upload step not found: {filename}")
               path.write_text(text.replace(old, new, 1), encoding="utf-8")
