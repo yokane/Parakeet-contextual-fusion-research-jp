@@ -20,10 +20,13 @@ PY
 fi
 bucket="$(hf_normalize_bucket_id "$HF_BUCKET")"
 remote="hf://buckets/${bucket}/workspace-cache/${key}"
-mkdir -p artifacts data/generated
+state_root="${JPA_CF_STATE_ROOT:-${ROOT}/.jpacf-state}"
+artifact_dir="${JPA_CF_ARTIFACT_DIR:-${state_root}/artifacts}"
+generated_dir="${JPA_CF_GENERATED_DIR:-${state_root}/generated}"
+mkdir -p "$artifact_dir" "$generated_dir"
 if [[ "$mode" == "pull" ]]; then
-  hf_bucket_cli buckets sync "${remote}/artifacts" artifacts --token "$HF_TOKEN"
-  hf_bucket_cli buckets sync "${remote}/generated" data/generated --token "$HF_TOKEN"
+  hf_bucket_cli buckets sync "${remote}/artifacts" "$artifact_dir" --token "$HF_TOKEN"
+  hf_bucket_cli buckets sync "${remote}/generated" "$generated_dir" --token "$HF_TOKEN"
   echo "restored ${remote}"
   exit 0
 fi
@@ -32,8 +35,8 @@ existing="$(hf_bucket_cli buckets list "${bucket}/workspace-cache/${key}" -R -q 
 plan_a="$(mktemp -t jpacf-artifacts.XXXXXX.jsonl)"
 plan_g="$(mktemp -t jpacf-generated.XXXXXX.jsonl)"
 trap 'rm -f "$plan_a" "$plan_g"' EXIT
-hf_bucket_cli buckets sync artifacts "${remote}/artifacts" --token "$HF_TOKEN" --plan "$plan_a"
-hf_bucket_cli buckets sync data/generated "${remote}/generated" --token "$HF_TOKEN" --plan "$plan_g"
+hf_bucket_cli buckets sync "$artifact_dir" "${remote}/artifacts" --token "$HF_TOKEN" --plan "$plan_a"
+hf_bucket_cli buckets sync "$generated_dir" "${remote}/generated" --token "$HF_TOKEN" --plan "$plan_g"
 hf_bucket_cli buckets sync --token "$HF_TOKEN" --apply "$plan_a"
 hf_bucket_cli buckets sync --token "$HF_TOKEN" --apply "$plan_g"
 echo "published ${remote}"
