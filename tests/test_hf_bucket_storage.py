@@ -155,7 +155,10 @@ def test_ghcr_build_uses_registry_cache_and_direct_push_contract() -> None:
     assert '--cache-from "type=registry,ref=${base_current}"' in builder
     assert '--cache-from "type=registry,ref=${runtime_current}"' in builder
     assert builder.count("--push") >= 2
-    assert "--load" not in builder
+    command_lines = [
+        line for line in builder.splitlines() if not line.lstrip().startswith("#")
+    ]
+    assert all("--load" not in line for line in command_lines)
     assert 'runtime_tag="${image_repo}:sha-${SOURCE_SHA}"' in builder
 
 
