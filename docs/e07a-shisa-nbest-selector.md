@@ -133,15 +133,24 @@ deterministic.
 
 ## 5. Environment
 
-The repository pins Python and the CUDA/NeMo stack separately. Add the LLM
-extra to the existing GPU environment:
+The repository's `uv.lock` remains the authoritative dependency contract for the
+ASR runtime. E07a intentionally does not modify that lock just to add a
+second-pass research model.
+
+Run E07a with ephemeral, versioned Transformers dependencies layered on top of
+the locked GPU environment:
 
 ```bash
-uv sync --extra gpu --extra llm
+uv run \
+  --extra gpu \
+  --with 'transformers==4.57.3' \
+  --with 'accelerate>=1.10,<2' \
+  --with 'safetensors>=0.5' \
+  bash experiments/E07a_shisa_select.sh
 ```
 
-The LLM extra currently installs Transformers/Accelerate only; CUDA PyTorch
-continues to come from the repository GPU runtime contract.
+This keeps the existing NeMo/CUDA lock unchanged while making the LLM runtime
+version explicit in the command and run notes.
 
 Canonical selector model:
 
@@ -149,7 +158,7 @@ Canonical selector model:
 shisa-ai/shisa-v2-qwen2.5-7b
 ```
 
-The initial revision used by the runner is:
+The initial immutable commit prefix used by the runner is:
 
 ```text
 2ba1a59
@@ -209,7 +218,12 @@ with the canonical E05 run.
 Canonical command:
 
 ```bash
-uv run --extra gpu --extra llm bash experiments/E07a_shisa_select.sh
+uv run \
+  --extra gpu \
+  --with 'transformers==4.57.3' \
+  --with 'accelerate>=1.10,<2' \
+  --with 'safetensors>=0.5' \
+  bash experiments/E07a_shisa_select.sh
 ```
 
 Equivalent explicit environment:
@@ -223,7 +237,12 @@ export SHISA_TOP_K=8
 export SHISA_SEED=7
 export SHISA_DTYPE=bfloat16
 
-uv run --extra gpu --extra llm bash experiments/E07a_shisa_select.sh
+uv run \
+  --extra gpu \
+  --with 'transformers==4.57.3' \
+  --with 'accelerate>=1.10,<2' \
+  --with 'safetensors>=0.5' \
+  bash experiments/E07a_shisa_select.sh
 ```
 
 Do not set `SHISA_CONTEXT_FIELD` for the canonical zero-external-context run.
@@ -410,7 +429,8 @@ hf://buckets/saeeew/J-PACF-YOMI-tdt-bucket/runs/<RUN_ID>
 
 The existing uploader refuses to overwrite an already existing run ID.
 
-To retrieve a run later with current Hugging Face CLI Bucket support:
+Current Hugging Face Bucket tooling supports directory synchronization in both
+directions. To retrieve a frozen run later:
 
 ```bash
 hf buckets sync \
