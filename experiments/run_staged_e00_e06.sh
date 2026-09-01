@@ -22,7 +22,7 @@ for path in "${MANIFEST}" "${CONTEXT_PHRASES}" "${NGPU_LM}" "${BENCHMARK_INDEX}"
   test -f "${path}" || { echo "Missing prerequisite: ${path}" >&2; exit 2; }
 done
 
-model_revision="$(python - <<'PY'
+model_revision="$(uv run --locked --no-sync python - <<'PY'
 import json
 from pathlib import Path
 print(json.loads(Path('locks/hf-revisions.lock.json').read_text(encoding='utf-8'))['repositories']['base_model']['revision'])
@@ -35,7 +35,7 @@ bash experiments/E02_ngpulm.sh
 bash experiments/E03_gpu_pb.sh
 bash experiments/E04_ctc_rerank.sh
 
-uv run --locked python scripts/collect_experiment_metrics.py \
+uv run --locked --no-sync python scripts/collect_experiment_metrics.py \
   --benchmark "${BENCHMARK_INDEX}" \
   --execution-manifest "${MANIFEST}" \
   --result "E00=${RESULTS_DIR}/E00_tdt_greedy.jsonl" \
@@ -47,7 +47,7 @@ uv run --locked python scripts/collect_experiment_metrics.py \
   --summary "${RESULTS_DIR}/summary_e00_e04.json"
 
 gate_status=0
-uv run --locked python scripts/evaluate_e05_gate.py \
+uv run --locked --no-sync python scripts/evaluate_e05_gate.py \
   --metrics "${RESULTS_DIR}/metrics_e00_e04.parquet" \
   --output "${RESULTS_DIR}/e05_gate.json" || gate_status=$?
 
@@ -64,12 +64,12 @@ if [[ "${gate_status}" -ne 0 && "${RUN_E05}" != "force" && "${RUN_E05}" != "1" &
   exit 3
 fi
 
-uv run --locked python scripts/extract_encoder_features.py \
+uv run --locked --no-sync python scripts/extract_encoder_features.py \
   --manifest "${MANIFEST}" \
   --output-dir "${ENCODER_FEATURE_DIR}" \
   --model-revision "${model_revision}"
 
-uv run --locked python scripts/prepare_phone_head_data.py \
+uv run --locked --no-sync python scripts/prepare_phone_head_data.py \
   --benchmark "${BENCHMARK_INDEX}" \
   --e04 "${RESULTS_DIR}/E04_ctc_rerank.jsonl" \
   --feature-dir "${ENCODER_FEATURE_DIR}" \
@@ -77,13 +77,13 @@ uv run --locked python scripts/prepare_phone_head_data.py \
   --vocab "${PHONE_VOCAB}" \
   --annotated-e04 "${RESULTS_DIR}/E04_phone_ready.jsonl"
 
-phone_vocab_size="$(python - "${PHONE_VOCAB}" <<'PY'
+phone_vocab_size="$(uv run --locked --no-sync python - "${PHONE_VOCAB}" <<'PY'
 import json
 import sys
 print(json.load(open(sys.argv[1], encoding='utf-8'))['phone_vocab_size'])
 PY
 )"
-uv run --locked python scripts/train_phone_head.py \
+uv run --locked --no-sync python scripts/train_phone_head.py \
   --manifest "${PHONE_TRAIN_MANIFEST}" \
   --phone-vocab-size "${phone_vocab_size}" \
   --output "${PHONE_HEAD}"
@@ -93,7 +93,7 @@ PHONE_HEAD="${PHONE_HEAD}" \
 ENCODER_FEATURE_DIR="${ENCODER_FEATURE_DIR}" \
 bash experiments/E05_phone_rerank.sh
 
-uv run --locked python scripts/collect_experiment_metrics.py \
+uv run --locked --no-sync python scripts/collect_experiment_metrics.py \
   --benchmark "${BENCHMARK_INDEX}" \
   --execution-manifest "${MANIFEST}" \
   --result "E00=${RESULTS_DIR}/E00_tdt_greedy.jsonl" \
@@ -108,7 +108,7 @@ uv run --locked python scripts/collect_experiment_metrics.py \
 if [[ "${RUN_E06}" == "1" || "${RUN_E06}" == "true" ]]; then
   : "${E06_DRIVER:?RUN_E06 requires E06_DRIVER to a NeMo-3.0.0-specific in-beam driver}"
   bash experiments/E06_inbeam.sh
-  uv run --locked python scripts/collect_experiment_metrics.py \
+  uv run --locked --no-sync python scripts/collect_experiment_metrics.py \
     --benchmark "${BENCHMARK_INDEX}" \
     --execution-manifest "${MANIFEST}" \
     --result "E00=${RESULTS_DIR}/E00_tdt_greedy.jsonl" \
