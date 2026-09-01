@@ -6,7 +6,6 @@ import json
 from pathlib import Path
 
 import pyarrow.parquet as pq
-
 from build_run_bundle import sha256
 
 
