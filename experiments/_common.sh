@@ -6,7 +6,7 @@ cd "${ROOT}"
 
 read_hf_lock() {
   local field="$1"
-  python - "$field" <<'PY'
+  uv run --locked python - "$field" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -44,7 +44,7 @@ require_file() {
 }
 
 decode_tdt() {
-  python scripts/decode_nbest.py \
+  uv run --locked python scripts/decode_nbest.py \
     --model-revision "${MODEL_REVISION}" \
     "$@"
 }
