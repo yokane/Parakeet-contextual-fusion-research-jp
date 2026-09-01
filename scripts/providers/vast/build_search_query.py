@@ -16,12 +16,21 @@ BASE_FILTERS = (
 TOKEN = re.compile(r"^[A-Za-z0-9_.+-]+$")
 
 
+def append_numeric_filter(filters: list[str], field: str, value: str) -> None:
+    value = value.strip()
+    if not value:
+        return
+    filters.append(field + (("=" if value[0].isdigit() else "") + value))
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Build the canonical Vast CUDA13 research query")
     parser.add_argument("--gpu-name", default="")
     parser.add_argument("--num-gpus", default="1")
     parser.add_argument("--gpu-ram", default="")
     parser.add_argument("--duration", default="")
+    parser.add_argument("--inet-down", default="")
+    parser.add_argument("--reliability", default="")
     parser.add_argument("--output-json", type=Path, required=True)
     args = parser.parse_args()
 
@@ -37,10 +46,10 @@ def main() -> None:
         )
     if args.num_gpus:
         filters.append("num_gpus=" + args.num_gpus.strip())
-    if args.gpu_ram:
-        filters.append("gpu_ram" + (("=" if args.gpu_ram[0].isdigit() else "") + args.gpu_ram))
-    if args.duration:
-        filters.append("duration" + (("=" if args.duration[0].isdigit() else "") + args.duration))
+    append_numeric_filter(filters, "gpu_ram", args.gpu_ram)
+    append_numeric_filter(filters, "duration", args.duration)
+    append_numeric_filter(filters, "inet_down", args.inet_down)
+    append_numeric_filter(filters, "reliability", args.reliability)
 
     payload = {
         "schema_version": 1,

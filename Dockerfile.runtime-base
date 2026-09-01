@@ -1,0 +1,75 @@
+# syntax=docker/dockerfile:1.7
+ARG NVIDIA_BASE_IMAGE
+FROM ${NVIDIA_BASE_IMAGE}
+
+ARG SOURCE_REPOSITORY=https://github.com/yokane/Parakeet-contextual-fusion-research-jp
+
+LABEL org.opencontainers.image.source="${SOURCE_REPOSITORY}" \
+      org.opencontainers.image.title="J-PACF-YOMI-TDT CUDA/NeMo dependency base" \
+      org.opencontainers.image.description="Pinned CUDA13/PyTorch/NeMo/Python dependency layer for thin runtime builds"
+
+# Everything in this image is immutable build-time state. Runtime writable state
+# intentionally lives under /workspace/state in the child runtime image.
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    JPA_CF_IMAGE_HOME=/opt/jpacf \
+    JPA_CF_WORKSPACE=/opt/jpacf \
+    JPA_CF_STATE_ROOT=/workspace/state \
+    HF_TRANSPORT_PROJECT=/opt/jpacf/tools/hf-bucket \
+    UV_PROJECT_ENVIRONMENT=/opt/jpacf/.venv \
+    UV_PYTHON_INSTALL_DIR=/opt/jpacf/.uv-python \
+    UV_PYTHON_INSTALL_BIN=0
+
+RUN rm -f /etc/apt/apt.conf.d/docker-clean \
+    && printf '%s\n' 'Binary::apt::APT::Keep-Downloaded-Packages "true";' \
+      > /etc/apt/apt.conf.d/keep-cache
+
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update \
+    && apt-get install -y --no-install-recommends \
+      build-essential \
+      ca-certificates \
+      cmake \
+      curl \
+      git \
+      libsndfile1 \
+      ninja-build \
+      libboost-program-options-dev \
+      libboost-system-dev \
+      libboost-test-dev \
+      libboost-thread-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /opt/jpacf
+
+RUN --mount=type=cache,target=/root/.cache/uv \
+    python -m pip install --no-cache-dir uv==0.12.1 \
+    && UV_CACHE_DIR=/root/.cache/uv uv python install 3.12.3
+
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    UV_CACHE_DIR=/root/.cache/uv \
+      uv sync \
+        --locked \
+        --python 3.12.3 \
+        --extra dev \
+        --extra gpu \
+        --no-install-project
+
+COPY tools/hf-bucket ./tools/hf-bucket
+RUN --mount=type=cache,target=/root/.cache/uv \
+    env -u UV_PROJECT_ENVIRONMENT UV_CACHE_DIR=/root/.cache/uv \
+      uv sync --project tools/hf-bucket --locked
+
+# Catch the mutable-volume interpreter regression in the dependency image itself.
+RUN set -euo pipefail; \
+    test -x /opt/jpacf/.venv/bin/python; \
+    resolved="$(readlink -f /opt/jpacf/.venv/bin/python)"; \
+    case "$resolved" in \
+      /opt/jpacf/.uv-python/*) ;; \
+      *) echo "project Python escaped immutable image state: $resolved" >&2; exit 2 ;; \
+    esac
+
+WORKDIR /opt/jpacf

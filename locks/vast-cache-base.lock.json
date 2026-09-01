@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "purpose": "Vast.ai cold-start cache candidate; does not replace the canonical runtime base until GPU and Vast smoke verification pass",
+  "repository": "vastai/base-image",
+  "source_tag": "cuda-13.3.1-cudnn-devel-ubuntu24.04-py312-2026-08-06",
+  "platform": "linux/amd64",
+  "reference": "vastai/base-image@sha256:e3d905840a74e0cc972ce6d0a0b034bca1d263dc2e407e8b0aee13696304c218",
+  "cuda_toolkit": "13.3.1",
+  "promotion_policy": "candidate-only until Docker/NVIDIA runtime verification and Vast entrypoint cold-start smoke both pass"
+}

@@ -6,13 +6,19 @@ HF_TRANSPORT_PROJECT="${HF_TRANSPORT_PROJECT:-${HF_REPOSITORY_ROOT}/tools/hf-buc
 
 hf_bucket_cli() {
     command -v uv >/dev/null 2>&1 || {
-        printf '[hf-cli] ERROR: uv is required; enter through mise\n' >&2
+        printf '[hf-cli] ERROR: uv is required\n' >&2
         return 127
     }
-    # Root mise.toml intentionally pins UV_PROJECT_ENVIRONMENT=.venv for the
-    # ASR environment. Unset it here so the Bucket transport lock materializes
-    # and runs in tools/hf-bucket/.venv instead of mutating the NeMo environment.
-    env -u UV_PROJECT_ENVIRONMENT uv run --project "${HF_TRANSPORT_PROJECT}" --locked -- hf "$@"
+    # Bucket transport is intentionally isolated from the ASR environment.
+    # In the GHCR runtime it is already materialized under /opt/jpacf and must
+    # never be re-synchronized during a research run.
+    if [[ "${JPA_CF_CONTAINER_RUNTIME:-0}" == "1" ]]; then
+        env -u UV_PROJECT_ENVIRONMENT \
+            uv run --project "${HF_TRANSPORT_PROJECT}" --locked --no-sync -- hf "$@"
+    else
+        env -u UV_PROJECT_ENVIRONMENT \
+            uv run --project "${HF_TRANSPORT_PROJECT}" --locked -- hf "$@"
+    fi
 }
 
 hf_normalize_bucket_id() {

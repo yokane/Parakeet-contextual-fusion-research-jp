@@ -56,6 +56,8 @@ if [[ -n "${root}" ]]; then
     }
   done
 
+  # Clean up the legacy two-generation exporter directory. Buildx >= 0.35 can
+  # safely reset an in-place local cache, avoiding a second full cache copy.
   rm -rf "${buildkit_cache}-next"
 
   write_env SELF_CACHE_PERSISTENT true
@@ -71,7 +73,7 @@ if [[ -n "${root}" ]]; then
   else
     write_env BUILDKIT_CACHE_FROM ""
   fi
-  write_env BUILDKIT_CACHE_TO "type=local,dest=${buildkit_cache}-next,mode=max"
+  write_env BUILDKIT_CACHE_TO "type=local,dest=${buildkit_cache},mode=min,reset=true"
   printf 'persistent=true\n' >> "${GITHUB_OUTPUT}"
 else
   uv_cache="${workspace}/.cache/uv"

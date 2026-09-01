@@ -1,0 +1,118 @@
+name: hf-bucket-write-preflight
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/portable-ghcr-gpu-runtime]
+    paths:
+      - ".github/workflows/hf-bucket-write-preflight.yml"
+
+permissions:
+  contents: read
+
+env:
+  HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
+
+jobs:
+  bucket-write-preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install exact mise toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: true
+
+      - name: Materialize isolated HF Bucket transport
+        run: mise run hf:transport:sync
+
+      - name: Inspect token identity without printing credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || { echo "HF_TOKEN is required" >&2; exit 2; }
+          mkdir -p dist/hf-auth
+          env -u UV_PROJECT_ENVIRONMENT \
+            uv run --project tools/hf-bucket --locked --no-sync -- \
+            hf auth whoami --format json \
+            > dist/hf-auth/whoami-raw.json
+
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          raw = json.loads(Path("dist/hf-auth/whoami-raw.json").read_text(encoding="utf-8"))
+          safe = {"authenticated": bool(raw)}
+          if isinstance(raw, dict):
+              for key in ("name", "type", "fullname"):
+                  if key in raw:
+                      safe[key] = raw[key]
+          Path("dist/hf-auth/whoami-safe.json").write_text(
+              json.dumps(safe, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          print(json.dumps(safe, ensure_ascii=False, indent=2, sort_keys=True))
+          PY
+          rm -f dist/hf-auth/whoami-raw.json
+
+      - name: Prove write access with a disposable Bucket object
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/hf-auth
+          probe="dist/hf-auth/probe-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.txt"
+          remote="hf://buckets/${HF_BUCKET}/_auth-probe/github-actions/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.txt"
+          printf 'github_run_id=%s\ngithub_run_attempt=%s\nsource_sha=%s\n' \
+            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" > "$probe"
+
+          hf_bucket() {
+            env -u UV_PROJECT_ENVIRONMENT \
+              uv run --project tools/hf-bucket --locked --no-sync -- hf buckets "$@"
+          }
+
+          if ! hf_bucket cp "$probe" "$remote" --token "$HF_TOKEN" \
+            > dist/hf-auth/write-probe.log 2>&1; then
+            cat dist/hf-auth/write-probe.log >&2
+            echo "HF_TOKEN cannot obtain write access to ${HF_BUCKET}. Vast must not be started." >&2
+            exit 1
+          fi
+
+          hf_bucket cp "$remote" dist/hf-auth/roundtrip.txt --token "$HF_TOKEN" \
+            >> dist/hf-auth/write-probe.log 2>&1
+          cmp "$probe" dist/hf-auth/roundtrip.txt
+          hf_bucket rm "$remote" -y --token "$HF_TOKEN" \
+            >> dist/hf-auth/write-probe.log 2>&1
+
+          # One-time cleanup from the first preflight run, which stopped at the
+          # confirmation prompt before -y was added. Missing paths are harmless.
+          hf_bucket rm \
+            "hf://buckets/${HF_BUCKET}/_auth-probe/github-actions/33523841485-1.txt" \
+            -y --token "$HF_TOKEN" \
+            >> dist/hf-auth/write-probe.log 2>&1 || true
+
+          {
+            echo "### HF Bucket write preflight"
+            echo
+            echo "- bucket: \`${HF_BUCKET}\`"
+            echo "- write: success"
+            echo "- read-back: success"
+            echo "- cleanup: success"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload preflight evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-bucket-write-preflight-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/hf-auth/whoami-safe.json
+            dist/hf-auth/write-probe.log
+            dist/hf-auth/roundtrip.txt
+          if-no-files-found: warn
+          retention-days: 30

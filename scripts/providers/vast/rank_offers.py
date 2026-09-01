@@ -22,6 +22,7 @@ def main() -> None:
     parser.add_argument("--input", type=Path, required=True)
     parser.add_argument("--predicted-minutes", type=float, required=True)
     parser.add_argument("--max-cost-usd", type=float, default=0.5)
+    parser.add_argument("--min-inet-down-mbps", type=float, default=0.0)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
 
@@ -29,6 +30,8 @@ def main() -> None:
         raise SystemExit("Vast research budget must be > 0 and <= $0.50")
     if args.predicted_minutes <= 0:
         raise SystemExit("predicted-minutes must be positive")
+    if args.min_inet_down_mbps < 0:
+        raise SystemExit("min-inet-down-mbps must be non-negative")
 
     ranked: list[dict[str, Any]] = []
     for raw in offers(json.loads(args.input.read_text(encoding="utf-8"))):
@@ -37,7 +40,14 @@ def main() -> None:
             continue
         cuda = float(raw.get("cuda_max_good") or 0)
         disk = float(raw.get("disk_space") or 0)
-        if cuda < 13 or disk < 50 or raw.get("rentable") is False or raw.get("verified") is False:
+        inet_down = float(raw.get("inet_down") or 0)
+        if (
+            cuda < 13
+            or disk < 50
+            or inet_down < args.min_inet_down_mbps
+            or raw.get("rentable") is False
+            or raw.get("verified") is False
+        ):
             continue
         predicted_cost = round(dph * (args.predicted_minutes / 60.0), 4)
         if predicted_cost > args.max_cost_usd:
@@ -58,30 +68,44 @@ def main() -> None:
                 "reliability": reliability,
                 "disk_space_gb": disk,
                 "cuda_max_good": cuda,
+                "inet_down_mbps": inet_down,
+                "inet_up_mbps": float(raw.get("inet_up") or 0),
+                "dlperf": float(raw.get("dlperf") or 0),
+                "min_bid": float(raw.get("min_bid") or 0),
+                "is_bid": bool(raw.get("is_bid", False)),
             }
         )
 
-    ranked.sort(key=lambda item: (item["predicted_cost_usd"], -item["reliability"], item["offer_id"]))
+    ranked.sort(
+        key=lambda item: (
+            item["predicted_cost_usd"],
+            -item["inet_down_mbps"],
+            -item["reliability"],
+            item["offer_id"],
+        )
+    )
     result = {
-        "schema_version": 1,
+        "schema_version": 2,
         "platform": "linux/amd64",
         "cuda_major": 13,
         "max_cost_usd": args.max_cost_usd,
+        "min_inet_down_mbps": args.min_inet_down_mbps,
         "storage_gb": 50,
         "offers": ranked,
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
-    print("|Rank|Offer|GPU|$/h|Minutes|Predicted $|Confidence|")
-    print("|---:|---:|---|---:|---:|---:|---|")
+    print("|Rank|Offer|GPU|$/h|Down Mbps|Minutes|Predicted $|Confidence|")
+    print("|---:|---:|---|---:|---:|---:|---:|---|")
     for index, item in enumerate(ranked[:20], 1):
         print(
             f"|{index}|{item['offer_id']}|{item['gpu_name']}|{item['dph_total']:.4f}|"
-            f"{item['predicted_minutes']:.2f}|{item['predicted_cost_usd']:.4f}|{item['confidence']}|"
+            f"{item['inet_down_mbps']:.0f}|{item['predicted_minutes']:.2f}|"
+            f"{item['predicted_cost_usd']:.4f}|{item['confidence']}|"
         )
     if not ranked:
-        print("|—|—|No eligible offer|—|—|—|—|")
+        print("|—|—|No eligible offer|—|—|—|—|—|")
 
 
 if __name__ == "__main__":

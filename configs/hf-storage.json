@@ -9,7 +9,9 @@
   "collections": {
     "candidates": "candidate",
     "experiments": "experiment",
-    "config": "config"
+    "config": "config",
+    "runtime": "runtime",
+    "workspace_cache": "workspace-cache"
   },
   "mutable_paths": [
     "README.md",
@@ -20,7 +22,9 @@
     "candidates/candidate-",
     "experiments/experiment-",
     "runs/",
-    "benchmarks/"
+    "benchmarks/",
+    "runtime/",
+    "workspace-cache/"
   ],
   "required_roots": [
     "config",
@@ -29,7 +33,9 @@
     "runs",
     "benchmarks",
     "reference",
+    "runtime",
     "scripts",
-    "tmp"
+    "tmp",
+    "workspace-cache"
   ]
 }

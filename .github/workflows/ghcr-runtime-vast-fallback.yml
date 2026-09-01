@@ -1,0 +1,301 @@
+name: ghcr-runtime-vast-fallback
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ghcr-runtime-vast-fallback-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/jpacf-yomi-tdt-runtime
+  HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
+  STORAGE_GB: "80"
+  GPU_RAM_GB: "24"
+  GPU_ALLOWLIST: RTX_4090
+  MIN_INET_DOWN_MBPS: "1000"
+  MIN_RELIABILITY: "0.98"
+  PREDICTED_MINUTES: "30"
+  MAX_COST_USD: "0.35"
+  OFFER_LIMIT: "50"
+  WAIT_MAX_ATTEMPTS: "240"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 105
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
+      source_sha: ${{ steps.target.outputs.sha }}
+      image: ${{ steps.build.outputs.image }}
+      base_image: ${{ steps.build.outputs.base_reference }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+
+      - name: Select source commit
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          target="$GITHUB_SHA"
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            target='${{ github.event.before }}'
+          fi
+          [[ "$target" =~ ^[0-9a-f]{40}$ ]]
+          git fetch --no-tags --depth=1 origin "$target"
+          git checkout --force "$target"
+          echo "sha=$target" >> "$GITHUB_OUTPUT"
+
+      - name: Free hosted runner disk
+        shell: bash
+        run: |
+          set -euo pipefail
+          df -h /
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
+          sudo apt-get clean || true
+          docker system prune -af || true
+          df -h /
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # docker-container does not auto-load the result into Docker Engine. With
+      # --push the large CUDA/NeMo layers are exported straight to GHCR instead
+      # of being unpacked into the hosted runner's local image store.
+      - name: Set up direct-to-registry Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        with:
+          driver: docker-container
+
+      - name: Read immutable NVIDIA base image reference
+        id: nvidia-base
+        shell: bash
+        run: |
+          set -euo pipefail
+          reference="$(sed -n 's/^[[:space:]]*"reference": "\([^"]*\)",*$/\1/p' locks/containers.lock.json | head -1)"
+          [[ "$reference" =~ @sha256:[0-9a-f]{64}$ ]]
+          echo "reference=$reference" >> "$GITHUB_OUTPUT"
+
+      - name: Build dependency base if needed and push thin runtime
+        id: build
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ steps.target.outputs.sha }}
+          SOURCE_REPOSITORY: ${{ github.server_url }}/${{ github.repository }}
+          NVIDIA_BASE_IMAGE: ${{ steps.nvidia-base.outputs.reference }}
+        run: |
+          set -euo pipefail
+          timeout --signal=TERM --kill-after=2m 90m bash scripts/ci/build_runtime_image.sh
+
+      - name: Record build identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "dependency_base=${{ steps.build.outputs.base_reference }}"
+          echo "runtime=${{ steps.build.outputs.image }}"
+          [[ '${{ steps.build.outputs.digest }}' =~ ^sha256:[0-9a-f]{64}$ ]]
+
+  verify-vast:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+      GHCR_TOKEN: ${{ github.token }}
+      VAST_LABEL: jpacf-canonical-${{ github.run_id }}-${{ github.run_attempt }}
+      RUNTIME_IMAGE: ${{ needs.build.outputs.image }}
+      SOURCE_SHA: ${{ needs.build.outputs.source_sha }}
+      RUNTIME_DIGEST: ${{ needs.build.outputs.digest }}
+      RUNTIME_BASE_IMAGE: ${{ needs.build.outputs.base_image }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.build.outputs.source_sha }}
+
+      - name: Install exact mise toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: true
+
+      - name: Materialize Vast CLI environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mise run deps:sync-vast
+          command -v jq >/dev/null
+          test -n "${VAST_API_KEY:-}"
+          test -n "${GHCR_TOKEN:-}"
+          [[ "$RUNTIME_IMAGE" =~ @sha256:[0-9a-f]{64}$ ]]
+          [[ "$RUNTIME_BASE_IMAGE" =~ @sha256:[0-9a-f]{64}$ ]]
+          test -x scripts/container/vast_verify.sh
+
+      - name: Select fast budget-compliant on-demand RTX 4090
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/providers dist/runtime
+          uv run --locked python scripts/providers/vast/build_search_query.py \
+            --gpu-name "$GPU_ALLOWLIST" --num-gpus 1 \
+            --gpu-ram ">=${GPU_RAM_GB}" \
+            --inet-down ">=${MIN_INET_DOWN_MBPS}" \
+            --reliability ">=${MIN_RELIABILITY}" \
+            --output-json dist/providers/canonical-search-query.json \
+            > dist/providers/canonical-search-query.txt
+          query="$(cat dist/providers/canonical-search-query.txt)"
+          timeout 30s uv run --locked vastai search offers \
+            --api-key "$VAST_API_KEY" --raw --no-default --type on-demand \
+            --order 'inet_down-,dph_total' --storage "$STORAGE_GB" --limit "$OFFER_LIMIT" \
+            "$query" > dist/providers/canonical-raw.json
+          uv run --locked python scripts/providers/vast/rank_offers.py \
+            --input dist/providers/canonical-raw.json \
+            --predicted-minutes "$PREDICTED_MINUTES" \
+            --max-cost-usd "$MAX_COST_USD" \
+            --min-inet-down-mbps "$MIN_INET_DOWN_MBPS" \
+            --output dist/providers/canonical-inventory.json \
+            > dist/providers/canonical-inventory.md
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload=json.loads(Path('dist/providers/canonical-inventory.json').read_text())
+          offers=[row for row in payload.get('offers', []) if not row.get('is_bid')]
+          if not offers:
+              raise SystemExit('no budget-compliant on-demand RTX 4090 offer')
+          selected=max(offers, key=lambda row:(float(row.get('inet_down_mbps') or 0), -float(row.get('dph_total') or 999)))
+          Path('dist/providers/canonical-selected.json').write_text(json.dumps(selected, indent=2, sort_keys=True)+'\n')
+          with open('/tmp/canonical.env','w') as h:
+              h.write(f"VAST_OFFER_ID={selected['offer_id']}\n")
+              h.write(f"VAST_GPU_NAME={selected['gpu_name']}\n")
+              h.write(f"VAST_DPH_TOTAL={selected['dph_total']}\n")
+              h.write(f"VAST_INET_DOWN={selected['inet_down_mbps']}\n")
+              h.write(f"VAST_PREDICTED_COST={selected['predicted_cost_usd']}\n")
+          PY
+          cat /tmp/canonical.env >> "$GITHUB_ENV"
+          cat dist/providers/canonical-inventory.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Create Vast canonical verification instance
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::add-mask::${GHCR_TOKEN}"
+          response="$(timeout 30s uv run --locked vastai create instance "$VAST_OFFER_ID" \
+            --api-key "$VAST_API_KEY" --raw --image "$RUNTIME_IMAGE" \
+            --disk "$STORAGE_GB" --label "$VAST_LABEL" \
+            --login "-u ${GITHUB_ACTOR} -p ${GHCR_TOKEN} ghcr.io" \
+            --cancel-unavail \
+            --args /opt/jpacf/scripts/container/vast_verify.sh)"
+          printf '%s\n' "$response" > dist/runtime/create-response.json
+          id="$(python -c "import json; print(int(json.load(open('dist/runtime/create-response.json'))['new_contract']))")"
+          printf '%s\n' "$id" > "$RUNNER_TEMP/vast-instance-id"
+          echo "VAST_INSTANCE_ID=$id" >> "$GITHUB_ENV"
+
+      - name: Wait for canonical GPU proof
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > dist/runtime/instance-status.jsonl
+          : > dist/runtime/vast-container.log
+          complete=0
+          for attempt in $(seq 1 "$WAIT_MAX_ATTEMPTS"); do
+            raw="$(timeout 20s uv run --locked vastai show instance "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --raw 2>/dev/null || true)"
+            actual_status=""
+            if [[ -n "$raw" ]]; then
+              printf '%s\n' "$raw" > "$RUNNER_TEMP/vast-status.json"
+              actual_status="$(python - "$attempt" "$RUNNER_TEMP/vast-status.json" <<'PY' | tee -a dist/runtime/instance-status.jsonl | python -c 'import json,sys; print(json.load(sys.stdin).get("actual_status", ""))'
+          import json, sys
+          from pathlib import Path
+          row=json.loads(Path(sys.argv[2]).read_text())
+          msg=' | '.join(x.strip() for x in str(row.get('status_msg') or '').splitlines() if x.strip())
+          print(json.dumps({'attempt': int(sys.argv[1]), 'actual_status': row.get('actual_status') or '', 'status_msg': msg, 'dph_total': row.get('dph_total')}, sort_keys=True))
+          PY
+              )"
+            fi
+            timeout 20s uv run --locked vastai logs "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --tail 3000 > dist/runtime/vast-container.log 2>&1 || true
+            if grep -q 'JPA_CF_CANONICAL_VERIFY rc=0' dist/runtime/vast-container.log; then
+              complete=1
+              break
+            fi
+            if grep -Eq 'JPA_CF_CANONICAL_VERIFY rc=[1-9][0-9]*' dist/runtime/vast-container.log; then
+              cat dist/runtime/vast-container.log
+              exit 1
+            fi
+            if [[ "$actual_status" == "exited" ]]; then
+              echo "Vast container exited before producing a successful proof marker" >&2
+              cat dist/runtime/vast-container.log >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          [[ "$complete" == 1 ]] || { tail -300 dist/runtime/vast-container.log >&2; exit 1; }
+          cat dist/runtime/vast-container.log
+
+      - name: Record canonical runtime identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/runtime
+          cat > dist/runtime/runtime-image.json <<JSON
+          {
+            "schema_version": 4,
+            "source_git_sha": "${SOURCE_SHA}",
+            "platform": "linux/amd64",
+            "cuda_major": 13,
+            "nemo_toolkit": "3.0.0",
+            "torch": "2.12.0+cu132",
+            "runtime_base_reference": "${RUNTIME_BASE_IMAGE}",
+            "digest": "${RUNTIME_DIGEST}",
+            "reference": "${RUNTIME_IMAGE}",
+            "published_tag": "sha-${SOURCE_SHA}",
+            "gpu_verified": true,
+            "execution_contract": "vast-container-runtime",
+            "state_mount": "/workspace/state",
+            "vast_offer_id": "${VAST_OFFER_ID}",
+            "vast_gpu": "${VAST_GPU_NAME}",
+            "vast_dph_total": "${VAST_DPH_TOTAL}",
+            "vast_predicted_cost_usd": "${VAST_PREDICTED_COST}"
+          }
+          JSON
+          cat dist/runtime/runtime-image.json
+
+      - name: Publish runtime identity to HF Bucket
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}"
+          source scripts/hf/hf-identity.sh
+          hf_bucket_cli buckets sync dist/runtime "hf://buckets/${HF_BUCKET}/runtime/sha-${SOURCE_SHA}" --token "$HF_TOKEN"
+
+      - name: Destroy Vast instance
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set +e
+          if [[ -s "$RUNNER_TEMP/vast-instance-id" ]]; then
+            id="$(cat "$RUNNER_TEMP/vast-instance-id")"
+            timeout 30s uv run --locked vastai destroy instance "$id" --api-key "$VAST_API_KEY" -y || true
+          fi
+
+      - name: Upload fallback evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ghcr-runtime-vast-fallback-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/providers/canonical-*
+            dist/runtime/
+          if-no-files-found: warn
+          retention-days: 30

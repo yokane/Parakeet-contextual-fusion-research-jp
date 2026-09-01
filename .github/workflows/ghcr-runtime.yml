@@ -3,14 +3,13 @@ name: ghcr-runtime
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, feat/portable-ghcr-gpu-runtime]
     paths:
       - "Dockerfile"
+      - "Dockerfile.runtime-base"
       - ".dockerignore"
       - "pyproject.toml"
       - "uv.lock"
-      - "mise.toml"
-      - "mise.lock"
       - "stack.lock.yaml"
       - "locks/containers.lock.json"
       - "src/**"
@@ -19,6 +18,7 @@ on:
       - "configs/**"
       - "experiments/**"
       - "hf_model/**"
+      - "tools/hf-bucket/**"
       - ".github/workflows/ghcr-runtime.yml"
 
 permissions:
@@ -32,7 +32,7 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/jpacf-yomi-tdt-runtime
-  CACHE_SCOPE: jpacf-runtime-linux-amd64-cuda13
+  HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
 
 jobs:
   build-and-verify:
@@ -40,23 +40,18 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - name: Configure self-hosted cache contract
-        id: cache
-        shell: bash
-        env:
-          ACTIONS_CACHE_SCOPE: ${{ env.CACHE_SCOPE }}
-        run: bash scripts/ci/setup_actions_cache.sh
-
-      - name: Install repository toolchain from mise.lock
-        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          version: 2026.8.16
-          install: true
-          cache: ${{ steps.cache.outputs.persistent != 'true' }}
+          clean: false
 
-      - name: Verify host research platform
-        run: mise run platform:verify
+      - name: Isolate Docker client configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker_config="${RUNNER_TEMP}/docker-config"
+          rm -rf "${docker_config}"
+          mkdir -p "${docker_config}"
+          printf '{}\n' > "${docker_config}/config.json"
+          echo "DOCKER_CONFIG=${docker_config}" >> "${GITHUB_ENV}"
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -65,100 +60,91 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Keep the docker driver on the self-hosted runner because it is known to
+      # initialize reliably there. The hosted fallback uses docker-container to
+      # avoid local image-store export pressure.
       - name: Set up Buildx
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        with:
+          driver: docker
 
-      - name: Read immutable base image reference
-        id: base
+      - name: Read immutable NVIDIA base image reference
+        id: nvidia-base
         shell: bash
         run: |
           set -euo pipefail
-          reference="$(python - <<'PY'
-          import json
-          from pathlib import Path
-          payload = json.loads(Path('locks/containers.lock.json').read_text(encoding='utf-8'))
-          print(payload['images']['nvidia_pytorch']['reference'])
-          PY
-          )"
-          [[ "${reference}" =~ @sha256:[0-9a-f]{64}$ ]] || {
-            echo "base image is not digest-pinned" >&2
-            exit 2
-          }
+          reference="$(sed -n 's/^[[:space:]]*"reference": "\([^"]*\)",*$/\1/p' locks/containers.lock.json | head -1)"
+          [[ "${reference}" =~ @sha256:[0-9a-f]{64}$ ]] || { echo "base image is not digest-pinned" >&2; exit 2; }
           echo "reference=${reference}" >> "${GITHUB_OUTPUT}"
 
-      - name: Build and push runtime
+      - name: Build dependency base if needed and push immutable runtime
         id: build
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
-        with:
-          context: .
-          file: ./Dockerfile
-          platforms: linux/amd64
-          push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
-          labels: |
-            org.opencontainers.image.title=J-PACF-YOMI-TDT runtime
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            org.opencontainers.image.vendor=J-PACF-YOMI-TDT research
-          cache-from: ${{ env.BUILDKIT_CACHE_FROM }}
-          cache-to: ${{ env.BUILDKIT_CACHE_TO }}
-          build-args: BASE_IMAGE=${{ steps.base.outputs.reference }}
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_REPOSITORY: ${{ github.server_url }}/${{ github.repository }}
+          NVIDIA_BASE_IMAGE: ${{ steps.nvidia-base.outputs.reference }}
+        run: bash scripts/ci/build_runtime_image.sh
 
-      - name: Commit persistent BuildKit cache generation
-        if: ${{ env.SELF_CACHE_PERSISTENT == 'true' }}
+      - name: Verify built image through NVIDIA container runtime
         shell: bash
         run: |
           set -euo pipefail
-          test -d "${BUILDKIT_CACHE_DIR}-next" || {
-            echo "BuildKit did not produce the expected local cache export" >&2
-            exit 2
-          }
-          rm -rf "${BUILDKIT_CACHE_DIR}"
-          mv "${BUILDKIT_CACHE_DIR}-next" "${BUILDKIT_CACHE_DIR}"
+          image='${{ steps.build.outputs.image }}'
+          [[ "$image" =~ @sha256:[0-9a-f]{64}$ ]]
+          mkdir -p .jpacf-state
+          JPA_CF_IMAGE="$image" bash scripts/container/run.sh
 
-      - name: Verify built image on CUDA13 GPU
+      - name: Promote verified digest to main tag
+        if: ${{ github.ref == 'refs/heads/main' }}
         shell: bash
         run: |
           set -euo pipefail
-          image="${REGISTRY}/${IMAGE_NAME}@${{ steps.build.outputs.digest }}"
-          docker pull "$image"
-          docker run --rm --gpus all \
-            -e JPA_CF_PLATFORM=linux/amd64 \
-            -e JPA_CF_CUDA_MAJOR=13 \
-            "$image" \
-            python scripts/repro/verify_platform.py --require-gpu
+          docker buildx imagetools create \
+            --tag "${REGISTRY}/${IMAGE_NAME}:main" \
+            '${{ steps.build.outputs.image }}'
 
       - name: Record immutable runtime identity
         shell: bash
         run: |
           set -euo pipefail
+          digest='${{ steps.build.outputs.digest }}'
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
           mkdir -p dist/runtime
-          python - <<'PY'
-          import json
-          import os
-          from pathlib import Path
-          digest = "${{ steps.build.outputs.digest }}"
-          if not digest.startswith("sha256:") or len(digest) != 71:
-              raise SystemExit(f"invalid runtime digest: {digest}")
-          image = f"{os.environ['REGISTRY']}/{os.environ['IMAGE_NAME']}"
-          payload = {
-              "schema_version": 2,
-              "source_git_sha": "${{ github.sha }}",
-              "platform": "linux/amd64",
-              "cuda_major": 13,
-              "nemo_toolkit": "3.0.0",
-              "torch": "2.12.0+cu132",
-              "digest": digest,
-              "reference": f"{image}@{digest}",
-              "published_tag": f"sha-${{ github.sha }}",
-              "gpu_verified": True,
+          cat > dist/runtime/runtime-image.json <<EOF
+          {
+            "schema_version": 4,
+            "source_git_sha": "${{ github.sha }}",
+            "platform": "linux/amd64",
+            "cuda_major": 13,
+            "nemo_toolkit": "3.0.0",
+            "torch": "2.12.0+cu132",
+            "runtime_base_reference": "${{ steps.build.outputs.base_reference }}",
+            "digest": "$digest",
+            "reference": "${{ steps.build.outputs.image }}",
+            "published_tag": "sha-${{ github.sha }}",
+            "gpu_verified": true,
+            "execution_contract": "docker-nvidia-runtime",
+            "state_mount": "/workspace/state"
           }
-          Path("dist/runtime/runtime-image.json").write_text(
-              json.dumps(payload, indent=2, sort_keys=True) + "\n",
-              encoding="utf-8",
-          )
-          print(json.dumps(payload, indent=2, sort_keys=True))
-          PY
+          EOF
+          cat dist/runtime/runtime-image.json
+
+      - name: Publish runtime identity to HF Bucket
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -n "${HF_TOKEN:-}" ]] || { echo "HF_TOKEN is required" >&2; exit 2; }
+          image='${{ steps.build.outputs.image }}'
+          JPA_CF_IMAGE="$image" \
+          HF_TOKEN="$HF_TOKEN" \
+          HF_BUCKET="$HF_BUCKET" \
+          GITHUB_SHA="$GITHUB_SHA" \
+            bash scripts/container/run.sh \
+              bash -lc \
+              'source scripts/hf/hf-identity.sh; hf_bucket_cli buckets sync dist/runtime "hf://buckets/${HF_BUCKET}/runtime/sha-${GITHUB_SHA}" --token "$HF_TOKEN"'
 
       - name: Upload runtime identity
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

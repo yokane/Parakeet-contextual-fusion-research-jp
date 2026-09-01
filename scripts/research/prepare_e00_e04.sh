@@ -22,10 +22,14 @@ for command in git cmake c++ make; do
   }
 done
 
-mise install --locked
-mise run deps:sync-gpu
-mise run hf:transport:sync
-uv run --locked --no-sync python scripts/repro/verify_platform.py --require-gpu
+if [[ "${JPA_CF_CONTAINER_RUNTIME:-0}" == "1" ]]; then
+  python /opt/jpacf/scripts/container/verify_runtime.py --require-gpu
+else
+  mise install --locked
+  mise run deps:sync-gpu
+  mise run hf:transport:sync
+  uv run --locked --no-sync python scripts/repro/verify_platform.py --require-gpu
+fi
 
 benchmark_revision="$(uv run --locked --no-sync python - <<'PY'
 import json
