@@ -3,6 +3,11 @@ name: e00-e06-staged-gpu
 on:
   workflow_dispatch:
     inputs:
+      runtime_image:
+        description: "GHCR image tag or digest; tags are resolved to a digest before execution"
+        required: true
+        default: "ghcr.io/yokane/jpacf-yomi-tdt-runtime:main"
+        type: string
       run_e05:
         description: "E05 policy after the E04 evidence gate"
         required: true
@@ -26,6 +31,7 @@ on:
 
 permissions:
   contents: read
+  packages: read
 
 concurrency:
   group: e00-e06-staged-${{ github.ref }}
@@ -46,52 +52,56 @@ jobs:
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: false
 
-      - name: Configure persistent self-hosted caches
-        id: cache
-        shell: bash
-        run: bash scripts/ci/setup_actions_cache.sh
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Isolate mise from runner user configuration
+      - name: Resolve immutable runtime and persistent state
         shell: bash
         run: |
           set -euo pipefail
-          : > "${RUNNER_TEMP}/mise-global.toml"
-          : > "${RUNNER_TEMP}/mise-system.toml"
-          echo "MISE_GLOBAL_CONFIG_FILE=${RUNNER_TEMP}/mise-global.toml" >> "${GITHUB_ENV}"
-          echo "MISE_SYSTEM_CONFIG_FILE=${RUNNER_TEMP}/mise-system.toml" >> "${GITHUB_ENV}"
+          image="$(bash scripts/container/resolve-image.sh '${{ inputs.runtime_image }}')"
+          echo "JPA_CF_IMAGE=${image}" >> "${GITHUB_ENV}"
+          echo "JPA_CF_STATE_ROOT=${GITHUB_WORKSPACE}/.jpacf-state" >> "${GITHUB_ENV}"
+          echo "Resolved runtime: ${image}" >> "${GITHUB_STEP_SUMMARY}"
 
-      - name: Install exact mise toolchain
-        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
-        with:
-          version: 2026.8.16
-          install: true
-          cache: ${{ steps.cache.outputs.persistent != 'true' }}
-
-      - name: Validate runner and prepare E00-E04 prerequisites
+      - name: Verify GPU inside container
         shell: bash
-        run: bash scripts/research/prepare_e00_e04.sh
+        run: bash scripts/container/run.sh python /opt/jpacf/scripts/container/verify_runtime.py --require-gpu
 
-      - name: Run staged E00-E06 experiment ladder
+      - name: Prepare E00-E04 and run staged ladder
         shell: bash
-        run: bash experiments/run_staged_e00_e06.sh
+        run: |
+          set -euo pipefail
+          bash scripts/container/run.sh bash -lc '
+            bash scripts/research/prepare_e00_e04.sh
+            bash experiments/run_staged_e00_e06.sh
+          '
 
       - name: Persist immutable evidence to HF Bucket
         if: ${{ always() }}
         shell: bash
         run: |
           set -euo pipefail
-          test -d "${RESULTS_DIR}" || exit 0
+          test -d "${JPA_CF_STATE_ROOT}/results/${{ inputs.results_name }}" || exit 0
           run_id="gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-e00-e06"
-          run_dir="dist/hf-runs/${run_id}"
-          uv run --locked --no-sync python scripts/hf/build_run_bundle.py \
-            --results-dir "${RESULTS_DIR}" \
-            --output-dir "${run_dir}" \
-            --run-id "${run_id}" \
-            --workflow-kind e00-e06-staged \
-            --benchmark-index "${EVAL_DIR}/bench_index.jsonl" \
-            --execution-manifest "${EVAL_DIR}/nemo_eval.jsonl"
-          bash scripts/hf/hf-push-run.sh "${run_dir}"
+          bash scripts/container/run.sh bash -lc "
+            run_dir='dist/hf-runs/${run_id}'
+            uv run --locked --no-sync python scripts/hf/build_run_bundle.py \
+              --results-dir '${RESULTS_DIR}' \
+              --output-dir \"\${run_dir}\" \
+              --run-id '${run_id}' \
+              --workflow-kind e00-e06-staged \
+              --benchmark-index '${EVAL_DIR}/bench_index.jsonl' \
+              --execution-manifest '${EVAL_DIR}/nemo_eval.jsonl'
+            bash scripts/hf/hf-push-run.sh \"\${run_dir}\"
+          "
           echo "HF Bucket run: hf://buckets/${HF_BUCKET}/runs/${run_id}" >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Upload short-lived GitHub artifact
@@ -100,10 +110,11 @@ jobs:
         with:
           name: e00-e06-${{ inputs.results_name }}-${{ github.sha }}
           path: |
-            data/generated/eval/eval_provenance.json
-            data/generated/eval/audio_coverage.json
-            data/generated/eval/bench_index.jsonl
-            data/generated/eval/nemo_eval.jsonl
-            ${{ env.RESULTS_DIR }}
+            .jpacf-state/generated/eval/eval_provenance.json
+            .jpacf-state/generated/eval/audio_coverage.json
+            .jpacf-state/generated/eval/bench_index.jsonl
+            .jpacf-state/generated/eval/nemo_eval.jsonl
+            .jpacf-state/results/${{ inputs.results_name }}
+            .jpacf-state/dist/hf-runs
           if-no-files-found: warn
           retention-days: 30
