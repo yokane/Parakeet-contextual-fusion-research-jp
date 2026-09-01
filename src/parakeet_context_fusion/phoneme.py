@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-import torch
-from torch import nn
+try:
+    import torch
+    from torch import nn
+except ModuleNotFoundError:
+    torch = None
+    nn = None
 
 from .phone_distance import (
     DEFAULT_PHONE_COSTS,
@@ -27,17 +31,30 @@ __all__ = [
 ]
 
 
-class PhoneCTCHead(nn.Module):
-    """Small trainable CTC projection intended for a frozen FastConformer encoder."""
+if nn is not None:
 
-    def __init__(self, encoder_dim: int, phone_vocab_size: int, dropout: float = 0.1) -> None:
-        super().__init__()
-        self.projection = nn.Sequential(
-            nn.LayerNorm(encoder_dim),
-            nn.Dropout(dropout),
-            nn.Linear(encoder_dim, phone_vocab_size),
-        )
+    class PhoneCTCHead(nn.Module):
+        """Small trainable CTC projection intended for a frozen FastConformer encoder."""
 
-    def forward(self, encoder_states: torch.Tensor) -> torch.Tensor:
-        """Return log probabilities; accepts [..., encoder_dim]."""
-        return self.projection(encoder_states).log_softmax(dim=-1)
+        def __init__(self, encoder_dim: int, phone_vocab_size: int, dropout: float = 0.1) -> None:
+            super().__init__()
+            self.projection = nn.Sequential(
+                nn.LayerNorm(encoder_dim),
+                nn.Dropout(dropout),
+                nn.Linear(encoder_dim, phone_vocab_size),
+            )
+
+        def forward(self, encoder_states: torch.Tensor) -> torch.Tensor:
+            """Return log probabilities; accepts [..., encoder_dim]."""
+            return self.projection(encoder_states).log_softmax(dim=-1)
+
+else:
+
+    class PhoneCTCHead:
+        """Placeholder that reports the optional torch dependency only when instantiated."""
+
+        def __init__(self, encoder_dim: int, phone_vocab_size: int, dropout: float = 0.1) -> None:
+            del encoder_dim, phone_vocab_size, dropout
+            raise ModuleNotFoundError(
+                "PhoneCTCHead requires the GPU/torch dependency set; run `mise run deps:sync-gpu`."
+            )
