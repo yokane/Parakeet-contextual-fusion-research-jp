@@ -11,7 +11,6 @@ from typing import Any
 
 import pyarrow.parquet as pq
 
-
 MetricFn = Callable[[dict[str, Any]], float | None]
 
 
