@@ -1,9 +1,12 @@
 PYTHON ?= python
 RELEASE ?= data/releases/v0.1.0
 HF_REPO ?= saeeew/JP-HomophoneBench
+HF_MODEL_REPO ?= saeeew/J-PACF-YOMI-tdt
+HF_BUCKET ?= saeeew/J-PACF-YOMI-tdt-bucket
 HF_CONFIG ?= homophone8
 HF_SPLIT ?= test
 HF_LICENSE_POLICY ?= permissive
+GHCR_IMAGE ?= ghcr.io/yokane/jpacf-yomi-tdt-runtime
 GENERATED ?= data/generated
 RESULTS_DIR ?= results
 RESULT_SPECS ?=
@@ -14,8 +17,10 @@ MIN_AUDIO_PER_CATEGORY ?= 5
 DISTRACTOR_COUNTS ?= 0,10,100
 CONTEXT_STRESS_DIR ?= $(GENERATED)/context-stress
 CONTEXT_STRESS_RESULTS ?= $(RESULTS_DIR)/context-stress
+CANDIDATE_DIR ?=
+RUN_DIR ?=
 
-.PHONY: lint test validate bench bench-permissive bench-validate hf-publish hf-eval-index hf-eval-audio metrics saturation audio-coverage context-stress-lists context-stress-analyze run-e00 run-e01 run-e02 run-e03 run-e04 run-e05 run-e06
+.PHONY: lint test validate bench bench-permissive bench-validate hf-publish hf-eval-index hf-eval-audio metrics saturation audio-coverage context-stress-lists context-stress-analyze hf-bucket-bootstrap hf-bucket-validate hf-candidate-push hf-run-push docker-build docker-pull run-e00 run-e01 run-e02 run-e03 run-e04 run-e05 run-e06
 
 lint:
 	ruff check src scripts tests
@@ -109,6 +114,28 @@ context-stress-analyze:
 		--metrics $(CONTEXT_STRESS_RESULTS)/metrics.parquet \
 		--stress-manifest $(CONTEXT_STRESS_DIR)/lists/context_stress_manifest.json \
 		--output $(CONTEXT_STRESS_RESULTS)/context_stress.json
+
+hf-bucket-bootstrap:
+	HF_BUCKET=$(HF_BUCKET) bash scripts/hf/hf-bootstrap-bucket.sh
+
+hf-bucket-validate:
+	@tmp="$$(mktemp)"; trap 'rm -f "$$tmp"' EXIT; \
+	hf buckets list "$(HF_BUCKET)" -R -q --token "$$HF_TOKEN" > "$$tmp"; \
+	$(PYTHON) scripts/hf/validate_bucket_layout.py --listing "$$tmp"
+
+hf-candidate-push:
+	@test -n "$(CANDIDATE_DIR)" || { echo 'Set CANDIDATE_DIR=dist/hf-candidate/<release>' >&2; exit 2; }
+	HF_BUCKET=$(HF_BUCKET) bash scripts/hf/hf-push-candidate.sh $(CANDIDATE_DIR)
+
+hf-run-push:
+	@test -n "$(RUN_DIR)" || { echo 'Set RUN_DIR=dist/hf-runs/<run-id>' >&2; exit 2; }
+	HF_BUCKET=$(HF_BUCKET) bash scripts/hf/hf-push-run.sh $(RUN_DIR)
+
+docker-build:
+	DOCKER_BUILDKIT=1 docker build --progress=plain -t $(GHCR_IMAGE):local .
+
+docker-pull:
+	docker pull $(GHCR_IMAGE):main
 
 run-e00:
 	bash experiments/E00_tdt_greedy.sh
