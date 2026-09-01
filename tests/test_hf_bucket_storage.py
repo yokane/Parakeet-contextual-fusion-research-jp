@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -140,3 +142,49 @@ def test_ghcr_build_exports_both_gha_and_registry_caches() -> None:
     assert "type=gha,scope=${{ env.CACHE_SCOPE }}" in text
     assert "type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache" in text
     assert "type=raw,value=sha-${{ github.sha }}" in text
+
+
+def test_candidate_roundtrip_detects_tampering(tmp_path: Path) -> None:
+    release_root = tmp_path / "release"
+    candidate_dir = tmp_path / "candidate"
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/build_hf_model_release.py",
+            "--release",
+            "candidate-test",
+            "--output-root",
+            str(release_root),
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            sys.executable,
+            "scripts/hf/prepare_candidate.py",
+            "--release-dir",
+            str(release_root / "candidate-test"),
+            "--output-dir",
+            str(candidate_dir),
+        ],
+        check=True,
+    )
+    valid = subprocess.run(
+        [sys.executable, "scripts/hf/validate_candidate.py", str(candidate_dir)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert valid.returncode == 0, valid.stderr
+    assert (candidate_dir / "README.md").is_file()
+
+    with (candidate_dir / "fusion_config.yaml").open("a", encoding="utf-8") as handle:
+        handle.write("\n# tampered\n")
+    tampered = subprocess.run(
+        [sys.executable, "scripts/hf/validate_candidate.py", str(candidate_dir)],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert tampered.returncode != 0
+    assert "SHA-256 mismatch" in tampered.stderr
