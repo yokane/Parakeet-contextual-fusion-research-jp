@@ -17,6 +17,15 @@
     "public_config": "homophone8",
     "research_config": "homophone8-research"
   },
+  "storage": {
+    "work_bucket": "saeeew/J-PACF-YOMI-tdt-bucket",
+    "accepted_model_repo": "saeeew/J-PACF-YOMI-tdt",
+    "ghcr_runtime": "ghcr.io/yokane/jpacf-yomi-tdt-runtime",
+    "promotion_policy": "bucket-candidate-first",
+    "candidate_mutability": "immutable-by-policy",
+    "run_mutability": "append-only",
+    "accepted_release_mutability": "immutable-by-policy"
+  },
   "source_repository": "https://github.com/yokane/Parakeet-contextual-fusion-research-jp",
   "experiment_ladder": [
     "E00_tdt_greedy",
@@ -31,7 +40,7 @@
     "metadata_and_configs": "publishable_now",
     "base_or_derived_nemo_checkpoint": "publish_only_after_validation",
     "phone_head": "publish_only_after_e05_validation",
-    "metrics": "publish_with_release_manifest",
+    "metrics": "persist_to_bucket_run_and_publish_with_promoted_release_manifest",
     "license_for_base_derived_model_artifacts": "cc-by-4.0"
   }
 }
