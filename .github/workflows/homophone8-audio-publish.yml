@@ -13,8 +13,10 @@ on:
       - "scripts/build_homophone8_audio.py"
       - "scripts/materialize_hf_eval.py"
       - "scripts/validate_audio_coverage.py"
+      - "scripts/ci/setup_actions_cache.sh"
       - "pyproject.toml"
       - "uv.lock"
+      - "mise.toml"
       - "mise.lock"
       - ".github/workflows/homophone8-audio-publish.yml"
 
@@ -44,12 +46,27 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Configure cache contract
+        id: cache
+        shell: bash
+        run: bash scripts/ci/setup_actions_cache.sh
+
       - name: Install repository toolchain from immutable lock
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           version: 2026.8.16
           install: true
-          cache: true
+          cache: ${{ steps.cache.outputs.persistent != 'true' }}
+
+      - name: Restore uv and HF caches
+        if: ${{ steps.cache.outputs.persistent != 'true' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ env.UV_CACHE_DIR }}
+            ${{ env.HF_HUB_CACHE }}
+            ${{ env.HF_XET_CACHE }}
+          key: homophone8-audio-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('uv.lock', 'mise.lock') }}
 
       - name: Require Hugging Face Dataset write token
         shell: bash
