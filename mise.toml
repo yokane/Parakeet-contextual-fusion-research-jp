@@ -1,0 +1,104 @@
+[settings]
+lockfile = true
+jobs = 4
+yes = true
+
+[tools]
+python = "3.11.16"
+uv = "0.12.8"
+
+[env]
+UV_PROJECT_ENVIRONMENT = ".venv"
+UV_CACHE_DIR = ".cache/uv"
+UV_LOCKED = "1"
+HF_BUCKET = "saeeew/J-PACF-YOMI-tdt-bucket"
+HF_MODEL_REPO = "saeeew/J-PACF-YOMI-tdt"
+HF_BENCHMARK_REPO = "saeeew/JP-HomophoneBench"
+
+[tasks."deps:sync"]
+description = "Materialize the Python environment from uv.lock without changing it"
+run = "uv sync --locked --extra dev"
+sources = ["pyproject.toml", "uv.lock"]
+
+[tasks.lint]
+description = "Run Python lint from the locked environment"
+deps = ["deps:sync"]
+run = "uv run --locked ruff check src scripts tests"
+
+[tasks.test]
+description = "Run unit tests from the locked environment"
+deps = ["deps:sync"]
+run = "uv run --locked pytest"
+
+[tasks.compile]
+description = "Compile Python sources"
+deps = ["deps:sync"]
+run = "uv run --locked python -m compileall -q src scripts"
+
+[tasks."shell:syntax"]
+description = "Validate shell syntax"
+run = "find experiments scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n"
+
+[tasks."locks:verify"]
+description = "Verify immutable references and required language lockfiles"
+deps = ["deps:sync"]
+run = "uv run --locked python scripts/repro/verify_reproducibility.py"
+
+[tasks."spdx:generate"]
+description = "Generate the deterministic SPDX reproducibility inventory"
+deps = ["deps:sync"]
+run = "uv run --locked python scripts/repro/generate_spdx.py --output sbom/reproducibility.spdx.json"
+
+[tasks."spdx:check"]
+description = "Require committed SPDX inventory to match all lockfiles"
+deps = ["deps:sync"]
+run = "uv run --locked python scripts/repro/generate_spdx.py --check sbom/reproducibility.spdx.json"
+
+[tasks.ci]
+description = "Canonical CPU CI job"
+depends = ["lint", "test", "compile", "shell:syntax", "locks:verify", "spdx:check"]
+
+[tasks."versions:discover"]
+description = "Discover newer stable upstream versions; never changes runtime references"
+deps = ["deps:sync"]
+run = "uv run --locked python scripts/repro/discover_versions.py"
+
+[tasks."hf:resolve-revisions"]
+description = "Resolve configured Hugging Face repositories to full commit revisions"
+deps = ["deps:sync"]
+run = "uv run --locked python scripts/repro/resolve_hf_revisions.py --write locks/hf-revisions.lock.json"
+
+[tasks."container:resolve-base"]
+description = "Resolve the configured base container tag to an immutable OCI digest"
+run = "bash scripts/repro/resolve_container_digest.sh locks/upstream-sources.json locks/containers.lock.json"
+
+[tasks."lock:refresh"]
+description = "Intentional lock refresh; run only in the maintenance workflow"
+run = [
+  "mise lock",
+  "uv lock",
+  "mise run hf:resolve-revisions",
+  "mise run container:resolve-base",
+  "mise run spdx:generate",
+]
+
+[tasks."run:e00"]
+run = "bash experiments/E00_tdt_greedy.sh"
+
+[tasks."run:e01"]
+run = "bash experiments/E01_tdt_beam.sh"
+
+[tasks."run:e02"]
+run = "bash experiments/E02_ngpulm.sh"
+
+[tasks."run:e03"]
+run = "bash experiments/E03_gpu_pb.sh"
+
+[tasks."run:e04"]
+run = "bash experiments/E04_ctc_rerank.sh"
+
+[tasks."run:e05"]
+run = "bash experiments/E05_phone_rerank.sh"
+
+[tasks."run:e06"]
+run = "bash experiments/E06_inbeam.sh"
