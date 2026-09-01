@@ -10,6 +10,7 @@
     "candidates": "candidate",
     "experiments": "experiment",
     "config": "config",
+    "runtime": "runtime",
     "workspace_cache": "workspace-cache"
   },
   "mutable_paths": [
@@ -22,6 +23,7 @@
     "experiments/experiment-",
     "runs/",
     "benchmarks/",
+    "runtime/",
     "workspace-cache/"
   ],
   "required_roots": [
@@ -31,6 +33,7 @@
     "runs",
     "benchmarks",
     "reference",
+    "runtime",
     "scripts",
     "tmp",
     "workspace-cache"
