@@ -92,20 +92,15 @@ run = "uv run --locked python scripts/repro/resolve_hf_revisions.py --write lock
 description = "Resolve the configured base container tag to an immutable OCI digest"
 run = "bash scripts/repro/resolve_container_digest.sh locks/upstream-sources.json locks/containers.lock.json"
 
-[tasks."provider:plan"]
-description = "Create one immutable GPU job contract shared by self-hosted, Vast, RunPod and HF Jobs"
-depends = ["deps:sync"]
-run = "uv run --locked python scripts/providers/build_job_spec.py"
-
 [tasks."provider:vast-query"]
 description = "Build the CUDA13/Linux-amd64 Vast offer query"
 depends = ["deps:sync", "platform:verify"]
 run = "uv run --locked python scripts/providers/vast/build_search_query.py --output-json dist/providers/vast-search.json"
 
 [tasks."lock:refresh"]
-description = "Intentional lock refresh; maintenance workflow only"
+description = "Intentional Linux x86_64 lock refresh; maintenance workflow only"
 run = [
-  "mise lock",
+  "mise lock --platforms linux-x64",
   "uv lock",
   "uv lock --project tools/hf-bucket",
   "mise run hf:resolve-revisions",
