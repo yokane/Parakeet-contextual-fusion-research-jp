@@ -21,7 +21,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: hf-model-promotion-${{ inputs.candidate_id }}-${{ inputs.release_name }}
+  group: hf-model-promotion-${{ inputs.release_name }}
   cancel-in-progress: false
 
 jobs:
