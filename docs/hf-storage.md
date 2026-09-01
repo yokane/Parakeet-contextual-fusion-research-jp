@@ -204,39 +204,39 @@ The build context excludes generated audio, model weights, experiment outputs, l
 
 ## GitHub Actions cache policy
 
-CPU CI caches the installed `.venv` with a key based on:
+Hosted jobs use the normal GitHub cache service for small dependency caches. Self-hosted jobs instead honor the runner process environment variable `SELF_ACTIONS_CACHE_ROOT` and map persistent caches to:
 
 ```text
-runner OS
-runner architecture
-Python version
-pyproject.toml hash
+<SELF_ACTIONS_CACHE_ROOT>/<owner>/<repo>/uv
+<SELF_ACTIONS_CACHE_ROOT>/<owner>/<repo>/huggingface/hub
+<SELF_ACTIONS_CACHE_ROOT>/<owner>/<repo>/huggingface/xet
+<SELF_ACTIONS_CACHE_ROOT>/<owner>/<repo>/xdg
+<SELF_ACTIONS_CACHE_ROOT>/<owner>/<repo>/mise/data
+<SELF_ACTIONS_CACHE_ROOT>/<owner>/<repo>/mise/cache
+<SELF_ACTIONS_CACHE_ROOT>/<owner>/<repo>/buildkit
 ```
 
-The source tree is deliberately excluded from the key. Every run performs only the cheap source-only editable install after restoring dependencies.
+Workflow code never infers the self-hosted runner installation directory or `_work` path. The runner administrator owns the physical root through the process environment.
 
-Self-hosted GPU jobs cache pip downloads. Large model/audio caches are not copied into GitHub Actions cache because self-hosted runner storage is persistent and multi-gigabyte Actions cache churn is counterproductive.
+Credential-bearing homes are deliberately excluded from persistent mapping. In particular, workflows do not remap `HF_HOME`; only Hugging Face content caches are persisted. When `SELF_ACTIONS_CACHE_ROOT` is absent, workflows fall back to workspace-local cache paths plus the normal GitHub cache service.
+
+BuildKit uses a generation swap: a successful build exports to `buildkit-next` and then replaces the previous local cache. The first build omits local cache import until a valid `index.json` exists.
 
 ## GHCR policy
 
-`ghcr-runtime.yml` builds:
+`ghcr-runtime.yml` publishes the source-SHA tag:
 
 ```text
-ghcr.io/yokane/jpacf-yomi-tdt-runtime:main
-ghcr.io/yokane/jpacf-yomi-tdt-runtime:latest
 ghcr.io/yokane/jpacf-yomi-tdt-runtime:sha-<full-git-sha>
 ```
 
-BuildKit imports from both:
+The workflow records and consumes the resulting immutable digest:
 
 ```text
-GitHub Actions cache
-GHCR :buildcache
+ghcr.io/yokane/jpacf-yomi-tdt-runtime@sha256:<digest>
 ```
 
-and exports `mode=max` to both. This allows hosted CI, self-hosted builders, and external Docker-capable compute to reuse dependency layers without rebuilding NeMo/Python dependencies after source-only changes.
-
-Use the full-SHA image for reproducible experiment execution. `main` and `latest` are convenience pointers.
+Reproducible experiments use the digest reference, never a moving convenience tag. BuildKit uses the self-hosted physical cache contract above when configured, otherwise the GitHub cache backend.
 
 ## Commands
 
@@ -254,7 +254,7 @@ make hf-run-push RUN_DIR=dist/hf-runs/<run-id>
 # Local BuildKit build
 make docker-build
 
-# Pull shared runtime
+# Pull a digest-pinned shared runtime
 make docker-pull
 ```
 
