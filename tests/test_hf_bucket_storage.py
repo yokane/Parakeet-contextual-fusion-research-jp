@@ -100,8 +100,10 @@ def canonical_bucket_listing() -> list[str]:
         "runs/README.md",
         "benchmarks/README.md",
         "reference/README.md",
+        "runtime/README.md",
         "scripts/README.md",
         "tmp/README.md",
+        "workspace-cache/README.md",
         "candidates/candidate-000001/README.md",
     ]
 
