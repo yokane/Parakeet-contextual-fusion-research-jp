@@ -20,7 +20,7 @@ env:
   HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
   STORAGE_GB: "50"
   GPU_RAM_GB: "24"
-  GPU_ALLOWLIST: RTX_4090,RTX_3090
+  GPU_ALLOWLIST: RTX_4090
   PREDICTED_MINUTES: "20"
   MAX_COST_USD: "0.50"
   OFFER_LIMIT: "50"
@@ -28,7 +28,7 @@ env:
 jobs:
   vast-to-hf-bucket:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 25
     env:
       VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -88,7 +88,7 @@ jobs:
           cmp "$probe" "$roundtrip"
           hf_bucket_cli buckets rm "$remote" -y --token "$HF_TOKEN"
 
-      - name: Build modern 24GB Vast offer query
+      - name: Query and rank RTX 4090 Vast offers
         shell: bash
         run: |
           set -euo pipefail
@@ -99,12 +99,6 @@ jobs:
             --gpu-ram ">=${GPU_RAM_GB}" \
             --output-json dist/providers/vast-search-query.json \
             > dist/providers/vast-search-query.txt
-          cat dist/providers/vast-search-query.txt
-
-      - name: Query and rank Vast offers by predicted total cost
-        shell: bash
-        run: |
-          set -euo pipefail
           query="$(cat dist/providers/vast-search-query.txt)"
           uv run --locked vastai search offers \
             --api-key "$VAST_API_KEY" \
@@ -131,7 +125,7 @@ jobs:
           inventory = json.loads(Path("dist/providers/vast-inventory.json").read_text())
           offers = inventory.get("offers", [])
           if not offers:
-              raise SystemExit("No RTX 4090/3090 Vast offer satisfies storage/budget policy")
+              raise SystemExit("No RTX 4090 Vast offer satisfies storage/budget policy")
           selected = offers[0]
           Path("dist/providers/vast-selected-offer.json").write_text(
               json.dumps(selected, indent=2, sort_keys=True) + "\n",
@@ -145,82 +139,17 @@ jobs:
           PY
           cat /tmp/vast-selected.env >> "$GITHUB_ENV"
 
-      - name: Build the Vast onstart payload
+      - name: Generate ephemeral SSH identity
         shell: bash
         run: |
           set -euo pipefail
-          cat > "$RUNNER_TEMP/vast-smoke-remote.sh" <<'REMOTE'
-          #!/usr/bin/env bash
-          set -euo pipefail
-          export JPA_CF_CONTAINER_RUNTIME=1
-          work=/workspace/state/artifacts/vast-hf-smoke
-          rm -rf "$work"
-          mkdir -p "$work"
+          key="$RUNNER_TEMP/vast-smoke-ed25519"
+          rm -f "$key" "$key.pub"
+          ssh-keygen -q -t ed25519 -N '' -C "${VAST_LABEL}" -f "$key"
+          chmod 600 "$key"
+          echo "VAST_SSH_KEY=$key" >> "$GITHUB_ENV"
 
-          python /opt/jpacf/scripts/container/verify_runtime.py --require-gpu > "$work/runtime-verify.txt"
-
-          python - <<'PY'
-          import datetime as dt
-          import json
-          import os
-          import platform
-          import socket
-          import subprocess
-          from pathlib import Path
-          import torch
-
-          if not torch.cuda.is_available():
-              raise SystemExit("torch.cuda.is_available() is false")
-          tensor = torch.arange(16, device="cuda", dtype=torch.float32)
-          checksum = float((tensor * tensor).sum().item())
-          smi = subprocess.check_output(
-              [
-                  "nvidia-smi",
-                  "--query-gpu=name,driver_version,memory.total",
-                  "--format=csv,noheader,nounits",
-              ],
-              text=True,
-          ).strip().splitlines()[0]
-          gpu_name, driver_version, memory_mib = [part.strip() for part in smi.split(",", 2)]
-          payload = {
-              "schema_version": 1,
-              "provider": "vast",
-              "run_key": os.environ["SMOKE_RUN_KEY"],
-              "vast_label": os.environ["VAST_LABEL"],
-              "offer_id": int(os.environ["VAST_OFFER_ID"]),
-              "expected_image": os.environ["EXPECTED_IMAGE"],
-              "hostname": socket.gethostname(),
-              "platform": platform.platform(),
-              "gpu_name": gpu_name,
-              "driver_version": driver_version,
-              "gpu_memory_mib": int(memory_mib),
-              "torch": torch.__version__,
-              "torch_cuda": torch.version.cuda,
-              "cuda_available": True,
-              "cuda_device_count": torch.cuda.device_count(),
-              "cuda_tensor_checksum": checksum,
-              "created_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
-          }
-          Path("/workspace/state/artifacts/vast-hf-smoke/result.json").write_text(
-              json.dumps(payload, indent=2, sort_keys=True) + "\n",
-              encoding="utf-8",
-          )
-          PY
-
-          printf '%s\n' "$SMOKE_RUN_KEY" > "$work/_SUCCESS"
-          source /opt/jpacf/scripts/hf/hf-identity.sh
-          remote="hf://buckets/${HF_BUCKET}/runs/${SMOKE_RUN_KEY}/vast-smoke"
-          for name in runtime-verify.txt result.json _SUCCESS; do
-            hf_bucket_cli buckets cp \
-              "$work/$name" \
-              "$remote/$name" \
-              --token "$HF_TOKEN"
-          done
-          REMOTE
-          remote_script_b64="$(base64 -w0 "$RUNNER_TEMP/vast-smoke-remote.sh")"
-          echo "REMOTE_SCRIPT_B64=$remote_script_b64" >> "$GITHUB_ENV"
-
-      - name: Create short-lived Vast GPU instance with onstart smoke
+      - name: Create short-lived Vast GPU instance
         shell: bash
         run: |
           set -euo pipefail
@@ -232,10 +161,8 @@ jobs:
               --disk "$STORAGE_GB" \
               --label "$VAST_LABEL" \
               --login "-u ${GITHUB_ACTOR} -p ${GHCR_TOKEN} ghcr.io" \
-              --env "-e HF_TOKEN=${HF_TOKEN} -e HF_BUCKET=${HF_BUCKET} -e SMOKE_RUN_KEY=${SMOKE_RUN_KEY} -e VAST_LABEL=${VAST_LABEL} -e VAST_OFFER_ID=${VAST_OFFER_ID} -e EXPECTED_IMAGE=${RUNTIME_IMAGE} -e REMOTE_SCRIPT_B64=${REMOTE_SCRIPT_B64}" \
               --ssh \
               --direct \
-              --onstart-cmd 'printf "%s" "$REMOTE_SCRIPT_B64" | base64 -d >/tmp/jpacf-vast-hf-smoke.sh && chmod 700 /tmp/jpacf-vast-hf-smoke.sh && /tmp/jpacf-vast-hf-smoke.sh' \
               --cancel-unavail
           )"
           printf '%s\n' "$create_response" > dist/vast-smoke/create-response.json
@@ -253,84 +180,254 @@ jobs:
           echo "VAST_INSTANCE_ID=$instance_id" >> "$GITHUB_ENV"
           echo "Created Vast instance ${instance_id} from offer ${VAST_OFFER_ID}."
 
-      - name: Poll HF Bucket for Vast-created success marker
+      - name: Attach ephemeral SSH public key
         shell: bash
         run: |
           set -euo pipefail
-          remote="hf://buckets/${HF_BUCKET}/runs/${SMOKE_RUN_KEY}/vast-smoke"
-          local_dir="dist/vast-smoke/from-hf"
-          source scripts/hf/hf-identity.sh
-          found=0
-          for attempt in $(seq 1 60); do
-            rm -rf "$local_dir"
-            mkdir -p "$local_dir"
-            : > dist/vast-smoke/hf-poll.txt
-            for name in result.json _SUCCESS runtime-verify.txt; do
-              hf_bucket_cli buckets cp "$remote/$name" "$local_dir/$name" --token "$HF_TOKEN" \
-                >> dist/vast-smoke/hf-poll.txt 2>&1 || true
-            done
-            if [[ -s "$local_dir/result.json" && -s "$local_dir/_SUCCESS" ]] \
-              && grep -Fxq "$SMOKE_RUN_KEY" "$local_dir/_SUCCESS"; then
-              found=1
-              echo "HF Bucket evidence appeared on attempt ${attempt}."
-              break
+          uv run --locked vastai attach ssh "$VAST_INSTANCE_ID" \
+            "$(cat "${VAST_SSH_KEY}.pub")" \
+            --api-key "$VAST_API_KEY" \
+            | tee dist/vast-smoke/attach-ssh.txt
+
+      - name: Wait for a healthy running container and SSH
+        shell: bash
+        run: |
+          set -euo pipefail
+          ready=0
+          : > dist/vast-smoke/instance-status.jsonl
+          for attempt in $(seq 1 72); do
+            raw="$(uv run --locked vastai show instance "$VAST_INSTANCE_ID" \
+              --api-key "$VAST_API_KEY" --raw 2>/dev/null || true)"
+            if [[ -n "$raw" ]]; then
+              printf '%s\n' "$raw" > dist/vast-smoke/instance-status-latest.json
+              python - "$attempt" <<'PY' >> dist/vast-smoke/instance-status.jsonl
+          import json, sys
+          from pathlib import Path
+          try:
+              row = json.loads(Path("dist/vast-smoke/instance-status-latest.json").read_text())
+          except Exception:
+              raise SystemExit(0)
+          print(json.dumps({
+              "attempt": int(sys.argv[1]),
+              "actual_status": row.get("actual_status"),
+              "intended_status": row.get("intended_status"),
+              "status_msg": row.get("status_msg"),
+              "ssh_host": row.get("ssh_host"),
+              "ssh_port": row.get("ssh_port"),
+              "public_ipaddr": row.get("public_ipaddr"),
+              "ports": row.get("ports", {}).get("22/tcp"),
+          }, sort_keys=True))
+          PY
             fi
-            echo "Waiting for Vast onstart artifact (${attempt}/60)."
-            sleep 10
+
+            actual="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          try:
+              row = json.loads(Path("dist/vast-smoke/instance-status-latest.json").read_text())
+          except Exception:
+              print("")
+          else:
+              print(row.get("actual_status") or "")
+          PY
+            )"
+            if [[ "$actual" == "running" ]]; then
+              ssh_url="$(uv run --locked vastai ssh-url "$VAST_INSTANCE_ID" \
+                --api-key "$VAST_API_KEY" 2>/dev/null || true)"
+              if [[ "$ssh_url" =~ ^ssh://root@(.+):([0-9]+)$ ]]; then
+                host="${BASH_REMATCH[1]}"
+                port="${BASH_REMATCH[2]}"
+                if timeout 10s ssh \
+                  -i "$VAST_SSH_KEY" \
+                  -p "$port" \
+                  -o BatchMode=yes \
+                  -o ConnectTimeout=7 \
+                  -o StrictHostKeyChecking=no \
+                  -o UserKnownHostsFile=/dev/null \
+                  "root@${host}" 'true' >/dev/null 2>&1; then
+                  echo "VAST_SSH_HOST=$host" >> "$GITHUB_ENV"
+                  echo "VAST_SSH_PORT=$port" >> "$GITHUB_ENV"
+                  printf '%s\n' "$ssh_url" > dist/vast-smoke/ssh-url.txt
+                  ready=1
+                  break
+                fi
+              fi
+            fi
+            echo "Vast container/SSH not ready (${attempt}/72, actual_status=${actual:-unknown})."
+            sleep 5
           done
-          if [[ "$found" != 1 ]]; then
-            echo "Vast did not publish the expected HF Bucket evidence within 10 minutes." >&2
-            cat dist/vast-smoke/hf-poll.txt >&2 || true
+
+          if [[ "$ready" != 1 ]]; then
+            echo "Vast instance did not reach running+SSH-ready state in 6 minutes." >&2
+            cat dist/vast-smoke/instance-status.jsonl >&2 || true
             exit 1
           fi
 
-      - name: Verify the Vast-created artifact from GitHub runner
+      - name: Execute GPU evidence workload over SSH
         shell: bash
         run: |
           set -euo pipefail
+          cat > "$RUNNER_TEMP/vast-gpu-smoke.sh" <<'REMOTE'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          export JPA_CF_CONTAINER_RUNTIME=1
+          work=/workspace/state/artifacts/vast-hf-smoke
+          rm -rf "$work"
+          mkdir -p "$work"
+          python /opt/jpacf/scripts/container/verify_runtime.py --require-gpu > "$work/runtime-verify.txt"
+          python - <<'PY'
+          import datetime as dt
+          import json
+          import os
+          import platform
+          import socket
+          import subprocess
+          from pathlib import Path
+          import torch
+
+          if not torch.cuda.is_available():
+              raise SystemExit("torch.cuda.is_available() is false")
+          tensor = torch.arange(16, device="cuda", dtype=torch.float32)
+          checksum = float((tensor * tensor).sum().item())
+          smi = subprocess.check_output(
+              ["nvidia-smi", "--query-gpu=name,driver_version,memory.total", "--format=csv,noheader,nounits"],
+              text=True,
+          ).strip().splitlines()[0]
+          gpu_name, driver_version, memory_mib = [part.strip() for part in smi.split(",", 2)]
+          payload = {
+              "schema_version": 1,
+              "provider": "vast",
+              "transport": "ephemeral-ssh-relay",
+              "run_key": os.environ["SMOKE_RUN_KEY"],
+              "vast_label": os.environ["VAST_LABEL"],
+              "offer_id": int(os.environ["VAST_OFFER_ID"]),
+              "expected_image": os.environ["EXPECTED_IMAGE"],
+              "hostname": socket.gethostname(),
+              "platform": platform.platform(),
+              "gpu_name": gpu_name,
+              "driver_version": driver_version,
+              "gpu_memory_mib": int(memory_mib),
+              "torch": torch.__version__,
+              "torch_cuda": torch.version.cuda,
+              "cuda_available": True,
+              "cuda_device_count": torch.cuda.device_count(),
+              "cuda_tensor_checksum": checksum,
+              "created_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+          }
+          Path("/workspace/state/artifacts/vast-hf-smoke/result.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+          )
+          PY
+          printf '%s\n' "$SMOKE_RUN_KEY" > "$work/_SUCCESS"
+          REMOTE
+
+          q_run="$(printf '%q' "$SMOKE_RUN_KEY")"
+          q_label="$(printf '%q' "$VAST_LABEL")"
+          q_offer="$(printf '%q' "$VAST_OFFER_ID")"
+          q_image="$(printf '%q' "$RUNTIME_IMAGE")"
+          timeout 300s ssh \
+            -i "$VAST_SSH_KEY" \
+            -p "$VAST_SSH_PORT" \
+            -o BatchMode=yes \
+            -o ConnectTimeout=10 \
+            -o StrictHostKeyChecking=no \
+            -o UserKnownHostsFile=/dev/null \
+            "root@${VAST_SSH_HOST}" \
+            "SMOKE_RUN_KEY=${q_run} VAST_LABEL=${q_label} VAST_OFFER_ID=${q_offer} EXPECTED_IMAGE=${q_image} bash -s" \
+            < "$RUNNER_TEMP/vast-gpu-smoke.sh" \
+            | tee dist/vast-smoke/ssh-workload.txt
+
+      - name: SCP Vast-generated artifacts to GitHub runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          local_dir="dist/vast-smoke/from-vast"
+          mkdir -p "$local_dir"
+          for name in runtime-verify.txt result.json _SUCCESS; do
+            scp \
+              -i "$VAST_SSH_KEY" \
+              -P "$VAST_SSH_PORT" \
+              -o BatchMode=yes \
+              -o ConnectTimeout=10 \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              "root@${VAST_SSH_HOST}:/workspace/state/artifacts/vast-hf-smoke/${name}" \
+              "$local_dir/${name}"
+          done
+          test -s "$local_dir/result.json"
+          test -s "$local_dir/_SUCCESS"
+          grep -Fx "$SMOKE_RUN_KEY" "$local_dir/_SUCCESS"
+
+      - name: Upload relayed Vast artifacts to HF Bucket and round-trip
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/hf/hf-identity.sh
+          source_dir="dist/vast-smoke/from-vast"
           remote="hf://buckets/${HF_BUCKET}/runs/${SMOKE_RUN_KEY}/vast-smoke"
+          for name in runtime-verify.txt result.json _SUCCESS; do
+            hf_bucket_cli buckets cp "$source_dir/$name" "$remote/$name" --token "$HF_TOKEN"
+          done
+
+          verify_dir="dist/vast-smoke/from-hf"
+          rm -rf "$verify_dir"
+          mkdir -p "$verify_dir"
+          for name in runtime-verify.txt result.json _SUCCESS; do
+            hf_bucket_cli buckets cp "$remote/$name" "$verify_dir/$name" --token "$HF_TOKEN"
+          done
+          cmp "$source_dir/result.json" "$verify_dir/result.json"
+          cmp "$source_dir/_SUCCESS" "$verify_dir/_SUCCESS"
+
+      - name: Verify GPU evidence
+        shell: bash
+        run: |
+          set -euo pipefail
           python - <<'PY'
           import json
           import os
           from pathlib import Path
           result = json.loads(Path("dist/vast-smoke/from-hf/result.json").read_text())
           assert result["provider"] == "vast"
+          assert result["transport"] == "ephemeral-ssh-relay"
           assert result["run_key"] == os.environ["SMOKE_RUN_KEY"]
           assert result["vast_label"] == os.environ["VAST_LABEL"]
           assert result["offer_id"] == int(os.environ["VAST_OFFER_ID"])
           assert result["expected_image"] == os.environ["RUNTIME_IMAGE"]
+          assert result["gpu_name"] == "NVIDIA GeForce RTX 4090"
           assert result["cuda_available"] is True
           assert result["cuda_device_count"] >= 1
           assert result["cuda_tensor_checksum"] == 1240.0
           print(json.dumps(result, indent=2, sort_keys=True))
           PY
-
           {
-            echo "### Vast → HF Bucket smoke"
+            echo "### Vast → GitHub relay → HF Bucket smoke"
             echo
             echo "- offer: ${VAST_OFFER_ID}"
             echo "- GPU: ${VAST_GPU_NAME}"
             echo "- quoted rate: \$${VAST_DPH_TOTAL}/h"
             echo "- predicted ${PREDICTED_MINUTES} min cost: \$${VAST_PREDICTED_COST}"
             echo "- runtime: \`${RUNTIME_IMAGE}\`"
-            echo "- evidence: \`${remote}\`"
-            echo "- result: GPU-generated artifact round-tripped through HF Bucket"
+            echo "- bucket: \`hf://buckets/${HF_BUCKET}/runs/${SMOKE_RUN_KEY}/vast-smoke\`"
+            echo "- transport: ephemeral SSH/SCP; HF_TOKEN stayed on GitHub runner"
+            echo "- result: GPU artifact round-tripped through HF Bucket"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Capture Vast logs on failure
+      - name: Capture Vast state/logs on failure
         if: ${{ failure() }}
         shell: bash
         run: |
           set +e
           if [[ -s "$RUNNER_TEMP/vast-instance-id" ]]; then
             id="$(cat "$RUNNER_TEMP/vast-instance-id")"
+            uv run --locked vastai show instance "$id" \
+              --api-key "$VAST_API_KEY" --raw \
+              > dist/vast-smoke/instance-failure.json 2>&1 || true
             uv run --locked vastai logs "$id" \
-              --api-key "$VAST_API_KEY" \
-              --tail 300 \
+              --api-key "$VAST_API_KEY" --tail 300 \
               > dist/vast-smoke/vast-container.log 2>&1 || true
           fi
 
-      - name: Destroy Vast instance and recover any same-label leftovers
+      - name: Destroy Vast instance and recover same-label leftovers
         if: ${{ always() }}
         shell: bash
         run: |
@@ -339,11 +436,8 @@ jobs:
           if [[ -s "$RUNNER_TEMP/vast-instance-id" ]]; then
             ids="$(cat "$RUNNER_TEMP/vast-instance-id")"
           fi
-
           raw="$(uv run --locked vastai show instances \
-            --api-key "$VAST_API_KEY" \
-            --label "$VAST_LABEL" \
-            --raw 2>/dev/null)"
+            --api-key "$VAST_API_KEY" --label "$VAST_LABEL" --raw 2>/dev/null)"
           recovered="$(printf '%s' "$raw" | python -c '
           import json, sys
           try:
@@ -354,11 +448,11 @@ jobs:
           print(" ".join(str(row["id"]) for row in rows if isinstance(row, dict) and row.get("id") is not None))
           ' 2>/dev/null)"
           ids="$(printf '%s\n%s\n' "$ids" "$recovered" | tr ' ' '\n' | sed '/^$/d' | sort -u | tr '\n' ' ')"
-
           for id in $ids; do
             echo "Destroying Vast instance ${id}."
             uv run --locked vastai destroy instance "$id" --api-key "$VAST_API_KEY" -y || true
           done
+          rm -f "${VAST_SSH_KEY:-/nonexistent}" "${VAST_SSH_KEY:-/nonexistent}.pub"
 
       - name: Upload smoke evidence to GitHub Actions
         if: ${{ always() }}
@@ -374,8 +468,14 @@ jobs:
             dist/vast-smoke/hf-preflight.txt
             dist/vast-smoke/hf-preflight-roundtrip.txt
             dist/vast-smoke/create-response.json
-            dist/vast-smoke/hf-poll.txt
+            dist/vast-smoke/attach-ssh.txt
+            dist/vast-smoke/instance-status.jsonl
+            dist/vast-smoke/instance-status-latest.json
+            dist/vast-smoke/instance-failure.json
+            dist/vast-smoke/ssh-url.txt
+            dist/vast-smoke/ssh-workload.txt
             dist/vast-smoke/vast-container.log
+            dist/vast-smoke/from-vast/
             dist/vast-smoke/from-hf/
           if-no-files-found: warn
           retention-days: 30
