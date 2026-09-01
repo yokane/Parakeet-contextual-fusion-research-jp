@@ -56,6 +56,8 @@ if [[ -n "${root}" ]]; then
     }
   done
 
+  rm -rf "${buildkit_cache}-next"
+
   write_env SELF_CACHE_PERSISTENT true
   write_env UV_CACHE_DIR "${uv_cache}"
   write_env HF_HUB_CACHE "${hf_hub_cache}"
@@ -64,7 +66,11 @@ if [[ -n "${root}" ]]; then
   write_env MISE_DATA_DIR "${mise_data}"
   write_env MISE_CACHE_DIR "${mise_cache}"
   write_env BUILDKIT_CACHE_DIR "${buildkit_cache}"
-  write_env BUILDKIT_CACHE_FROM "type=local,src=${buildkit_cache}"
+  if [[ -f "${buildkit_cache}/index.json" ]]; then
+    write_env BUILDKIT_CACHE_FROM "type=local,src=${buildkit_cache}"
+  else
+    write_env BUILDKIT_CACHE_FROM ""
+  fi
   write_env BUILDKIT_CACHE_TO "type=local,dest=${buildkit_cache}-next,mode=max"
   printf 'persistent=true\n' >> "${GITHUB_OUTPUT}"
 else
