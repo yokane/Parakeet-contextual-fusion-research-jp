@@ -1,8 +1,21 @@
 {
   "repositories": {
+    "accepted_model": {
+      "repo_id": "saeeew/J-PACF-YOMI-tdt",
+      "repo_type": "model",
+      "revision": "3acdb87d8b12d264e7fa7afa4030078546b21ff7"
+    },
     "base_model": {
       "repo_id": "nvidia/parakeet-tdt_ctc-0.6b-ja",
       "repo_type": "model",
+      "required_files": [
+        {
+          "blob_id": "938b96001d1286bd0192332d8f16d7afea2b0703",
+          "path": "parakeet-tdt_ctc-0.6b-ja.nemo",
+          "sha256": "a2ed2aab9c82cce4e9b699dca669184d7525c7b5e1eb8c3f7b789421bc3637e8",
+          "size": 2490951680
+        }
+      ],
       "revision": "44edb27eea9317daf89333e75eb830db4b1cc298"
     },
     "benchmark": {
@@ -11,5 +24,5 @@
       "revision": "06b8501ae5d0afa98496f7d37a63de9c1c2ba6bb"
     }
   },
-  "schema_version": 1
+  "schema_version": 2
 }

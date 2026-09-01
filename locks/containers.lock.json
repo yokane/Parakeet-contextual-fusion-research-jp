@@ -1,10 +1,10 @@
 {
   "images": {
     "nvidia_pytorch": {
-      "digest": "sha256:ace9a848c0ae543317e3c4763b6b4248961c47902625abfe3c77a0fb931c50fb",
-      "reference": "nvcr.io/nvidia/pytorch@sha256:ace9a848c0ae543317e3c4763b6b4248961c47902625abfe3c77a0fb931c50fb",
+      "digest": "sha256:2140e699b3beaf7f96a0081fd9c9406bc3832b435cdb60dfa2d261f7d2f34a1c",
+      "reference": "nvcr.io/nvidia/pytorch@sha256:2140e699b3beaf7f96a0081fd9c9406bc3832b435cdb60dfa2d261f7d2f34a1c",
       "repository": "nvcr.io/nvidia/pytorch",
-      "source_version_tag": "25.08-py3"
+      "source_version_tag": "26.07-py3"
     }
   },
   "schema_version": 1

@@ -22,6 +22,17 @@
       "versionInfo": "0.1.0"
     },
     {
+      "SPDXID": "SPDXRef-hugging-face-accepted-model-saeeew-J-PACF-YOMI-tdt-3acdb87d8b12d264e7fa7afa4030078546b21ff7-345f6b652c8d",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://huggingface.co/saeeew/J-PACF-YOMI-tdt/tree/3acdb87d8b12d264e7fa7afa4030078546b21ff7",
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "accepted_model:saeeew/J-PACF-YOMI-tdt",
+      "supplier": "NOASSERTION",
+      "versionInfo": "3acdb87d8b12d264e7fa7afa4030078546b21ff7"
+    },
+    {
       "SPDXID": "SPDXRef-github-action-actions-cache-55cc8345863c7cc4c66a329aec7e433d2d1c52a9-f0d9255eb533",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://github.com/actions/cache/tree/55cc8345863c7cc4c66a329aec7e433d2d1c52a9",
@@ -100,28 +111,52 @@
       "versionInfo": "2.5.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-accelerate-1.14.0-b9c4d07808de",
+      "SPDXID": "SPDXRef-pypi-asr-agent-detector-1.1.0-9dfe1009d8d9",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "41b9c4377a54e0b460a959b0defa1b736e4ca0a2373252d9a539964c2afe3c8d"
+          "checksumValue": "3428dc45713f93a115bd0b05c9dbbfdc72af70246064c07bd837a9a95cf016bc"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/8d/75/94cd5d389649578aca399e5aa822637eec18319a1dadc400ffe2f9a7493f/accelerate-1.14.0.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/0a/51/2d6a4580f8a1ad26eca1f3849207e08d65a0df318188fe1a5b56cd868a1e/agent_detector-1.1.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/accelerate@1.14.0",
+          "referenceLocator": "pkg:pypi/agent-detector@1.1.0",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:accelerate",
+      "name": "asr:agent-detector",
       "supplier": "NOASSERTION",
-      "versionInfo": "1.14.0"
+      "versionInfo": "1.1.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-aiodns-3.6.1-406db9ed855c",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "b0e9ce98718a5b8f7ca8cd16fc393163374bc2412236b91f6c851d066e3324b6"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/85/2f/9d1ee4f937addda60220f47925dac6c6b3782f6851fd578987284a8d2491/aiodns-3.6.1.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/aiodns@3.6.1",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:aiodns",
+      "supplier": "NOASSERTION",
+      "versionInfo": "3.6.1"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-aiohappyeyeballs-2.7.1-a470f1ed2025",
@@ -172,6 +207,30 @@
       "versionInfo": "3.14.3"
     },
     {
+      "SPDXID": "SPDXRef-pypi-asr-aiohttp-retry-2.9.1-9a3c4263ee18",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "8eb75e904ed4ee5c2ec242fefe85bf04240f685391c4879d8f541d6028ff01f1"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/9d/61/ebda4d8e3d8cfa1fd3db0fb428db2dd7461d5742cea35178277ad180b033/aiohttp_retry-2.9.1.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/aiohttp-retry@2.9.1",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:aiohttp-retry",
+      "supplier": "NOASSERTION",
+      "versionInfo": "2.9.1"
+    },
+    {
       "SPDXID": "SPDXRef-pypi-asr-aiosignal-1.4.0-aa865b5ad93d",
       "checksums": [
         {
@@ -196,28 +255,52 @@
       "versionInfo": "1.4.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-alembic-1.19.1-1dbdc711453b",
+      "SPDXID": "SPDXRef-pypi-asr-aistore-1.26.0-8128186d222c",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "e0fca0518118c78acc493e31bcb5402f190057aaf6df8b5b95ce94c4789cf648"
+          "checksumValue": "7936d687a22d9442c5e7b8a543cc0e2790353e65fc734b2e57c9acd9987bdc63"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/16/2b/e4153978368de59918115c9e01d3ebf58a558a7285efa7e960c383c4b59a/alembic-1.19.1.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/3d/6f/dda8b38ccf750cb63fe3ae67f3611aed5d3d08c47dd626140b83b99c251c/aistore-1.26.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/alembic@1.19.1",
+          "referenceLocator": "pkg:pypi/aistore@1.26.0",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:alembic",
+      "name": "asr:aistore",
       "supplier": "NOASSERTION",
-      "versionInfo": "1.19.1"
+      "versionInfo": "1.26.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-annotated-doc-0.0.5-a9af630f187e",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "c7e58ce09192557605d8bbd92836d7e1d520ac9580096042c0bfd197efacf1bb"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/5a/8e/38aa427ed5402449e226975b649c5dc73ccadfefeb95e6aecb8f8ea4b6b6/annotated_doc-0.0.5.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/annotated-doc@0.0.5",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:annotated-doc",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.0.5"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-annotated-types-0.8.0-5398e8be822a",
@@ -292,28 +375,28 @@
       "versionInfo": "4.14.2"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-asttokens-3.0.2-5d650f53a3f7",
+      "SPDXID": "SPDXRef-pypi-asr-argcomplete-3.7.2-a85db59310c2",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "3ecdbd8f2cc195f53ccada3a613538bb5f9ef6f6869129f13e03c30a677b8fe2"
+          "checksumValue": "aad8b69a0b9969edb62db0d1752354c0d50717b10e0cbb00e2a958381b9fc6b9"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/25/1e/faf0f247f6f881b98fc4d6d07e14085cb89d13665084e6d6ac1dc2c03d0b/asttokens-3.0.2.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/87/6f/5a73f04007ca950701765949209f068da628bd11f9c2da287278ce91e0ee/argcomplete-3.7.2.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/asttokens@3.0.2",
+          "referenceLocator": "pkg:pypi/argcomplete@3.7.2",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:asttokens",
+      "name": "asr:argcomplete",
       "supplier": "NOASSERTION",
-      "versionInfo": "3.0.2"
+      "versionInfo": "3.7.2"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-attrs-26.1.0-a83130f2ee6f",
@@ -364,6 +447,150 @@
       "versionInfo": "3.1.0"
     },
     {
+      "SPDXID": "SPDXRef-pypi-asr-backoff-2.2.1-65f4fb99a222",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "03f829f5bb1923180821643f8753b0502c3b682293992485b0eef2807afa5cba"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/47/d7/5bbeb12c44d7c4f2fb5b56abce497eb5ed9f34d85701de869acedd602619/backoff-2.2.1.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/backoff@2.2.1",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:backoff",
+      "supplier": "NOASSERTION",
+      "versionInfo": "2.2.1"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-backports-zstd-1.7.0-0058b7ebf781",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "1a967189c1822b6e85a2e550fdfc88a3272c17633ea0a4732dac5911a8034f2b"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/75/f0/9ba1b05811aa5f5434f69768253129460a5744e1814f359efba39a01ce20/backports_zstd-1.7.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/backports-zstd@1.7.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:backports-zstd",
+      "supplier": "NOASSERTION",
+      "versionInfo": "1.7.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-bcrypt-5.0.0-7943f1562948",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "f748f7c2d6fd375cc93d3fba7ef4a9e3a092421b8dbf34d8d4dc06be9492dfdd"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/d4/36/3329e2518d70ad8e2e5817d5a4cac6bba05a47767ec416c7d020a965f408/bcrypt-5.0.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/bcrypt@5.0.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:bcrypt",
+      "supplier": "NOASSERTION",
+      "versionInfo": "5.0.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-borb-2.1.25-a6338b4a977c",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "813a25227b96f471d29244bf3c07a7b3df36d61d62bcbecf45b14944b8011ef4"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/a1/f7/8efd8bbb1ae2c63bc62e1869c1edf312b7411c15c76f9a3058384ed89554/borb-2.1.25.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/borb@2.1.25",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:borb",
+      "supplier": "NOASSERTION",
+      "versionInfo": "2.1.25"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-boto3-1.43.85-e4de9de28aa4",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "113b6e1aa3f5722f90c01fc63968c269a9b1fd03ac2594fe16c56a66e6331c5f"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/8d/db/adb561589806195a40e6f5015c884981595eed85ff43a887122165ffd3f4/boto3-1.43.85.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/boto3@1.43.85",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:boto3",
+      "supplier": "NOASSERTION",
+      "versionInfo": "1.43.85"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-botocore-1.43.85-20baa87878a0",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "8fc0a3c56078c629320b021edadf7a45d289eea21a4988ada6a02277e5bbbdc0"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/bc/93/a8b3acb06fcbb440704f195dbf14d12bb83c9c9d67b2e699076017f3d5c6/botocore-1.43.85.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/botocore@1.43.85",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:botocore",
+      "supplier": "NOASSERTION",
+      "versionInfo": "1.43.85"
+    },
+    {
       "SPDXID": "SPDXRef-pypi-asr-braceexpand-0.1.7-dfb324cc7aa4",
       "checksums": [
         {
@@ -386,6 +613,54 @@
       "name": "asr:braceexpand",
       "supplier": "NOASSERTION",
       "versionInfo": "0.1.7"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-brotli-1.2.0-ea0e4628e7a6",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "e310f77e41941c13340a95976fe66a8a95b01e783d430eeaf7a2f87e0a57dd0a"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/f7/16/c92ca344d646e71a43b8bb353f0a6490d7f6e06210f8554c8f874e454285/brotli-1.2.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/brotli@1.2.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:brotli",
+      "supplier": "NOASSERTION",
+      "versionInfo": "1.2.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-brotlicffi-1.2.0.2-03fb2aa1f0be",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "5e0fbd13644cf1f6015e75fa5e0ad8fdce1048d9c9ff90b0ce826174b249ee35"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/71/97/7845739a36828ffe751a1c6b240692f552fd7ecf65026c51326c0a4aa369/brotlicffi-1.2.0.2.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/brotlicffi@1.2.0.2",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:brotlicffi",
+      "supplier": "NOASSERTION",
+      "versionInfo": "1.2.0.2"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-certifi-2026.7.22-15643237a5e3",
@@ -532,52 +807,52 @@
       "versionInfo": "0.4.6"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-colorlog-6.12.0-fc4212fbd77c",
+      "SPDXID": "SPDXRef-pypi-asr-cryptography-49.0.0-da83ec350ef6",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "2a7924c1dadf18b22a0eb8b06d1c7b01d5341707ec1641eb6fcc4fde0c3e8e5f"
+          "checksumValue": "f89660a348f4f78a92366240a61404e337586ef7f5909a2fef59ca88ef505493"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/8c/55/ba79756cb90c8d69d599d57785398ac87bba7b19c80e87f4e8a562197c93/colorlog-6.12.0.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/1f/99/d1c90d6041656cc6ee229dc99cd67fd0cd5aec3c5f7d72fffc27cc750054/cryptography-49.0.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/colorlog@6.12.0",
+          "referenceLocator": "pkg:pypi/cryptography@49.0.0",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:colorlog",
+      "name": "asr:cryptography",
       "supplier": "NOASSERTION",
-      "versionInfo": "6.12.0"
+      "versionInfo": "49.0.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-contourpy-1.3.3-08dbee4f9daa",
+      "SPDXID": "SPDXRef-pypi-asr-cryptography-50.0.1-eac83bf65462",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "083e12155b210502d0bca491432bb04d56dc3432f95a979b429f2848c3dbe880"
+          "checksumValue": "5dd9bda1c12b4162f6ff568eeb5e0ff956c28d14406e875cfe8a63a2d414ff20"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/58/01/1253e6698a07380cd31a736d248a3f2a50a7c88779a1813da27503cadc2a/contourpy-1.3.3.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/bb/ad/5d6702db60b1e40b41ef513b6967ff5848f307d50f8449baf1634f5908f1/cryptography-50.0.1.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/contourpy@1.3.3",
+          "referenceLocator": "pkg:pypi/cryptography@50.0.1",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:contourpy",
+      "name": "asr:cryptography",
       "supplier": "NOASSERTION",
-      "versionInfo": "1.3.3"
+      "versionInfo": "50.0.1"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-cuda-bindings-13.3.1-6393bd82903a",
@@ -598,6 +873,24 @@
       "versionInfo": "13.3.1"
     },
     {
+      "SPDXID": "SPDXRef-pypi-asr-cuda-core-1.0.1-93d7f8f45143",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://pypi.org/simple",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/cuda-core@1.0.1",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:cuda-core",
+      "supplier": "NOASSERTION",
+      "versionInfo": "1.0.1"
+    },
+    {
       "SPDXID": "SPDXRef-pypi-asr-cuda-pathfinder-1.8.0-c621457e991c",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://pypi.org/simple",
@@ -616,13 +909,31 @@
       "versionInfo": "1.8.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-cuda-toolkit-13.0.3.0-ea475b7b28c6",
+      "SPDXID": "SPDXRef-pypi-asr-cuda-python-13.3.1-81c926dce918",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://pypi.org/simple",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/cuda-toolkit@13.0.3.0",
+          "referenceLocator": "pkg:pypi/cuda-python@13.3.1",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:cuda-python",
+      "supplier": "NOASSERTION",
+      "versionInfo": "13.3.1"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-cuda-toolkit-13.2.1-932e747d33ef",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://pypi.org/simple",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/cuda-toolkit@13.2.1",
           "referenceType": "purl"
         }
       ],
@@ -631,31 +942,31 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:cuda-toolkit",
       "supplier": "NOASSERTION",
-      "versionInfo": "13.0.3.0"
+      "versionInfo": "13.2.1"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-cycler-0.12.1-7b44b1957e59",
+      "SPDXID": "SPDXRef-pypi-asr-curlify-3.0.0-9a279883c7fb",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "88bb128f02ba341da8ef447245a9e138fae777f6a23943da4540077d3601eb1c"
+          "checksumValue": "7b488ff3c924dba3433a1cc74044c0942da21f0a97fa26c3138319ba640ca412"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/a9/95/a3dbbb5028f35eafb79008e7522a75244477d2838f38cbb722248dabc2a8/cycler-0.12.1.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/62/df/e9c2720d32c5de985ce64d5dedf883b52c26ff5e9aa2ba2becea00098320/curlify-3.0.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/cycler@0.12.1",
+          "referenceLocator": "pkg:pypi/curlify@3.0.0",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:cycler",
+      "name": "asr:curlify",
       "supplier": "NOASSERTION",
-      "versionInfo": "0.12.1"
+      "versionInfo": "3.0.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-cytoolz-1.1.0-e7ec1cd2248a",
@@ -730,6 +1041,30 @@
       "versionInfo": "5.3.1"
     },
     {
+      "SPDXID": "SPDXRef-pypi-asr-detect-installer-0.1.0-64a9e87fbaed",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "00ad7ba0a36e3cf7d08a40d3643011746dbc112597c7d475cc91c416710ca4e7"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/5f/ce/6897d812825e9d4c53e3c7112726e800cc5231b013b2223bf64f653ff362/detect_installer-0.1.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/detect-installer@0.1.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:detect-installer",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.1.0"
+    },
+    {
       "SPDXID": "SPDXRef-pypi-asr-dill-0.4.1-f4b0521fc610",
       "checksums": [
         {
@@ -754,28 +1089,28 @@
       "versionInfo": "0.4.1"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-editdistance-0.8.1-4a9b7cda03c6",
+      "SPDXID": "SPDXRef-pypi-asr-dnspython-2.8.0-b605defd761f",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "d1cdf80a5d5014b0c9126a69a42ce55a457b457f6986ff69ca98e4fe4d2d8fed"
+          "checksumValue": "181d3c6996452cb1189c4046c61599b84a5a86e099562ffde77d26984ff26d0f"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/d5/18/9f4f975ca87a390832b1c22478f3702fcdf739f83211e24d054b7551270d/editdistance-0.8.1.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/8c/8b/57666417c0f90f08bcafa776861060426765fdb422eb10212086fb811d26/dnspython-2.8.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/editdistance@0.8.1",
+          "referenceLocator": "pkg:pypi/dnspython@2.8.0",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:editdistance",
+      "name": "asr:dnspython",
       "supplier": "NOASSERTION",
-      "versionInfo": "0.8.1"
+      "versionInfo": "2.8.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-einops-0.8.2-e66cef295e17",
@@ -802,52 +1137,124 @@
       "versionInfo": "0.8.2"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-executing-2.2.1-4b250440a097",
+      "SPDXID": "SPDXRef-pypi-asr-email-validator-2.3.0-276e74ff7cd4",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "3632cc370565f6648cc328b32435bd120a1e4ebb20c77e3fdde9a13cd1e533c4"
+          "checksumValue": "9fc05c37f2f6cf439ff414f8fc46d917929974a82244c20eb10231ba60c54426"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/cc/28/c14e053b6762b1044f34a13aab6859bbf40456d37d23aa286ac24cfd9a5d/executing-2.2.1.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/f5/22/900cb125c76b7aaa450ce02fd727f452243f2e91a61af068b40adba60ea9/email_validator-2.3.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/executing@2.2.1",
+          "referenceLocator": "pkg:pypi/email-validator@2.3.0",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:executing",
+      "name": "asr:email-validator",
       "supplier": "NOASSERTION",
-      "versionInfo": "2.2.1"
+      "versionInfo": "2.3.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-fiddle-0.3.0-13a58e3df6a9",
+      "SPDXID": "SPDXRef-pypi-asr-fastapi-0.141.1-d6fee74a512f",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "5d083d3299a479868345513385a6c5546141bd92086c15d3dcbf8008a90075d3"
+          "checksumValue": "e8822fc40db1e1858054d7a949a888695bc9bdce70139178e33bd2871a453ca1"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/73/36/7a4fac76351619b36bbc7937abf59f7b601326dc4efc253b3c16819f782a/fiddle-0.3.0.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/8a/02/91e3416a8fdd715abb903a952a6bec7cdd8d14eed55d415fc8595524c319/fastapi-0.141.1.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/fiddle@0.3.0",
+          "referenceLocator": "pkg:pypi/fastapi@0.141.1",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:fiddle",
+      "name": "asr:fastapi",
       "supplier": "NOASSERTION",
-      "versionInfo": "0.3.0"
+      "versionInfo": "0.141.1"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-fastapi-cli-0.0.32-f90a0b4b1b15",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "38024d2345275e1b37ce8848727a580d84901b570e96b3256d9d36a9a5039424"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/33/eb/3b534c6f8e157f9ddbf2a153512307c886cad0b258739c200dd8ff8c4452/fastapi_cli-0.0.32.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/fastapi-cli@0.0.32",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:fastapi-cli",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.0.32"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-fastapi-cloud-cli-0.24.0-c40fa01b7fff",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "f48c0fce0749cf819f5e043cd9d5a385e8fc9cd97898efdefd38e2de663fb281"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/f0/40/ea8e20e690c2cfd14fc9f76a140e0797e4b6ab8203e79032d57364a2557a/fastapi_cloud_cli-0.24.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/fastapi-cloud-cli@0.24.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:fastapi-cloud-cli",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.24.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-fastar-0.12.0-09cce9dceb6e",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "bba71522eae6a7627a5514ffdd4ac9645ef27d82e23931d79fd974bb49c3f2ad"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/cc/52/5bee9a672f418008d34c708d66e89e8f6fed8f0812f406a1c92fb5e393a8/fastar-0.12.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/fastar@0.12.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:fastar",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.12.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-filelock-3.32.5-4564447e4758",
@@ -946,54 +1353,6 @@
       "versionInfo": "2024.12.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-graphviz-0.21-115ab190fee4",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "20743e7183be82aaaa8ad6c93f8893c923bd6658a04c32ee115edb3c8a835f78"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/f8/b3/3ac91e9be6b761a4b30d66ff165e54439dcd48b83f4e20d644867215f6ca/graphviz-0.21.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/graphviz@0.21",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:graphviz",
-      "supplier": "NOASSERTION",
-      "versionInfo": "0.21"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-greenlet-3.5.5-c61228859921",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "adb4bae02e91a8e863e48b177e4014bdcac8a6b5e047ea1df687a61534b85e6c"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/0b/d8/7cc97c142388aef03f622e001c572c4f84e9252a439549d483f555771970/greenlet-3.5.5.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/greenlet@3.5.5",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:greenlet",
-      "supplier": "NOASSERTION",
-      "versionInfo": "3.5.5"
-    },
-    {
       "SPDXID": "SPDXRef-pypi-asr-grpcio-1.83.1-dad541840b5b",
       "checksums": [
         {
@@ -1090,6 +1449,30 @@
       "versionInfo": "1.0.9"
     },
     {
+      "SPDXID": "SPDXRef-pypi-asr-httptools-0.8.0-71cc968b45eb",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "6b2a32f18d97e16e90827d7a819ffa8dbd8cc245fc4e1fa9d1095b54ef4bd999"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/43/e5/d471fcb0e14523fe1c3f4ba58ca52480e7bd70ad7109a3846bc75892f7fb/httptools-0.8.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/httptools@0.8.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:httptools",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.8.0"
+    },
+    {
       "SPDXID": "SPDXRef-pypi-asr-httpx-0.28.1-2da3f63c6a7b",
       "checksums": [
         {
@@ -1114,19 +1497,19 @@
       "versionInfo": "0.28.1"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-huggingface-hub-0.36.2-7e3c1c715421",
+      "SPDXID": "SPDXRef-pypi-asr-huggingface-hub-1.28.0-0cef6dd7b9df",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "1934304d2fb224f8afa3b87007d58501acfda9215b334eed53072dd5e815ff7a"
+          "checksumValue": "46a2e950c09234de54093d587d1675382f0d08dbd600d9fb599b5932f5b2c6cb"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/7c/b7/8cb61d2eece5fb05a83271da168186721c450eb74e3c31f7ef3169fa475b/huggingface_hub-0.36.2.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/c6/ae/222a91937ebee7f62c0ca8f5ee0afd97577caf24c0abb927d1f5c7e9f6d2/huggingface_hub-1.28.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/huggingface-hub@0.36.2",
+          "referenceLocator": "pkg:pypi/huggingface-hub@1.28.0",
           "referenceType": "purl"
         }
       ],
@@ -1135,7 +1518,31 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:huggingface-hub",
       "supplier": "NOASSERTION",
-      "versionInfo": "0.36.2"
+      "versionInfo": "1.28.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-humanize-4.16.0-8c89c6b89e3b",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "7dc2244a2f84a4bfb1d36c37bac80cd78e35cdc5c119206d87b018e1445f3a3f"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/0a/ea/13a1ef3c12d12662905801495283530251918b70d62d368f1d2e0272c70d/humanize-4.16.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/humanize@4.16.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:humanize",
+      "supplier": "NOASSERTION",
+      "versionInfo": "4.16.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-hydra-core-1.3.2-43217e87c852",
@@ -1160,6 +1567,30 @@
       "name": "asr:hydra-core",
       "supplier": "NOASSERTION",
       "versionInfo": "1.3.2"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-hypothesis-6.165.10-3f1564f4c396",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "68b45e09834cd80523cb1eb274463073c7a9af4e4ef7cff34d9615f355572d32"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/5c/e2/0fad246d2b6330e1f78479bfc566b5c22be82aee8a865cde9a08f648487d/hypothesis-6.165.10.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/hypothesis@6.165.10",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:hypothesis",
+      "supplier": "NOASSERTION",
+      "versionInfo": "6.165.10"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-idna-3.19-e5eb435342ee",
@@ -1210,30 +1641,6 @@
       "versionInfo": "1.1.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-inflect-7.5.0-652facb467e5",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "faf19801c3742ed5a05a8ce388e0d8fe1a07f8d095c82201eb904f5d27ad571f"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/78/c6/943357d44a21fd995723d07ccaddd78023eace03c1846049a2645d4324a3/inflect-7.5.0.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/inflect@7.5.0",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:inflect",
-      "supplier": "NOASSERTION",
-      "versionInfo": "7.5.0"
-    },
-    {
       "SPDXID": "SPDXRef-pypi-asr-iniconfig-2.3.0-f2bd445b4787",
       "checksums": [
         {
@@ -1256,6 +1663,30 @@
       "name": "asr:iniconfig",
       "supplier": "NOASSERTION",
       "versionInfo": "2.3.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-inquirerpy-0.3.4-b28b2499cfe7",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "89d2ada0111f337483cb41ae31073108b2ec1e618a49d7110b0d7ade89fc197e"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/64/73/7570847b9da026e07053da3bbe2ac7ea6cde6bb2cbd3c7a5a950fa0ae40b/InquirerPy-0.3.4.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/inquirerpy@0.3.4",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:inquirerpy",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.3.4"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-intervaltree-3.2.1-1c2450101ac8",
@@ -1282,76 +1713,52 @@
       "versionInfo": "3.2.1"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-ipython-9.17.0-110386c0aaa1",
+      "SPDXID": "SPDXRef-pypi-asr-invoke-3.0.3-c7732efb057f",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "1dc69e6966b270fb259f676c71a21450e63607729b14a672b942914a54e8b730"
+          "checksumValue": "437b6a622223824380bfb4e64f612711a6b648c795f565efc8625af66fb57f0c"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/c4/bc/e05ae123712ce4e1fde4408eedca1791fc1ff832684565132ea1dc646092/ipython-9.17.0.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/33/f6/227c48c5fe47fa178ccf1fda8f047d16c97ba926567b661e9ce2045c600c/invoke-3.0.3.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/ipython@9.17.0",
+          "referenceLocator": "pkg:pypi/invoke@3.0.3",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:ipython",
+      "name": "asr:invoke",
       "supplier": "NOASSERTION",
-      "versionInfo": "9.17.0"
+      "versionInfo": "3.0.3"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-ipython-pygments-lexers-1.1.1-d78a345b18de",
+      "SPDXID": "SPDXRef-pypi-asr-itsdangerous-2.2.0-1ed5f269b4ec",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "09c0138009e56b6854f9535736f4171d855c8c08a563a0dcd8022f78355c7e81"
+          "checksumValue": "e0050c0b7da1eea53ffaf149c0cfbb5c6e2e2b69c4bef22c81fa6eb73e5f6173"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/ef/4c/5dd1d8af08107f88c7f741ead7a40854b8ac24ddf9ae850afbcf698aa552/ipython_pygments_lexers-1.1.1.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/9c/cb/8ac0172223afbccb63986cc25049b154ecfb5e85932587206f42317be31d/itsdangerous-2.2.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/ipython-pygments-lexers@1.1.1",
+          "referenceLocator": "pkg:pypi/itsdangerous@2.2.0",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:ipython-pygments-lexers",
+      "name": "asr:itsdangerous",
       "supplier": "NOASSERTION",
-      "versionInfo": "1.1.1"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-jedi-0.20.0-713cd43670c6",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "c3f4ccbd276696f4b19c54618d4fb18f9fc24b0aef02acf704b23f487daa1011"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/46/b7/a3635f6a2d7cf5b5dd98064fc1d5fbbafcb25477bcea204a3a92145d158b/jedi-0.20.0.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/jedi@0.20.0",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:jedi",
-      "supplier": "NOASSERTION",
-      "versionInfo": "0.20.0"
+      "versionInfo": "2.2.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-jinja2-3.1.6-0e82f97bd6fb",
@@ -1378,19 +1785,19 @@
       "versionInfo": "3.1.6"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-jiwer-3.1.0-3a033052c98e",
+      "SPDXID": "SPDXRef-pypi-asr-jiwer-4.0.0-16c5f1a69efe",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "dc492d09e570f1baba98c76aba09baf8e09c06e6808a4ba412dd4bde67fb79ac"
+          "checksumValue": "ae9c051469102a61ef0927100baeeb4546f78d180c9b0948281d08eaf44c191e"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/85/3e/71b95cf0e2179fb5de8744a79fd36c8bd4e02e1803129a16d423884b6654/jiwer-3.1.0.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/12/1e/963dfc249d5bbe88079b57a22556e981ddd9208e4b6116e48bdbfc01f26b/jiwer-4.0.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/jiwer@3.1.0",
+          "referenceLocator": "pkg:pypi/jiwer@4.0.0",
           "referenceType": "purl"
         }
       ],
@@ -1399,7 +1806,31 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:jiwer",
       "supplier": "NOASSERTION",
-      "versionInfo": "3.1.0"
+      "versionInfo": "4.0.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-jmespath-1.1.0-881ea7a89a4b",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "472c87d80f36026ae83c6ddd0f1d05d4e510134ed462851fd5f754c8c3cbb88d"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/d3/59/322338183ecda247fb5d1763a6cbe46eff7222eaeebafd9fa65d4bf5cb11/jmespath-1.1.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/jmespath@1.1.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:jmespath",
+      "supplier": "NOASSERTION",
+      "versionInfo": "1.1.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-joblib-1.6.0-6e8b9a10b6e3",
@@ -1474,30 +1905,6 @@
       "versionInfo": "2025.9.1"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-kaldi-python-io-1.2.2-930ce65f1c08",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "4ebb4029c6c58296cc0abf96edff02832ba341d290ed37624a8d00105f0f7c00"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/80/45/e3e542ffa8970ebd782fcece35e2295de9c60e8c396c2c1a403410d1b24e/kaldi-python-io-1.2.2.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/kaldi-python-io@1.2.2",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:kaldi-python-io",
-      "supplier": "NOASSERTION",
-      "versionInfo": "1.2.2"
-    },
-    {
       "SPDXID": "SPDXRef-pypi-asr-kaldialign-0.9.1-c9178e3b450f",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://pypi.org/simple",
@@ -1514,30 +1921,6 @@
       "name": "asr:kaldialign",
       "supplier": "NOASSERTION",
       "versionInfo": "0.9.1"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-kiwisolver-1.5.1-f2adeb68f739",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "f1303ef2eec81262a4b708c3e858afe58d7c75ad91c1c05266eda7673369859a"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/ba/07/bd78e6a8fae171ea041ef5bba3ed21a003522fa088834b069b1909981f30/kiwisolver-1.5.1.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/kiwisolver@1.5.1",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:kiwisolver",
-      "supplier": "NOASSERTION",
-      "versionInfo": "1.5.1"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-lazy-loader-0.5-8a26941afc0d",
@@ -1586,30 +1969,6 @@
       "name": "asr:lhotse",
       "supplier": "NOASSERTION",
       "versionInfo": "1.33.0"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-libcst-1.9.0-fb200cb9ba65",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "087b58a9afe076bb08e2d726478e1f16cb928d67ffa9092817e033c335de522a"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/02/c0/098e5c91ff1537f00c85a6438b6cb1863d17144680cc91f47c87f104a200/libcst-1.9.0.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/libcst@1.9.0",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:libcst",
-      "supplier": "NOASSERTION",
-      "versionInfo": "1.9.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-librosa-0.11.0-a2965c8bebba",
@@ -1732,30 +2091,6 @@
       "versionInfo": "6.1.2"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-mako-1.4.1-004758dfcc06",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "d7904710b662996425a21627710c4777c45053146942cf8a7aebf757c92b8c27"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/2a/12/b5fa2353e2754cd67fb9f83793fa48ff42c213a5da7e719869d2301f6ab8/mako-1.4.1.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/mako@1.4.1",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:mako",
-      "supplier": "NOASSERTION",
-      "versionInfo": "1.4.1"
-    },
-    {
       "SPDXID": "SPDXRef-pypi-asr-markdown-3.10.3-edb0f485e846",
       "checksums": [
         {
@@ -1778,6 +2113,30 @@
       "name": "asr:markdown",
       "supplier": "NOASSERTION",
       "versionInfo": "3.10.3"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-markdown-it-py-4.2.0-a6e0de8c38ba",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "04a21681d6fbb623de53f6f364d352309d4094dd4194040a10fd51833e418d49"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/06/ff/7841249c247aa650a76b9ee4bbaeae59370dc8bfd2f6c01f3630c35eb134/markdown_it_py-4.2.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/markdown-it-py@4.2.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:markdown-it-py",
+      "supplier": "NOASSERTION",
+      "versionInfo": "4.2.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-markupsafe-3.0.3-1dc9df4b4354",
@@ -1804,100 +2163,28 @@
       "versionInfo": "3.0.3"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-marshmallow-4.3.1-bccfb4388b7d",
+      "SPDXID": "SPDXRef-pypi-asr-mdurl-0.1.2-b7e5c081902a",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "fb6b8048af08d4ab061610d5b7d3696a7e4c95337dbda880edb9f95812cabc20"
+          "checksumValue": "bb413d29f5eea38f31dd4754dd7377d4465116fb207585f97bf925588687c1ba"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/4e/d7/611e68d57e6a903c29cb33b5afec0f93b4baecacc6c6c62e33cde9eb9dcb/marshmallow-4.3.1.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/d6/54/cfe61301667036ec958cb99bd3efefba235e65cdeb9c84d24a8293ba1d90/mdurl-0.1.2.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/marshmallow@4.3.1",
+          "referenceLocator": "pkg:pypi/mdurl@0.1.2",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:marshmallow",
+      "name": "asr:mdurl",
       "supplier": "NOASSERTION",
-      "versionInfo": "4.3.1"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-matplotlib-3.11.1-d708f2c4fcff",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "69647db5746941c793d6e445a4cd349323ffb87d9cc958c2ad84a659b4832d30"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/49/64/f9a391af28f518b11ad45a8a712353c94a0aefce09d3703200e5c54b610a/matplotlib-3.11.1.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/matplotlib@3.11.1",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:matplotlib",
-      "supplier": "NOASSERTION",
-      "versionInfo": "3.11.1"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-matplotlib-inline-0.2.2-6a76d5a1a9d0",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "72f3fe8fce36b70d4a5b612f899090cd0401deddc4ea90e1572b9f4bfb058c79"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/bd/c0/9f7c9a46090390368a4d7bcb76bb87a4a36c421e4c0792cdb53486ffac7a/matplotlib_inline-0.2.2.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/matplotlib-inline@0.2.2",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:matplotlib-inline",
-      "supplier": "NOASSERTION",
-      "versionInfo": "0.2.2"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-mediapy-1.1.6-fb039d855d56",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "9f44b760400964d8bea5121a213f94dc9a225d026d6a819901283a695e585634"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/9e/b2/451be65c13d2d69b7601eded7ddd3f150884486715a9b3a705ffb08d0177/mediapy-1.1.6.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/mediapy@1.1.6",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:mediapy",
-      "supplier": "NOASSERTION",
-      "versionInfo": "1.1.6"
+      "versionInfo": "0.1.2"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-ml-dtypes-0.6.0-3ccadd89cb63",
@@ -1996,6 +2283,30 @@
       "versionInfo": "1.2.2"
     },
     {
+      "SPDXID": "SPDXRef-pypi-asr-msgspec-0.21.1-3f127f280e93",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "2313508e394b0d208f8f56892ca9b2799e2561329de9763b19619595a6c0f72c"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/e3/60/f79b9b013a16fa3a58350c9295ddc6789f2e335f36ea61ed10a21b215364/msgspec-0.21.1.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/msgspec@0.21.1",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:msgspec",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.21.1"
+    },
+    {
       "SPDXID": "SPDXRef-pypi-asr-multidict-6.7.1-452e0647c35c",
       "checksums": [
         {
@@ -2068,19 +2379,19 @@
       "versionInfo": "2.25.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-nemo-toolkit-2.7.3-2a133614ab63",
+      "SPDXID": "SPDXRef-pypi-asr-nemo-toolkit-3.0.0-13fdd8f94586",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "083240dd24b7534eeb6da5b3bc88fa930da625b2a6a8c071c23fb16919783224"
+          "checksumValue": "d4cf6d3fc3c3bf28b29efbdeb3d2a32ea2564a642269effd56d9b7a6fe087d91"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/e2/30/c385006f44cf6267592c38e16e9d84aa4770a39d55f347d9d8fcc6ee1df5/nemo_toolkit-2.7.3.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/65/59/878ea11e14f22e1ccb282470ff4a984b8c9184d9e29a29338ebcf414cbea/nemo_toolkit-3.0.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/nemo-toolkit@2.7.3",
+          "referenceLocator": "pkg:pypi/nemo-toolkit@3.0.0",
           "referenceType": "purl"
         }
       ],
@@ -2089,7 +2400,7 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:nemo-toolkit",
       "supplier": "NOASSERTION",
-      "versionInfo": "2.7.3"
+      "versionInfo": "3.0.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-networkx-3.6.1-14680c33ed51",
@@ -2140,43 +2451,37 @@
       "versionInfo": "0.67.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-numexpr-2.13.1-0c24473a5a53",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "ecb722249c2d6ed7fefe8504bb17e056481a5f31233c23a7ee02085c3d661fa1"
-        }
-      ],
+      "SPDXID": "SPDXRef-pypi-asr-numba-cuda-0.30.4-068dce1407bd",
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/8d/ca/c1217ae2c15c3284a9e219c269624f80fa1582622eb0400c711a26f84a43/numexpr-2.13.1.tar.gz",
+      "downloadLocation": "https://pypi.org/simple",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/numexpr@2.13.1",
+          "referenceLocator": "pkg:pypi/numba-cuda@0.30.4",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:numexpr",
+      "name": "asr:numba-cuda",
       "supplier": "NOASSERTION",
-      "versionInfo": "2.13.1"
+      "versionInfo": "0.30.4"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-numpy-2.4.6-8b8e91f1cd75",
+      "SPDXID": "SPDXRef-pypi-asr-numpy-2.3.2-3960ca3b3ccf",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "f3a3570c4a2a16746ac2c31a7c7c7b0c186b95ce902e33db6f28094ed7387dda"
+          "checksumValue": "e0486a11ec30cdecb53f184d496d1c6a20786c81e55e41640270130056f8ee48"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/d0/ad/fed0499ce6a338d2a03ebae59cd15093910c8875328855781952abf6c2fe/numpy-2.4.6.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/37/7d/3fec4199c5ffb892bed55cff901e4f39a58c81df9c44c280499e92cad264/numpy-2.3.2.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/numpy@2.4.6",
+          "referenceLocator": "pkg:pypi/numpy@2.3.2",
           "referenceType": "purl"
         }
       ],
@@ -2185,7 +2490,7 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:numpy",
       "supplier": "NOASSERTION",
-      "versionInfo": "2.4.6"
+      "versionInfo": "2.3.2"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-nv-one-logger-core-2.3.1-26b4777f938f",
@@ -2260,13 +2565,13 @@
       "versionInfo": "2.3.1"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-nvidia-cublas-13.1.1.3-a389484c7111",
+      "SPDXID": "SPDXRef-pypi-asr-nvidia-cublas-13.4.0.1-144a1f7dd68c",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://pypi.org/simple",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/nvidia-cublas@13.1.1.3",
+          "referenceLocator": "pkg:pypi/nvidia-cublas@13.4.0.1",
           "referenceType": "purl"
         }
       ],
@@ -2275,16 +2580,34 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:nvidia-cublas",
       "supplier": "NOASSERTION",
-      "versionInfo": "13.1.1.3"
+      "versionInfo": "13.4.0.1"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-nvidia-cuda-cupti-13.0.85-57d50d2a92c0",
+      "SPDXID": "SPDXRef-pypi-asr-nvidia-cuda-cccl-13.2.75-85e0cef180ef",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://pypi.org/simple",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/nvidia-cuda-cupti@13.0.85",
+          "referenceLocator": "pkg:pypi/nvidia-cuda-cccl@13.2.75",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:nvidia-cuda-cccl",
+      "supplier": "NOASSERTION",
+      "versionInfo": "13.2.75"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-nvidia-cuda-cupti-13.2.75-49a0871c256a",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://pypi.org/simple",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/nvidia-cuda-cupti@13.2.75",
           "referenceType": "purl"
         }
       ],
@@ -2293,16 +2616,16 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:nvidia-cuda-cupti",
       "supplier": "NOASSERTION",
-      "versionInfo": "13.0.85"
+      "versionInfo": "13.2.75"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-nvidia-cuda-nvrtc-13.0.88-d38caf9300e6",
+      "SPDXID": "SPDXRef-pypi-asr-nvidia-cuda-nvrtc-13.2.78-53dfadeb2688",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://pypi.org/simple",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/nvidia-cuda-nvrtc@13.0.88",
+          "referenceLocator": "pkg:pypi/nvidia-cuda-nvrtc@13.2.78",
           "referenceType": "purl"
         }
       ],
@@ -2311,16 +2634,16 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:nvidia-cuda-nvrtc",
       "supplier": "NOASSERTION",
-      "versionInfo": "13.0.88"
+      "versionInfo": "13.2.78"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-nvidia-cuda-runtime-13.0.96-de5f27cc1fc5",
+      "SPDXID": "SPDXRef-pypi-asr-nvidia-cuda-runtime-13.2.75-318b2543d556",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://pypi.org/simple",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/nvidia-cuda-runtime@13.0.96",
+          "referenceLocator": "pkg:pypi/nvidia-cuda-runtime@13.2.75",
           "referenceType": "purl"
         }
       ],
@@ -2329,7 +2652,7 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:nvidia-cuda-runtime",
       "supplier": "NOASSERTION",
-      "versionInfo": "13.0.96"
+      "versionInfo": "13.2.75"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-nvidia-cudnn-cu13-9.20.0.48-4bd776b71d1a",
@@ -2350,13 +2673,13 @@
       "versionInfo": "9.20.0.48"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-nvidia-cufft-12.0.0.61-d16d7f418b00",
+      "SPDXID": "SPDXRef-pypi-asr-nvidia-cufft-12.2.0.46-25fd02f70385",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://pypi.org/simple",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/nvidia-cufft@12.0.0.61",
+          "referenceLocator": "pkg:pypi/nvidia-cufft@12.2.0.46",
           "referenceType": "purl"
         }
       ],
@@ -2365,16 +2688,16 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:nvidia-cufft",
       "supplier": "NOASSERTION",
-      "versionInfo": "12.0.0.61"
+      "versionInfo": "12.2.0.46"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-nvidia-cufile-1.15.1.6-a1cc9ea23d00",
+      "SPDXID": "SPDXRef-pypi-asr-nvidia-cufile-1.17.1.22-bf0ba5b2cf1f",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://pypi.org/simple",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/nvidia-cufile@1.15.1.6",
+          "referenceLocator": "pkg:pypi/nvidia-cufile@1.17.1.22",
           "referenceType": "purl"
         }
       ],
@@ -2383,16 +2706,16 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:nvidia-cufile",
       "supplier": "NOASSERTION",
-      "versionInfo": "1.15.1.6"
+      "versionInfo": "1.17.1.22"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-nvidia-curand-10.4.0.35-24336fb297c2",
+      "SPDXID": "SPDXRef-pypi-asr-nvidia-curand-10.4.2.55-57b9f982f93c",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://pypi.org/simple",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/nvidia-curand@10.4.0.35",
+          "referenceLocator": "pkg:pypi/nvidia-curand@10.4.2.55",
           "referenceType": "purl"
         }
       ],
@@ -2401,16 +2724,16 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:nvidia-curand",
       "supplier": "NOASSERTION",
-      "versionInfo": "10.4.0.35"
+      "versionInfo": "10.4.2.55"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-nvidia-cusolver-12.0.4.66-586437672f0a",
+      "SPDXID": "SPDXRef-pypi-asr-nvidia-cusolver-12.2.0.1-d4a25b74693b",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://pypi.org/simple",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/nvidia-cusolver@12.0.4.66",
+          "referenceLocator": "pkg:pypi/nvidia-cusolver@12.2.0.1",
           "referenceType": "purl"
         }
       ],
@@ -2419,16 +2742,16 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:nvidia-cusolver",
       "supplier": "NOASSERTION",
-      "versionInfo": "12.0.4.66"
+      "versionInfo": "12.2.0.1"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-nvidia-cusparse-12.6.3.3-463c2a081eb5",
+      "SPDXID": "SPDXRef-pypi-asr-nvidia-cusparse-12.7.10.1-7fdada01d8b3",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://pypi.org/simple",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/nvidia-cusparse@12.6.3.3",
+          "referenceLocator": "pkg:pypi/nvidia-cusparse@12.7.10.1",
           "referenceType": "purl"
         }
       ],
@@ -2437,7 +2760,7 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:nvidia-cusparse",
       "supplier": "NOASSERTION",
-      "versionInfo": "12.6.3.3"
+      "versionInfo": "12.7.10.1"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-nvidia-cusparselt-cu13-0.8.1-071a1ab9422c",
@@ -2512,13 +2835,13 @@
       "versionInfo": "3.4.5"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-nvidia-nvtx-13.0.85-7cd9089fb6be",
+      "SPDXID": "SPDXRef-pypi-asr-nvidia-nvtx-13.2.75-f72de59bf5b7",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://pypi.org/simple",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/nvidia-nvtx@13.0.85",
+          "referenceLocator": "pkg:pypi/nvidia-nvtx@13.2.75",
           "referenceType": "purl"
         }
       ],
@@ -2527,7 +2850,25 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:nvidia-nvtx",
       "supplier": "NOASSERTION",
-      "versionInfo": "13.0.85"
+      "versionInfo": "13.2.75"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-nvidia-nvvm-13.2.78-431ec00abb9c",
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://pypi.org/simple",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/nvidia-nvvm@13.2.78",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:nvidia-nvvm",
+      "supplier": "NOASSERTION",
+      "versionInfo": "13.2.78"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-omegaconf-2.3.0-ae5d3a6ec7e9",
@@ -2602,30 +2943,6 @@
       "versionInfo": "1.44.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-optuna-4.9.0-868eac83bcbf",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "b322e5cbdf1655fb84c37646c4a7a1f391de1b47806bbe222e015825d0a82b87"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/f4/aa/05f5e3f662cc96a4c478fc3446b8ed6359825a2b504ecb614a9ac84e4a4d/optuna-4.9.0.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/optuna@4.9.0",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:optuna",
-      "supplier": "NOASSERTION",
-      "versionInfo": "4.9.0"
-    },
-    {
       "SPDXID": "SPDXRef-pypi-asr-overrides-7.7.0-b0256374a3eb",
       "checksums": [
         {
@@ -2674,19 +2991,19 @@
       "versionInfo": "24.2"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-pandas-3.0.5-12e02df7bc18",
+      "SPDXID": "SPDXRef-pypi-asr-pandas-2.3.2-53fb1740c001",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "dca3734d6ab7c906e6730f0788b0a1dbb9f2467731f9711f77995c8e9d62d712"
+          "checksumValue": "ab7b58f8f82706890924ccdfb5f48002b83d2b5a3845976a9fb705d36c34dcdb"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/be/4f/5f3422a2afec5ffc46308b79e53291365a93748b498ac2e58bead0197916/pandas-3.0.5.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/79/8e/0e90233ac205ad182bd6b422532695d2b9414944a280488105d598c70023/pandas-2.3.2.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/pandas@3.0.5",
+          "referenceLocator": "pkg:pypi/pandas@2.3.2",
           "referenceType": "purl"
         }
       ],
@@ -2695,7 +3012,7 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:pandas",
       "supplier": "NOASSERTION",
-      "versionInfo": "3.0.5"
+      "versionInfo": "2.3.2"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-parakeet-context-fusion-0.1.0-1f356d60115b",
@@ -2716,76 +3033,76 @@
       "versionInfo": "0.1.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-parso-0.8.7-373b2e85440e",
+      "SPDXID": "SPDXRef-pypi-asr-paramiko-5.0.0-11605cf3b9a8",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "eaaac4c9fdd5e9e8852dc778d2d7405897ec510f2a298071453e5e3a07914bb1"
+          "checksumValue": "36763b5b95c2a0dcfdf1abc48e48156ee425b21efe2f0e787c2dd5a95c0e5e79"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/30/4b/90c937815137d43ce71ba043cd3566221e9df6b9c805f24b5d138c9d40a7/parso-0.8.7.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/62/93/dcc25d52f49022ae6175d15e6bd751f1acc99b98bc61fc55e5155a7be2e7/paramiko-5.0.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/parso@0.8.7",
+          "referenceLocator": "pkg:pypi/paramiko@5.0.0",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:parso",
+      "name": "asr:paramiko",
       "supplier": "NOASSERTION",
-      "versionInfo": "0.8.7"
+      "versionInfo": "5.0.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-peft-0.20.0-eee1c3871ec5",
+      "SPDXID": "SPDXRef-pypi-asr-pfzy-0.3.4-0f8da11eea9b",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "4769c8093a4ca145fd6fb3fd4dd50449675f5fe46434ad1e98b285a132d4b1d0"
+          "checksumValue": "717ea765dd10b63618e7298b2d98efd819e0b30cd5905c9707223dceeb94b3f1"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/b4/08/02541a2c29be7c78698f73d438bc0e733b214f3f35ec5db79fca8da8fc61/peft-0.20.0.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/d9/5a/32b50c077c86bfccc7bed4881c5a2b823518f5450a30e639db5d3711952e/pfzy-0.3.4.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/peft@0.20.0",
+          "referenceLocator": "pkg:pypi/pfzy@0.3.4",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:peft",
+      "name": "asr:pfzy",
       "supplier": "NOASSERTION",
-      "versionInfo": "0.20.0"
+      "versionInfo": "0.3.4"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-pexpect-4.9.0-da6526deb6aa",
+      "SPDXID": "SPDXRef-pypi-asr-pillow-12.2.0-22d25c3ba83c",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "ee7d41123f3c9911050ea2c2dac107568dc43b2d3b0c7557a33212c398ead30f"
+          "checksumValue": "a830b1a40919539d07806aa58e1b114df53ddd43213d9c8b75847eee6c0182b5"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/42/92/cc564bf6381ff43ce1f4d06852fc19a2f11d180f23dc32d9588bee2f149d/pexpect-4.9.0.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/8c/21/c2bcdd5906101a30244eaffc1b6e6ce71a31bd0742a01eb89e660ebfac2d/pillow-12.2.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/pexpect@4.9.0",
+          "referenceLocator": "pkg:pypi/pillow@12.2.0",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:pexpect",
+      "name": "asr:pillow",
       "supplier": "NOASSERTION",
-      "versionInfo": "4.9.0"
+      "versionInfo": "12.2.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-pillow-12.3.0-bf759d955ea0",
@@ -2908,6 +3225,30 @@
       "versionInfo": "4.3.0"
     },
     {
+      "SPDXID": "SPDXRef-pypi-asr-prettytable-3.18.0-a13fd6b445ac",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "439217116152244369caf3d9f1caf2f9fe29b03bd79e88d2928c8e718c95d680"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/81/74/ba08d81e668ccfe8658d7520a307e63c19862c08eb4ccb26f356c5239a7a/prettytable-3.18.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/prettytable@3.18.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:prettytable",
+      "supplier": "NOASSERTION",
+      "versionInfo": "3.18.0"
+    },
+    {
       "SPDXID": "SPDXRef-pypi-asr-prompt-toolkit-3.0.53-b805ee42be33",
       "checksums": [
         {
@@ -3004,124 +3345,28 @@
       "versionInfo": "7.2.2"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-ptyprocess-0.7.0-d47e38564272",
+      "SPDXID": "SPDXRef-pypi-asr-py-cpuinfo-9.0.0-47b562f30a41",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "5c5d0a3b48ceee0b48485e0c26037c0acd7d29765ca3fbb5cb3831d347423220"
+          "checksumValue": "3cdbbf3fac90dc6f118bfd64384f309edeadd902d7c8fb17f02ffa1fc3f49690"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/20/e5/16ff212c1e452235a90aeb09066144d0c5a6a8c0834397e03f5224495c4e/ptyprocess-0.7.0.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/37/a8/d832f7293ebb21690860d2e01d8115e5ff6f2ae8bbdc953f0eb0fa4bd2c7/py-cpuinfo-9.0.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/ptyprocess@0.7.0",
+          "referenceLocator": "pkg:pypi/py-cpuinfo@9.0.0",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:ptyprocess",
+      "name": "asr:py-cpuinfo",
       "supplier": "NOASSERTION",
-      "versionInfo": "0.7.0"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-pure-eval-0.2.3-907160462794",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "5f4e983f40564c576c7c8635ae88db5956bb2229d7e9237d03b3c0b0190eaf42"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/cd/05/0a34433a064256a578f1783a10da6df098ceaa4a57bbeaa96a6c0352786b/pure_eval-0.2.3.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/pure-eval@0.2.3",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:pure-eval",
-      "supplier": "NOASSERTION",
-      "versionInfo": "0.2.3"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-pyannote-core-6.0.1-5e7c77cfa5be",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "4b4ada3276f6df4e073fa79166636e3597d0dcb5a0fe26014a3477867cc033fb"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/a3/be/4a35ea31c685aef801f7f35c193e7766ca1bb948ae497a625cbfaa8c31ba/pyannote_core-6.0.1.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/pyannote-core@6.0.1",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:pyannote-core",
-      "supplier": "NOASSERTION",
-      "versionInfo": "6.0.1"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-pyannote-database-6.1.1-c7e14665194d",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "bbe76da738257a9e64061123d9694ad7e949c4f171d91a9269606d873528cd10"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/65/45/6210274c187cc457e854be8b56c6819fa14376f27e7e2b6021b2aa02449a/pyannote_database-6.1.1.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/pyannote-database@6.1.1",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:pyannote-database",
-      "supplier": "NOASSERTION",
-      "versionInfo": "6.1.1"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-pyannote-metrics-4.1-48c6aef8201e",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "afe24c54ee0799e8cfbe8ee85fa517793c3450bb7eae8fedd1a77ccec0343f7e"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/74/ba/7dbc2f790d5e321e46dc1e250ff00b69cdefc0c5695b811e96a4b932cddd/pyannote_metrics-4.1.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/pyannote-metrics@4.1",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:pyannote-metrics",
-      "supplier": "NOASSERTION",
-      "versionInfo": "4.1"
+      "versionInfo": "9.0.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-pyarrow-25.0.1-1142f8400013",
@@ -3148,6 +3393,30 @@
       "versionInfo": "25.0.1"
     },
     {
+      "SPDXID": "SPDXRef-pypi-asr-pycares-4.11.0-8250dc849115",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "c863d9003ca0ce7df26429007859afd2a621d3276ed9fef154a9123db9252557"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/8d/ad/9d1e96486d2eb5a2672c4d9a2dd372d015b8d7a332c6ac2722c4c8e6bbbf/pycares-4.11.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/pycares@4.11.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:pycares",
+      "supplier": "NOASSERTION",
+      "versionInfo": "4.11.0"
+    },
+    {
       "SPDXID": "SPDXRef-pypi-asr-pycparser-3.0-4d5360b99ffe",
       "checksums": [
         {
@@ -3172,19 +3441,43 @@
       "versionInfo": "3.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-pydantic-2.13.5-22e07a7fba78",
+      "SPDXID": "SPDXRef-pypi-asr-pycryptodome-3.23.0-96525be8afe1",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "51a9c5f7b2f8e636f04c6cada605d9b6a3bf1348fdf945a3d8869b19bba0ee08"
+          "checksumValue": "447700a657182d60338bab09fdb27518f8856aecd80ae4c6bdddb67ff5da44ef"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/53/ef/fc4f868f4e2cee79f863883abffceff107875f569b848507319842d2a681/pydantic-2.13.5.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/8e/a6/8452177684d5e906854776276ddd34eca30d1b1e15aa1ee9cefc289a33f5/pycryptodome-3.23.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/pydantic@2.13.5",
+          "referenceLocator": "pkg:pypi/pycryptodome@3.23.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:pycryptodome",
+      "supplier": "NOASSERTION",
+      "versionInfo": "3.23.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-pydantic-2.11.7-9c42b5944105",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "d989c3c6cb79469287b1569f7447a17848c998458d49ebe294e975b9baf0f0db"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/00/dd/4325abf92c39ba8623b5af936ddb36ffcfe0beae70405d456ab1fb2f5b8c/pydantic-2.11.7.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/pydantic@2.11.7",
           "referenceType": "purl"
         }
       ],
@@ -3193,22 +3486,22 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:pydantic",
       "supplier": "NOASSERTION",
-      "versionInfo": "2.13.5"
+      "versionInfo": "2.11.7"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-pydantic-core-2.46.5-40966f4f1cd8",
+      "SPDXID": "SPDXRef-pypi-asr-pydantic-core-2.33.2-6165c58c6b45",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "10416c15b8839ecc4ef4d0885da76da6fd0f67333a0eb8aff6d93c4b8f2910fc"
+          "checksumValue": "7cb8bc3605c29176e1b105350d2e6474142d7c1bd1d9327c4a9bdb46bf827acc"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/af/f9/8a06bea35ef8daf588f707784c973a7046e0034c8d8cfb08828eeffb8b75/pydantic_core-2.46.5.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/ad/88/5f2260bdfae97aabf98f1778d43f69574390ad787afb646292a638c923d4/pydantic_core-2.33.2.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/pydantic-core@2.46.5",
+          "referenceLocator": "pkg:pypi/pydantic-core@2.33.2",
           "referenceType": "purl"
         }
       ],
@@ -3217,31 +3510,55 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:pydantic-core",
       "supplier": "NOASSERTION",
-      "versionInfo": "2.46.5"
+      "versionInfo": "2.33.2"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-pydub-0.25.1-34869540f922",
+      "SPDXID": "SPDXRef-pypi-asr-pydantic-extra-types-2.11.1-bebe252cfbe9",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "980a33ce9949cab2a569606b65674d748ecbca4f0796887fd6f46173a7b0d30f"
+          "checksumValue": "46792d2307383859e923d8fcefa82108b1a141f8a9c0198982b3832ab5ef1049"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/fe/9a/e6bca0eed82db26562c73b5076539a4a08d3cffd19c3cc5913a3e61145fd/pydub-0.25.1.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/66/71/dba38ee2651f84f7842206adbd2233d8bbdb59fb85e9fa14232486a8c471/pydantic_extra_types-2.11.1.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/pydub@0.25.1",
+          "referenceLocator": "pkg:pypi/pydantic-extra-types@2.11.1",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:pydub",
+      "name": "asr:pydantic-extra-types",
       "supplier": "NOASSERTION",
-      "versionInfo": "0.25.1"
+      "versionInfo": "2.11.1"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-pydantic-settings-2.15.0-dcd8acac4e26",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "694b793e84f766ba76a90ebdefc01d0a9a045dab0382bee70393da93712ad117"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/68/ca/31c57507b13119d7d3cfa1576dad2911a4861e3be07b579395f4e9d393f9/pydantic_settings-2.15.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/pydantic-settings@2.15.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:pydantic-settings",
+      "supplier": "NOASSERTION",
+      "versionInfo": "2.15.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-pygments-2.21.0-799bf55761df",
@@ -3268,52 +3585,52 @@
       "versionInfo": "2.21.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-pyloudnorm-0.2.0-93631db7440a",
+      "SPDXID": "SPDXRef-pypi-asr-pynacl-1.6.2-afd93bb7ce7e",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "8bf597658ea4e1975c275adf490f6deb5369ea409f2901f939915efa4b681b16"
+          "checksumValue": "018494d6d696ae03c7e656e5e74cdfd8ea1326962cc401bcf018f1ed8436811c"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/23/00/f915eaa75326f4209941179c2b93ac477f2040e4aeff5bb21d16eb8058f9/pyloudnorm-0.2.0.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/d9/9a/4019b524b03a13438637b11538c82781a5eda427394380381af8f04f467a/pynacl-1.6.2.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/pyloudnorm@0.2.0",
+          "referenceLocator": "pkg:pypi/pynacl@1.6.2",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:pyloudnorm",
+      "name": "asr:pynacl",
       "supplier": "NOASSERTION",
-      "versionInfo": "0.2.0"
+      "versionInfo": "1.6.2"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-pyopenjtalk-0.4.1-958e7cf5dfd1",
+      "SPDXID": "SPDXRef-pypi-asr-pyopenjtalk-plus-0.4.1.post9-088fc554aeff",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "d5ada46f7fc2b52c1c79c273eb9668ff6ad7ab276a8db9d8be119ef93440f0dc"
+          "checksumValue": "cdcb0746659857554c6dad23956cad77e21f76c9f3dfa000ea2f8d4f0ba11d99"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/58/74/ccd31c696f047ba381f9b11a504bf1199756c3f30f3de64e3eeb83e10b4a/pyopenjtalk-0.4.1.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/1a/e7/03cc1d971260ae90cc35370965d6d8e612cc8b8588d2f81db7cd2accf9ad/pyopenjtalk_plus-0.4.1.post9.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/pyopenjtalk@0.4.1",
+          "referenceLocator": "pkg:pypi/pyopenjtalk-plus@0.4.1.post9",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:pyopenjtalk",
+      "name": "asr:pyopenjtalk-plus",
       "supplier": "NOASSERTION",
-      "versionInfo": "0.4.1"
+      "versionInfo": "0.4.1.post9"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-pyparsing-3.3.2-f681e58cc18c",
@@ -3340,19 +3657,19 @@
       "versionInfo": "3.3.2"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-pytest-9.1.1-0ddfcee82255",
+      "SPDXID": "SPDXRef-pypi-asr-pytest-8.4.2-44f7b48e64ce",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "1088fbde8f2b49d95a549a195707afa7a76a3ce9bcadc26b6d71f0ffda5fe313"
+          "checksumValue": "86c0d0b93306b961d58d62a4db4879f27fe25513d4b969df351abdddb3c30e01"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/e4/47/b9efed96c114afcfa3c9d3fe98a76a1d14c74a9e266d397cf6eb64be5e01/pytest-9.1.1.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/a3/5c/00a0e072241553e1a7496d638deababa67c5058571567b92a7eaa258397c/pytest-8.4.2.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/pytest@9.1.1",
+          "referenceLocator": "pkg:pypi/pytest@8.4.2",
           "referenceType": "purl"
         }
       ],
@@ -3361,7 +3678,31 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:pytest",
       "supplier": "NOASSERTION",
-      "versionInfo": "9.1.1"
+      "versionInfo": "8.4.2"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-python-barcode-0.16.1-1d81714d8197",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "665ed09516b0088b5593061c5ac8662caa0b08d56bdad328388b1cab39939ac5"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/0e/f2/4c0b07f100e1e184ba682021322c336bbba6aa7adfabd2616f70eff917d9/python_barcode-0.16.1.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/python-barcode@0.16.1",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:python-barcode",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.16.1"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-python-dateutil-2.9.0.post0-9dade3ebc0a2",
@@ -3388,6 +3729,54 @@
       "versionInfo": "2.9.0.post0"
     },
     {
+      "SPDXID": "SPDXRef-pypi-asr-python-dotenv-1.2.3-a6376ea9d3c4",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "a20a594dabeaa385725aa239d5244871c143ecb356add8a20fcf23773a6c3a35"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/6a/53/ed9d74092561d4b01a2ef1349d52cdbc135e526c245f366b089cfca6de49/python_dotenv-1.2.3.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/python-dotenv@1.2.3",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:python-dotenv",
+      "supplier": "NOASSERTION",
+      "versionInfo": "1.2.3"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-python-multipart-0.0.32-6784fbcf0586",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "be54b7f3fa167bb83e4fcd936b887b708f4e57fe75911c02aebf53efaf8d938e"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/5b/42/55c32bb9b12693c092ad250a0e82edb5b31ddeda6eb772de5f308b3804ad/python_multipart-0.0.32.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/python-multipart@0.0.32",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:python-multipart",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.0.32"
+    },
+    {
       "SPDXID": "SPDXRef-pypi-asr-pytorch-lightning-2.6.5-8fd85f860aa5",
       "checksums": [
         {
@@ -3412,19 +3801,43 @@
       "versionInfo": "2.6.5"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-pyyaml-6.0.3-cda17518d172",
+      "SPDXID": "SPDXRef-pypi-asr-pytz-2026.3.post1-b30e10a5dea7",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "d76623373421df22fb4cf8817020cbb7ef15c725b9d5e45f17e189bfc384190f"
+          "checksumValue": "2211d3fcf9a797d3405cac96ac7f61d80e6a644f72a3309607282fe8a2010c5d"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/05/8e/961c0007c59b8dd7729d542c61a4d537767a59645b82a0b521206e1e25c2/pyyaml-6.0.3.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/fb/48/fb042503b6ca6cd271261dc559fd6432f7d8c713153e9ec5c591af4dfc1c/pytz-2026.3.post1.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/pyyaml@6.0.3",
+          "referenceLocator": "pkg:pypi/pytz@2026.3.post1",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:pytz",
+      "supplier": "NOASSERTION",
+      "versionInfo": "2026.3.post1"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-pyyaml-6.0.2-0c99a80b5695",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "d584d9ec91ad65861cc08d42e834324ef890a082e591037abe114850ff7bbc3e"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/54/ed/79a089b6be93607fa5cdaedf301d7dfb23af5f25c398d5ead2525b063e17/pyyaml-6.0.2.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/pyyaml@6.0.2",
           "referenceType": "purl"
         }
       ],
@@ -3433,7 +3846,31 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:pyyaml",
       "supplier": "NOASSERTION",
-      "versionInfo": "6.0.3"
+      "versionInfo": "6.0.2"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-qrcode-8.2-7ffe96c762de",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "35c3f2a4172b33136ab9f6b3ef1c00260dd2f66f858f24d88418a015f446506c"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/8f/b2/7fc2931bfae0af02d5f53b174e9cf701adbb35f39d69c2af63d4a39f81a9/qrcode-8.2.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/qrcode@8.2",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:qrcode",
+      "supplier": "NOASSERTION",
+      "versionInfo": "8.2"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-rapidfuzz-3.14.6-471eb2a86c62",
@@ -3532,28 +3969,76 @@
       "versionInfo": "2.34.2"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-resampy-0.4.3-72e1e12a6fb0",
+      "SPDXID": "SPDXRef-pypi-asr-rich-15.0.0-b935fcf26d2e",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "a0d1c28398f0e55994b739650afef4e3974115edbe96cd4bb81968425e916e47"
+          "checksumValue": "edd07a4824c6b40189fb7ac9bc4c52536e9780fbbfbddf6f1e2502c31b068c36"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/29/f1/34be702a69a5d272e844c98cee82351f880985cfbca0cc86378011078497/resampy-0.4.3.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/c0/8f/0722ca900cc807c13a6a0c696dacf35430f72e0ec571c4275d2371fca3e9/rich-15.0.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/resampy@0.4.3",
+          "referenceLocator": "pkg:pypi/rich@15.0.0",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:resampy",
+      "name": "asr:rich",
       "supplier": "NOASSERTION",
-      "versionInfo": "0.4.3"
+      "versionInfo": "15.0.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-rich-toolkit-0.20.3-357b5b74757b",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "223dd2cfba325ed55e94933b9e53f3aca13e9fdf76622bd564c18109a2273c1b"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/e4/3a/a258c2fbc6c6bdf428611388f5698ba5d57ffdf0755e1cab474d9cc47813/rich_toolkit-0.20.3.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/rich-toolkit@0.20.3",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:rich-toolkit",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.20.3"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-rignore-0.8.1-f8f1a9a59612",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "2b6cf58501e9ff1b6a71c3fd66c8a105311e1f23237626fd4c9c00606bb3d30f"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/ff/7e/aa0640d74f6b4bb68466f5899bd5ed1680480732344c31a408504e215801/rignore-0.8.1.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/rignore@0.8.1",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:rignore",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.8.1"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-rpds-py-2026.6.3-1ea714db7a48",
@@ -3580,43 +4065,19 @@
       "versionInfo": "2026.6.3"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-ruamel-yaml-0.19.1-de03eb3214df",
+      "SPDXID": "SPDXRef-pypi-asr-ruff-0.12.11-856d92ad50ef",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "53eb66cd27849eff968ebf8f0bf61f46cdac2da1d1f3576dd4ccee9b25c31993"
+          "checksumValue": "c6b09ae8426a65bbee5425b9d0b82796dbb07cb1af045743c79bfb163001165d"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/c7/3b/ebda527b56beb90cb7652cb1c7e4f91f48649fbcd8d2eb2fb6e77cd3329b/ruamel_yaml-0.19.1.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/de/55/16ab6a7d88d93001e1ae4c34cbdcfb376652d761799459ff27c1dc20f6fa/ruff-0.12.11.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/ruamel-yaml@0.19.1",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:ruamel-yaml",
-      "supplier": "NOASSERTION",
-      "versionInfo": "0.19.1"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-ruff-0.16.5-30647897bd87",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "1b88500f9ffbcab3dedb0082c9f9492e91ec3d618aac1236a3e0189938f7040b"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/f3/85/c8e12473c93018f92d19dd988a294202e1c27426c47ec4de53ffb847b8d8/ruff-0.16.5.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/ruff@0.16.5",
+          "referenceLocator": "pkg:pypi/ruff@0.12.11",
           "referenceType": "purl"
         }
       ],
@@ -3625,7 +4086,55 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:ruff",
       "supplier": "NOASSERTION",
-      "versionInfo": "0.16.5"
+      "versionInfo": "0.12.11"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-runpod-1.12.0-0f92dc3c47f4",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "511c6b751221a9890450aa2ddedc0c50d4d64aa3a008aab0d7a23a84792dbb85"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/33/21/63136d292d95532b4fa51a5f8495883e71865b3534634cc28cdfc315df66/runpod-1.12.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/runpod@1.12.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:runpod",
+      "supplier": "NOASSERTION",
+      "versionInfo": "1.12.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-s3transfer-0.19.2-41accc37c061",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "ba0309fd86be3c27dbf78cdd813c13c5e1df16e5874b99d2535ebbdfb9892993"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/76/43/35e4d8aa320bffe8287fe8f65f578fa2d2db0a64212f0e710dce58267854/s3transfer-0.19.2.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/s3transfer@0.19.2",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:s3transfer",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.19.2"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-sacrebleu-2.6.0-7878e9cd38b7",
@@ -3650,30 +4159,6 @@
       "name": "asr:sacrebleu",
       "supplier": "NOASSERTION",
       "versionInfo": "2.6.0"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-sacremoses-0.2.0-792e89aed843",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "5aec4792efc2726710243d3566b381990e6b678cb1fd7b9d2dae216b4b8f1b1e"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/a4/69/e71340bf92b312107e8e1e9d360d45c8b304151ff1e022b6d4c1343a073a/sacremoses-0.2.0.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/sacremoses@0.2.0",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:sacremoses",
-      "supplier": "NOASSERTION",
-      "versionInfo": "0.2.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-safetensors-0.8.0-6f75dd732692",
@@ -3796,19 +4281,19 @@
       "versionInfo": "2.68.1"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-setuptools-84.0.0-73165daf22f7",
+      "SPDXID": "SPDXRef-pypi-asr-setuptools-81.0.0-56cf4f4b0822",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "f4695c21257f0d9b537ec2692c941d02ee143b7cc1276941349a546573b2ef73"
+          "checksumValue": "487b53915f52501f0a79ccfd0c02c165ffe06631443a886740b91af4b7a5845a"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/6d/44/f5da03a8ef95d369145c5bb53050e7877c9f3d312e128605fd9504829143/setuptools-84.0.0.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/0d/1c/73e719955c59b8e424d015ab450f51c0af856ae46ea2da83eba51cc88de1/setuptools-81.0.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/setuptools@84.0.0",
+          "referenceLocator": "pkg:pypi/setuptools@81.0.0",
           "referenceType": "purl"
         }
       ],
@@ -3817,7 +4302,31 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:setuptools",
       "supplier": "NOASSERTION",
-      "versionInfo": "84.0.0"
+      "versionInfo": "81.0.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-shellingham-1.5.4-430f9a28c0b8",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "8dbca0739d487e5bd35ab3ca4b36e11c4078f3a234bfce294b0a0291363404de"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/58/15/8b3609fd3830ef7b27b655beb4b4e9c62313a4e8da8c676e142cc210d58e/shellingham-1.5.4.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/shellingham@1.5.4",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:shellingham",
+      "supplier": "NOASSERTION",
+      "versionInfo": "1.5.4"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-six-1.17.0-c069269f89e7",
@@ -3842,6 +4351,30 @@
       "name": "asr:six",
       "supplier": "NOASSERTION",
       "versionInfo": "1.17.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-smart-open-8.0.1-a8d42230c8ba",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "18b1c4496003c6902be17c15f032b5c319f307c89c6ae9e6b028b508bed8b2cf"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/76/53/9c513747547fd595d5c143259129ea8b9c3ea2f6b7bb9dcea2b1966ded3c/smart_open-8.0.1.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/smart-open@8.0.1",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:smart-open",
+      "supplier": "NOASSERTION",
+      "versionInfo": "8.0.1"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-sortedcontainers-2.4.0-1b8b238d5278",
@@ -3892,30 +4425,6 @@
       "versionInfo": "0.14.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-sox-1.5.0-877e42599dc8",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "12c7be5bb1f548d891fe11e82c08cf5f1a1d74e225298f60082e5aeb2469ada0"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/3d/a2/d8e0d8fd7abf509ead4a2cb0fb24e5758b5330166bf9223d5cb9f98a7e8d/sox-1.5.0.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/sox@1.5.0",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:sox",
-      "supplier": "NOASSERTION",
-      "versionInfo": "1.5.0"
-    },
-    {
       "SPDXID": "SPDXRef-pypi-asr-soxr-1.1.0-8d091f5b1510",
       "checksums": [
         {
@@ -3940,52 +4449,28 @@
       "versionInfo": "1.1.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-sqlalchemy-2.0.52-092b6a77807f",
+      "SPDXID": "SPDXRef-pypi-asr-starlette-1.6.0-2ddb6957c7cc",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "5e2d46356ac2ccb7d268ab6c2319ac6a2b42f1b8d5fd8bd3d46855cd82abee97"
+          "checksumValue": "d4e3ac5e546444960c710297a3c9fc3f7ebae1b7e963f3d36173b49da535be9b"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/3b/21/77b4c147963073040dc3c3a5cb7a8c3001a1893c0209432cb77f9df836aa/sqlalchemy-2.0.52.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/b5/b4/205b0d5241d934e8add0c38aa924c4f9fb7330834ff11e5444db964ec3f9/starlette-1.6.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/sqlalchemy@2.0.52",
+          "referenceLocator": "pkg:pypi/starlette@1.6.0",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:sqlalchemy",
+      "name": "asr:starlette",
       "supplier": "NOASSERTION",
-      "versionInfo": "2.0.52"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-stack-data-0.6.3-92c098250c91",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "836a778de4fec4dcd1dcd89ed8abff8a221f58308462e1c4aa2a3cf30148f0b9"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/28/e3/55dcc2cfbc3ca9c29519eb6884dd1415ecb53b0e934862d3559ddcb7e20b/stack_data-0.6.3.tar.gz",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/stack-data@0.6.3",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:stack-data",
-      "supplier": "NOASSERTION",
-      "versionInfo": "0.6.3"
+      "versionInfo": "1.6.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-strenum-0.4.15-b29333cc01d9",
@@ -4010,6 +4495,54 @@
       "name": "asr:strenum",
       "supplier": "NOASSERTION",
       "versionInfo": "0.4.15"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-sudachidict-core-20260723-30ce400da952",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "d50c302f907c0bb9b048b9d224abc3b24cdbeb8416a73942de00b74235798fe7"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/2f/69/e8df4402744319080f9db9f20dc40a0cc3f2042db82ab7c040b785becf14/sudachidict_core-20260723.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/sudachidict-core@20260723",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:sudachidict-core",
+      "supplier": "NOASSERTION",
+      "versionInfo": "20260723"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-sudachipy-0.6.11-27283028d0c9",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "4f03310fd3fc779b3000f49395c939d18a30081632d3cb14488426f7c07cc526"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/13/34/a52dc020e1ac67ffe2469d22771a850589a1184e0d91d48addd364ee02ba/sudachipy-0.6.11.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/sudachipy@0.6.11",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:sudachipy",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.6.11"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-sympy-1.14.0-38da59f517d2",
@@ -4058,6 +4591,30 @@
       "name": "asr:tabulate",
       "supplier": "NOASSERTION",
       "versionInfo": "0.10.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-tenacity-9.1.4-1ced6aeb3638",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "adb31d4c263f2bd041081ab33b498309a57c77f9acf2db65aadf0898179cf93a"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/47/c6/ee486fd809e357697ee8a44d3d69222b344920433d3b6666ccd9b374630c/tenacity-9.1.4.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/tenacity@9.1.4",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:tenacity",
+      "supplier": "NOASSERTION",
+      "versionInfo": "9.1.4"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-tensorboard-2.20.0-19ce7156754b",
@@ -4168,19 +4725,19 @@
       "versionInfo": "3.6.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-tokenizers-0.22.2-3e810d114343",
+      "SPDXID": "SPDXRef-pypi-asr-tokenizers-0.23.1-51cad7b1f7cd",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "473b83b915e547aa366d1eee11806deaf419e17be16310ac0a14077f1e28f917"
+          "checksumValue": "1feeeadf865a7915adc25445dea30e9933e593c31bb96c277cee36de227c8bfa"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/73/6f/f80cfef4a312e1fb34baf7d85c72d4411afde10978d4657f8cdd811d3ccc/tokenizers-0.22.2.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/c1/60/21f715d9faba5f5407ff759472ade058ec4a507ad62bcea47cb847239a73/tokenizers-0.23.1.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/tokenizers@0.22.2",
+          "referenceLocator": "pkg:pypi/tokenizers@0.23.1",
           "referenceType": "purl"
         }
       ],
@@ -4189,7 +4746,7 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:tokenizers",
       "supplier": "NOASSERTION",
-      "versionInfo": "0.22.2"
+      "versionInfo": "0.23.1"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-toml-0.10.2-2811dc96bb1c",
@@ -4216,6 +4773,54 @@
       "versionInfo": "0.10.2"
     },
     {
+      "SPDXID": "SPDXRef-pypi-asr-tomli-2.4.1-e9cc5ef38d05",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "7c7e1a961a0b2f2472c1ac5b69affa0ae1132c39adcb67aba98568702b9cc23f"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/22/de/48c59722572767841493b26183a0d1cc411d54fd759c5607c4590b6563a6/tomli-2.4.1.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/tomli@2.4.1",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:tomli",
+      "supplier": "NOASSERTION",
+      "versionInfo": "2.4.1"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-tomlkit-0.15.1-8c5244911f54",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "e25bbf38843005246210a12982776f27f99cb9be67160e14434d0c0d21ee1e97"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/94/96/e07752635b98536177fa1f37671c8f3cdde2e724c6bcf6034b2cfb571565/tomlkit-0.15.1.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/tomlkit@0.15.1",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:tomlkit",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.15.1"
+    },
+    {
       "SPDXID": "SPDXRef-pypi-asr-toolz-1.1.0-1b08e2a1e58d",
       "checksums": [
         {
@@ -4240,13 +4845,13 @@
       "versionInfo": "1.1.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-torch-2.13.0-ecf76f211a73",
+      "SPDXID": "SPDXRef-pypi-asr-torch-2.12.0-cu132-8b588a639c6f",
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://pypi.org/simple",
+      "downloadLocation": "https://download.pytorch.org/whl/cu132",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/torch@2.13.0",
+          "referenceLocator": "pkg:pypi/torch@2.12.0+cu132",
           "referenceType": "purl"
         }
       ],
@@ -4255,7 +4860,7 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:torch",
       "supplier": "NOASSERTION",
-      "versionInfo": "2.13.0"
+      "versionInfo": "2.12.0+cu132"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-torchmetrics-1.9.0-2aba575b6e59",
@@ -4306,43 +4911,43 @@
       "versionInfo": "4.70.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-traitlets-5.16.1-72a4f3e3a546",
+      "SPDXID": "SPDXRef-pypi-asr-tqdm-loggable-0.4.1-7077104d8778",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "ed900c2b631aa3a112811139fa97b8d2c3bad5e989656bba4b7e52c7852c18c1"
+          "checksumValue": "49123ffcb2deb948edb7121d7e09a6008914e0d0333154f060e435deba9e547a"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/2c/2e/a7fbfe268c8a3b32546930c0297c101d65a4a14c304ad5790a9f478f0e4e/traitlets-5.16.1.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/d1/c1/bd361c24a76e7c0d137e299ca1e86bbe188e4c08e3e46674a285aa762051/tqdm_loggable-0.4.1.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/traitlets@5.16.1",
+          "referenceLocator": "pkg:pypi/tqdm-loggable@0.4.1",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:traitlets",
+      "name": "asr:tqdm-loggable",
       "supplier": "NOASSERTION",
-      "versionInfo": "5.16.1"
+      "versionInfo": "0.4.1"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-transformers-4.57.6-9b3db157b831",
+      "SPDXID": "SPDXRef-pypi-asr-transformers-5.16.1-125cf4aaed90",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "55e44126ece9dc0a291521b7e5492b572e6ef2766338a610b9ab5afbb70689d3"
+          "checksumValue": "17b0eac726ddc55e84ac58946063e0c6d37fd000c456b581f050ea0f4e822869"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/c4/35/67252acc1b929dc88b6602e8c4a982e64f31e733b804c14bc24b47da35e6/transformers-4.57.6.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/ad/2e/ba418680ab901dae269360bb8642485eae04f1af91ee2ebb8bd6f3607305/transformers-5.16.1.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/transformers@4.57.6",
+          "referenceLocator": "pkg:pypi/transformers@5.16.1",
           "referenceType": "purl"
         }
       ],
@@ -4351,16 +4956,16 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:transformers",
       "supplier": "NOASSERTION",
-      "versionInfo": "4.57.6"
+      "versionInfo": "5.16.1"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-triton-3.7.1-84a539650343",
+      "SPDXID": "SPDXRef-pypi-asr-triton-3.7.0-e58c5fe4b3c5",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "https://pypi.org/simple",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/triton@3.7.1",
+          "referenceLocator": "pkg:pypi/triton@3.7.0",
           "referenceType": "purl"
         }
       ],
@@ -4369,31 +4974,31 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:triton",
       "supplier": "NOASSERTION",
-      "versionInfo": "3.7.1"
+      "versionInfo": "3.7.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-typeguard-4.6.0-7ee16d1e2974",
+      "SPDXID": "SPDXRef-pypi-asr-typer-0.27.2-82bddea986f7",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "e7414f09111317de3e335de92cd397c5c0ca00b1cc1676de12e1d444a79b3f21"
+          "checksumValue": "269b7eb9d3c202ca84b4bc9618cb04ebb43d3d4d1e567e4c768607232c05f945"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/b4/de/4420db493fa8fc0856d5e5c1b159c63a323d2de2317babe36b01568928e8/typeguard-4.6.0.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/16/f7/57713ba479fd405eb76de31404b2c744c289e336b2d999511ebf51e496f7/typer-0.27.2.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/typeguard@4.6.0",
+          "referenceLocator": "pkg:pypi/typer@0.27.2",
           "referenceType": "purl"
         }
       ],
       "filesAnalyzed": false,
       "licenseConcluded": "NOASSERTION",
       "licenseDeclared": "NOASSERTION",
-      "name": "asr:typeguard",
+      "name": "asr:typer",
       "supplier": "NOASSERTION",
-      "versionInfo": "4.6.0"
+      "versionInfo": "0.27.2"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-typing-extensions-4.16.0-96d6aa8c4631",
@@ -4492,6 +5097,78 @@
       "versionInfo": "2.7.0"
     },
     {
+      "SPDXID": "SPDXRef-pypi-asr-uvicorn-0.52.4-81765458ebcb",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "73acfee47a0b133c5de13d219492d62d8a31e935f4fe6e41a232451a15379f86"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/f2/0f/3f86e61397dd33bf2ccf28188c40db6a740658aeebbbf6e7dbc101a1f487/uvicorn-0.52.4.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/uvicorn@0.52.4",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:uvicorn",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.52.4"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-uvloop-0.22.1-22a83222f12b",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "6c84bae345b9147082b17371e3dd5d42775bddce91f885499017f4607fdaf39f"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/06/f0/18d39dbd1971d6d62c4629cc7fa67f74821b0dc1f5a77af43719de7936a7/uvloop-0.22.1.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/uvloop@0.22.1",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:uvloop",
+      "supplier": "NOASSERTION",
+      "versionInfo": "0.22.1"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-vastai-1.5.6-f55d1721900d",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "370a005d4510305b78109e065f03372eb6f8a4caf217da85a5008cbb4ae08396"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/84/d6/166c8792187cd0e517cb6f49d689d08e1fd6a145ff3138bf4237daf47534/vastai-1.5.6.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/vastai@1.5.6",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:vastai",
+      "supplier": "NOASSERTION",
+      "versionInfo": "1.5.6"
+    },
+    {
       "SPDXID": "SPDXRef-pypi-asr-wandb-0.29.0-b0cbc039cc1e",
       "checksums": [
         {
@@ -4514,6 +5191,54 @@
       "name": "asr:wandb",
       "supplier": "NOASSERTION",
       "versionInfo": "0.29.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-watchdog-6.0.0-1be3232d93b3",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "9ddf7c82fda3ae8e24decda1338ede66e1c99883db93711d8fb941eaa2d8c282"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/db/7d/7f3d619e951c88ed75c6037b246ddcf2d322812ee8ea189be89511721d54/watchdog-6.0.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/watchdog@6.0.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:watchdog",
+      "supplier": "NOASSERTION",
+      "versionInfo": "6.0.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-watchfiles-1.2.0-41e4f6c20075",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "c995fba777f1ea992f090f9236e9284cf7a5d1a0130dd5a3d82c598cacd76838"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/cd/41/5e1a4bb12aac5f1493fa1bdc11154eca3b258ca4eba65d39c473fe19d8e9/watchfiles-1.2.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/watchfiles@1.2.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:watchfiles",
+      "supplier": "NOASSERTION",
+      "versionInfo": "1.2.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-wcwidth-0.8.3-e9316a2f17df",
@@ -4564,6 +5289,30 @@
       "versionInfo": "1.0.2"
     },
     {
+      "SPDXID": "SPDXRef-pypi-asr-websockets-17.1-2b6caade0a1a",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "acfea4c20bf54384883ea33b1240fc1db4f52e190823a4e2b334bc3e8bfca96a"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/18/72/fba934cb3dff7a85d811820efffcd141ddd52b5a2a01637f64551373ff4d/websockets-17.1.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/websockets@17.1",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:websockets",
+      "supplier": "NOASSERTION",
+      "versionInfo": "17.1"
+    },
+    {
       "SPDXID": "SPDXRef-pypi-asr-werkzeug-3.1.8-d0944ae3f287",
       "checksums": [
         {
@@ -4586,30 +5335,6 @@
       "name": "asr:werkzeug",
       "supplier": "NOASSERTION",
       "versionInfo": "3.1.8"
-    },
-    {
-      "SPDXID": "SPDXRef-pypi-asr-wget-3.2-3cf492b9a786",
-      "checksums": [
-        {
-          "algorithm": "SHA256",
-          "checksumValue": "35e630eca2aa50ce998b9b1a127bb26b30dfee573702782aa982f875e3f16061"
-        }
-      ],
-      "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/47/6a/62e288da7bcda82b935ff0c6cfe542970f04e29c756b0e147251b2fb251f/wget-3.2.zip",
-      "externalRefs": [
-        {
-          "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/wget@3.2",
-          "referenceType": "purl"
-        }
-      ],
-      "filesAnalyzed": false,
-      "licenseConcluded": "NOASSERTION",
-      "licenseDeclared": "NOASSERTION",
-      "name": "asr:wget",
-      "supplier": "NOASSERTION",
-      "versionInfo": "3.2"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-whisper-normalizer-0.1.15-21c4d415048f",
@@ -4660,19 +5385,43 @@
       "versionInfo": "2.4.0"
     },
     {
-      "SPDXID": "SPDXRef-pypi-asr-xxhash-4.0.1-568dc5079b40",
+      "SPDXID": "SPDXRef-pypi-asr-xdg-6.0.0-2e166cc4b094",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "d55bf4ef10eb09b8b6866790e083d26d087d84caa3cc0946ba87c3ca7ecaf7b7"
+          "checksumValue": "24278094f2d45e846d1eb28a2ebb92d7b67fc0cab5249ee3ce88c95f649a1c92"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "https://files.pythonhosted.org/packages/f6/a5/1386f35da1475fcaeef42581deae73417c6d2a6a0b2d2e8914de18844dcd/xxhash-4.0.1.tar.gz",
+      "downloadLocation": "https://files.pythonhosted.org/packages/2a/b9/0e6e6f19fb75cf5e1758f4f33c1256738f718966700cffc0fde2f966218b/xdg-6.0.0.tar.gz",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:pypi/xxhash@4.0.1",
+          "referenceLocator": "pkg:pypi/xdg@6.0.0",
+          "referenceType": "purl"
+        }
+      ],
+      "filesAnalyzed": false,
+      "licenseConcluded": "NOASSERTION",
+      "licenseDeclared": "NOASSERTION",
+      "name": "asr:xdg",
+      "supplier": "NOASSERTION",
+      "versionInfo": "6.0.0"
+    },
+    {
+      "SPDXID": "SPDXRef-pypi-asr-xxhash-3.5.0-fff89841b6cb",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "84f2caddf951c9cbf8dc2e22a89d4ccf5d86391ac6418fe81e3c67d0cf60b45f"
+        }
+      ],
+      "copyrightText": "NOASSERTION",
+      "downloadLocation": "https://files.pythonhosted.org/packages/00/5e/d6e5258d69df8b4ed8c83b6664f2b47d30d2dec551a29ad72a6c69eafd31/xxhash-3.5.0.tar.gz",
+      "externalRefs": [
+        {
+          "referenceCategory": "PACKAGE-MANAGER",
+          "referenceLocator": "pkg:pypi/xxhash@3.5.0",
           "referenceType": "purl"
         }
       ],
@@ -4681,7 +5430,7 @@
       "licenseDeclared": "NOASSERTION",
       "name": "asr:xxhash",
       "supplier": "NOASSERTION",
-      "versionInfo": "4.0.1"
+      "versionInfo": "3.5.0"
     },
     {
       "SPDXID": "SPDXRef-pypi-asr-yarl-1.24.5-b454d6ddfe27",
@@ -5222,19 +5971,19 @@
       "versionInfo": "c2a87611a18de5b3828c5652fe268e992400cb5c"
     },
     {
-      "SPDXID": "SPDXRef-oci-nvidia-pytorch-nvcr.io-nvidia-pytorch-sha256-ace9a848c0ae543317e3c4763b6b4248961c47902625abfe3c77a0fb931c50fb-acdb60585a82",
+      "SPDXID": "SPDXRef-oci-nvidia-pytorch-nvcr.io-nvidia-pytorch-sha256-2140e699b3beaf7f96a0081fd9c9406bc3832b435cdb60dfa2d261f7d2f34a1c-2fe74800a9b8",
       "checksums": [
         {
           "algorithm": "SHA256",
-          "checksumValue": "ace9a848c0ae543317e3c4763b6b4248961c47902625abfe3c77a0fb931c50fb"
+          "checksumValue": "2140e699b3beaf7f96a0081fd9c9406bc3832b435cdb60dfa2d261f7d2f34a1c"
         }
       ],
       "copyrightText": "NOASSERTION",
-      "downloadLocation": "nvcr.io/nvidia/pytorch@sha256:ace9a848c0ae543317e3c4763b6b4248961c47902625abfe3c77a0fb931c50fb",
+      "downloadLocation": "nvcr.io/nvidia/pytorch@sha256:2140e699b3beaf7f96a0081fd9c9406bc3832b435cdb60dfa2d261f7d2f34a1c",
       "externalRefs": [
         {
           "referenceCategory": "PACKAGE-MANAGER",
-          "referenceLocator": "pkg:oci/nvcr.io/nvidia/pytorch@sha256:ace9a848c0ae543317e3c4763b6b4248961c47902625abfe3c77a0fb931c50fb",
+          "referenceLocator": "pkg:oci/nvcr.io/nvidia/pytorch@sha256:2140e699b3beaf7f96a0081fd9c9406bc3832b435cdb60dfa2d261f7d2f34a1c",
           "referenceType": "purl"
         }
       ],
@@ -5243,10 +5992,10 @@
       "licenseDeclared": "NOASSERTION",
       "name": "nvidia_pytorch:nvcr.io/nvidia/pytorch",
       "supplier": "NOASSERTION",
-      "versionInfo": "sha256:ace9a848c0ae543317e3c4763b6b4248961c47902625abfe3c77a0fb931c50fb"
+      "versionInfo": "sha256:2140e699b3beaf7f96a0081fd9c9406bc3832b435cdb60dfa2d261f7d2f34a1c"
     },
     {
-      "SPDXID": "SPDXRef-mise-python-3.11.16-f233e40c524b",
+      "SPDXID": "SPDXRef-mise-python-3.12.3-311858fae37a",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": false,
@@ -5254,10 +6003,10 @@
       "licenseDeclared": "NOASSERTION",
       "name": "python",
       "supplier": "NOASSERTION",
-      "versionInfo": "3.11.16"
+      "versionInfo": "3.12.3"
     },
     {
-      "SPDXID": "SPDXRef-mise-uv-0.12.8-b6298c4a0614",
+      "SPDXID": "SPDXRef-mise-uv-0.12.1-84c44c837fae",
       "copyrightText": "NOASSERTION",
       "downloadLocation": "NOASSERTION",
       "filesAnalyzed": false,
@@ -5265,7 +6014,7 @@
       "licenseDeclared": "NOASSERTION",
       "name": "uv",
       "supplier": "NOASSERTION",
-      "versionInfo": "0.12.8"
+      "versionInfo": "0.12.1"
     }
   ],
   "relationships": [
@@ -5273,6 +6022,11 @@
       "relatedSpdxElement": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908",
       "relationshipType": "DESCRIBES",
       "spdxElementId": "SPDXRef-DOCUMENT"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-hugging-face-accepted-model-saeeew-J-PACF-YOMI-tdt-3acdb87d8b12d264e7fa7afa4030078546b21ff7-345f6b652c8d",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
       "relatedSpdxElement": "SPDXRef-github-action-actions-cache-55cc8345863c7cc4c66a329aec7e433d2d1c52a9-f0d9255eb533",
@@ -5295,7 +6049,12 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-accelerate-1.14.0-b9c4d07808de",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-agent-detector-1.1.0-9dfe1009d8d9",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-aiodns-3.6.1-406db9ed855c",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5310,12 +6069,22 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-aiohttp-retry-2.9.1-9a3c4263ee18",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-aiosignal-1.4.0-aa865b5ad93d",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-alembic-1.19.1-1dbdc711453b",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-aistore-1.26.0-8128186d222c",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-annotated-doc-0.0.5-a9af630f187e",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5335,7 +6104,7 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-asttokens-3.0.2-5d650f53a3f7",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-argcomplete-3.7.2-a85db59310c2",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5350,7 +6119,47 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-backoff-2.2.1-65f4fb99a222",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-backports-zstd-1.7.0-0058b7ebf781",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-bcrypt-5.0.0-7943f1562948",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-borb-2.1.25-a6338b4a977c",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-boto3-1.43.85-e4de9de28aa4",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-botocore-1.43.85-20baa87878a0",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-braceexpand-0.1.7-dfb324cc7aa4",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-brotli-1.2.0-ea0e4628e7a6",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-brotlicffi-1.2.0.2-03fb2aa1f0be",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5385,12 +6194,12 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-colorlog-6.12.0-fc4212fbd77c",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-cryptography-49.0.0-da83ec350ef6",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-contourpy-1.3.3-08dbee4f9daa",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-cryptography-50.0.1-eac83bf65462",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5400,17 +6209,27 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-cuda-core-1.0.1-93d7f8f45143",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-cuda-pathfinder-1.8.0-c621457e991c",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-cuda-toolkit-13.0.3.0-ea475b7b28c6",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-cuda-python-13.3.1-81c926dce918",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-cycler-0.12.1-7b44b1957e59",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-cuda-toolkit-13.2.1-932e747d33ef",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-curlify-3.0.0-9a279883c7fb",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5430,12 +6249,17 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-detect-installer-0.1.0-64a9e87fbaed",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-dill-0.4.1-f4b0521fc610",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-editdistance-0.8.1-4a9b7cda03c6",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-dnspython-2.8.0-b605defd761f",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5445,12 +6269,27 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-executing-2.2.1-4b250440a097",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-email-validator-2.3.0-276e74ff7cd4",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-fiddle-0.3.0-13a58e3df6a9",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-fastapi-0.141.1-d6fee74a512f",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-fastapi-cli-0.0.32-f90a0b4b1b15",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-fastapi-cloud-cli-0.24.0-c40fa01b7fff",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-fastar-0.12.0-09cce9dceb6e",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5475,16 +6314,6 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-graphviz-0.21-115ab190fee4",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-greenlet-3.5.5-c61228859921",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-grpcio-1.83.1-dad541840b5b",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
@@ -5505,17 +6334,32 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-httptools-0.8.0-71cc968b45eb",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-httpx-0.28.1-2da3f63c6a7b",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-huggingface-hub-0.36.2-7e3c1c715421",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-huggingface-hub-1.28.0-0cef6dd7b9df",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-humanize-4.16.0-8c89c6b89e3b",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
       "relatedSpdxElement": "SPDXRef-pypi-asr-hydra-core-1.3.2-43217e87c852",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-hypothesis-6.165.10-3f1564f4c396",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5530,12 +6374,12 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-inflect-7.5.0-652facb467e5",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-iniconfig-2.3.0-f2bd445b4787",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-iniconfig-2.3.0-f2bd445b4787",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-inquirerpy-0.3.4-b28b2499cfe7",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5545,17 +6389,12 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-ipython-9.17.0-110386c0aaa1",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-invoke-3.0.3-c7732efb057f",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-ipython-pygments-lexers-1.1.1-d78a345b18de",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-jedi-0.20.0-713cd43670c6",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-itsdangerous-2.2.0-1ed5f269b4ec",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5565,7 +6404,12 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-jiwer-3.1.0-3a033052c98e",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-jiwer-4.0.0-16c5f1a69efe",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-jmespath-1.1.0-881ea7a89a4b",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5585,17 +6429,7 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-kaldi-python-io-1.2.2-930ce65f1c08",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-kaldialign-0.9.1-c9178e3b450f",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-kiwisolver-1.5.1-f2adeb68f739",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5606,11 +6440,6 @@
     },
     {
       "relatedSpdxElement": "SPDXRef-pypi-asr-lhotse-1.33.0-1ba68db80794",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-libcst-1.9.0-fb200cb9ba65",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5640,12 +6469,12 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-mako-1.4.1-004758dfcc06",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-markdown-3.10.3-edb0f485e846",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-markdown-3.10.3-edb0f485e846",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-markdown-it-py-4.2.0-a6e0de8c38ba",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5655,22 +6484,7 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-marshmallow-4.3.1-bccfb4388b7d",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-matplotlib-3.11.1-d708f2c4fcff",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-matplotlib-inline-0.2.2-6a76d5a1a9d0",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-mediapy-1.1.6-fb039d855d56",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-mdurl-0.1.2-b7e5c081902a",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5695,6 +6509,11 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-msgspec-0.21.1-3f127f280e93",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-multidict-6.7.1-452e0647c35c",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
@@ -5710,7 +6529,7 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-nemo-toolkit-2.7.3-2a133614ab63",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-nemo-toolkit-3.0.0-13fdd8f94586",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5725,12 +6544,12 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-numexpr-2.13.1-0c24473a5a53",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-numba-cuda-0.30.4-068dce1407bd",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-numpy-2.4.6-8b8e91f1cd75",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-numpy-2.3.2-3960ca3b3ccf",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5750,22 +6569,27 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cublas-13.1.1.3-a389484c7111",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cublas-13.4.0.1-144a1f7dd68c",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cuda-cupti-13.0.85-57d50d2a92c0",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cuda-cccl-13.2.75-85e0cef180ef",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cuda-nvrtc-13.0.88-d38caf9300e6",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cuda-cupti-13.2.75-49a0871c256a",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cuda-runtime-13.0.96-de5f27cc1fc5",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cuda-nvrtc-13.2.78-53dfadeb2688",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cuda-runtime-13.2.75-318b2543d556",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5775,27 +6599,27 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cufft-12.0.0.61-d16d7f418b00",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cufft-12.2.0.46-25fd02f70385",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cufile-1.15.1.6-a1cc9ea23d00",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cufile-1.17.1.22-bf0ba5b2cf1f",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-curand-10.4.0.35-24336fb297c2",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-curand-10.4.2.55-57b9f982f93c",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cusolver-12.0.4.66-586437672f0a",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cusolver-12.2.0.1-d4a25b74693b",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cusparse-12.6.3.3-463c2a081eb5",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-cusparse-12.7.10.1-7fdada01d8b3",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5820,7 +6644,12 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-nvtx-13.0.85-7cd9089fb6be",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-nvtx-13.2.75-f72de59bf5b7",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-nvidia-nvvm-13.2.78-431ec00abb9c",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5840,11 +6669,6 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-optuna-4.9.0-868eac83bcbf",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-overrides-7.7.0-b0256374a3eb",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
@@ -5855,7 +6679,7 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-pandas-3.0.5-12e02df7bc18",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-pandas-2.3.2-53fb1740c001",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5865,17 +6689,17 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-parso-0.8.7-373b2e85440e",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-paramiko-5.0.0-11605cf3b9a8",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-peft-0.20.0-eee1c3871ec5",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-pfzy-0.3.4-0f8da11eea9b",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-pexpect-4.9.0-da6526deb6aa",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-pillow-12.2.0-22d25c3ba83c",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5905,6 +6729,11 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-prettytable-3.18.0-a13fd6b445ac",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-prompt-toolkit-3.0.53-b805ee42be33",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
@@ -5925,27 +6754,7 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-ptyprocess-0.7.0-d47e38564272",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-pure-eval-0.2.3-907160462794",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-pyannote-core-6.0.1-5e7c77cfa5be",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-pyannote-database-6.1.1-c7e14665194d",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-pyannote-metrics-4.1-48c6aef8201e",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-py-cpuinfo-9.0.0-47b562f30a41",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5955,22 +6764,37 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-pycares-4.11.0-8250dc849115",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-pycparser-3.0-4d5360b99ffe",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-pydantic-2.13.5-22e07a7fba78",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-pycryptodome-3.23.0-96525be8afe1",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-pydantic-core-2.46.5-40966f4f1cd8",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-pydantic-2.11.7-9c42b5944105",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-pydub-0.25.1-34869540f922",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-pydantic-core-2.33.2-6165c58c6b45",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-pydantic-extra-types-2.11.1-bebe252cfbe9",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-pydantic-settings-2.15.0-dcd8acac4e26",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5980,12 +6804,12 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-pyloudnorm-0.2.0-93631db7440a",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-pynacl-1.6.2-afd93bb7ce7e",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-pyopenjtalk-0.4.1-958e7cf5dfd1",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-pyopenjtalk-plus-0.4.1.post9-088fc554aeff",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -5995,7 +6819,12 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-pytest-9.1.1-0ddfcee82255",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-pytest-8.4.2-44f7b48e64ce",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-python-barcode-0.16.1-1d81714d8197",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -6005,12 +6834,32 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-python-dotenv-1.2.3-a6376ea9d3c4",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-python-multipart-0.0.32-6784fbcf0586",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-pytorch-lightning-2.6.5-8fd85f860aa5",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-pyyaml-6.0.3-cda17518d172",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-pytz-2026.3.post1-b30e10a5dea7",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-pyyaml-6.0.2-0c99a80b5695",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-qrcode-8.2-7ffe96c762de",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -6035,7 +6884,17 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-resampy-0.4.3-72e1e12a6fb0",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-rich-15.0.0-b935fcf26d2e",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-rich-toolkit-0.20.3-357b5b74757b",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-rignore-0.8.1-f8f1a9a59612",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -6045,22 +6904,22 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-ruamel-yaml-0.19.1-de03eb3214df",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-ruff-0.12.11-856d92ad50ef",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-ruff-0.16.5-30647897bd87",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-runpod-1.12.0-0f92dc3c47f4",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-s3transfer-0.19.2-41accc37c061",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
       "relatedSpdxElement": "SPDXRef-pypi-asr-sacrebleu-2.6.0-7878e9cd38b7",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-sacremoses-0.2.0-792e89aed843",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -6090,12 +6949,22 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-setuptools-84.0.0-73165daf22f7",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-setuptools-81.0.0-56cf4f4b0822",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-shellingham-1.5.4-430f9a28c0b8",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
       "relatedSpdxElement": "SPDXRef-pypi-asr-six-1.17.0-c069269f89e7",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-smart-open-8.0.1-a8d42230c8ba",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -6110,27 +6979,27 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-sox-1.5.0-877e42599dc8",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-soxr-1.1.0-8d091f5b1510",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-sqlalchemy-2.0.52-092b6a77807f",
-      "relationshipType": "DEPENDS_ON",
-      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
-    },
-    {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-stack-data-0.6.3-92c098250c91",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-starlette-1.6.0-2ddb6957c7cc",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
       "relatedSpdxElement": "SPDXRef-pypi-asr-strenum-0.4.15-b29333cc01d9",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-sudachidict-core-20260723-30ce400da952",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-sudachipy-0.6.11-27283028d0c9",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -6141,6 +7010,11 @@
     },
     {
       "relatedSpdxElement": "SPDXRef-pypi-asr-tabulate-0.10.0-1a3d59ccfba6",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-tenacity-9.1.4-1ced6aeb3638",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -6170,7 +7044,7 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-tokenizers-0.22.2-3e810d114343",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-tokenizers-0.23.1-51cad7b1f7cd",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -6180,12 +7054,22 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-tomli-2.4.1-e9cc5ef38d05",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-tomlkit-0.15.1-8c5244911f54",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-toolz-1.1.0-1b08e2a1e58d",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-torch-2.13.0-ecf76f211a73",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-torch-2.12.0-cu132-8b588a639c6f",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -6200,22 +7084,22 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-traitlets-5.16.1-72a4f3e3a546",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-tqdm-loggable-0.4.1-7077104d8778",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-transformers-4.57.6-9b3db157b831",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-transformers-5.16.1-125cf4aaed90",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-triton-3.7.1-84a539650343",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-triton-3.7.0-e58c5fe4b3c5",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-typeguard-4.6.0-7ee16d1e2974",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-typer-0.27.2-82bddea986f7",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -6240,7 +7124,32 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-uvicorn-0.52.4-81765458ebcb",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-uvloop-0.22.1-22a83222f12b",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-vastai-1.5.6-f55d1721900d",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
       "relatedSpdxElement": "SPDXRef-pypi-asr-wandb-0.29.0-b0cbc039cc1e",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-watchdog-6.0.0-1be3232d93b3",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-watchfiles-1.2.0-41e4f6c20075",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -6255,12 +7164,12 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-werkzeug-3.1.8-d0944ae3f287",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-websockets-17.1-2b6caade0a1a",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-wget-3.2-3cf492b9a786",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-werkzeug-3.1.8-d0944ae3f287",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -6275,7 +7184,12 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-pypi-asr-xxhash-4.0.1-568dc5079b40",
+      "relatedSpdxElement": "SPDXRef-pypi-asr-xdg-6.0.0-2e166cc4b094",
+      "relationshipType": "DEPENDS_ON",
+      "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
+    },
+    {
+      "relatedSpdxElement": "SPDXRef-pypi-asr-xxhash-3.5.0-fff89841b6cb",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
@@ -6405,17 +7319,17 @@
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-oci-nvidia-pytorch-nvcr.io-nvidia-pytorch-sha256-ace9a848c0ae543317e3c4763b6b4248961c47902625abfe3c77a0fb931c50fb-acdb60585a82",
+      "relatedSpdxElement": "SPDXRef-oci-nvidia-pytorch-nvcr.io-nvidia-pytorch-sha256-2140e699b3beaf7f96a0081fd9c9406bc3832b435cdb60dfa2d261f7d2f34a1c-2fe74800a9b8",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-mise-python-3.11.16-f233e40c524b",
+      "relatedSpdxElement": "SPDXRef-mise-python-3.12.3-311858fae37a",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     },
     {
-      "relatedSpdxElement": "SPDXRef-mise-uv-0.12.8-b6298c4a0614",
+      "relatedSpdxElement": "SPDXRef-mise-uv-0.12.1-84c44c837fae",
       "relationshipType": "DEPENDS_ON",
       "spdxElementId": "SPDXRef-project-parakeet-context-fusion-0.1.0-5debb8ca5908"
     }
