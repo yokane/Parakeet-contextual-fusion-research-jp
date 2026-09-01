@@ -1,0 +1,58 @@
+name: vast-diagnose
+
+on:
+  push:
+    branches: [feat/portable-ghcr-gpu-runtime]
+    paths:
+      - .github/vast-diagnose.trigger
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+      TARGET_LABEL: jpacf-canonical-33567053241-1
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: true
+      - name: Materialize Vast CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mise run deps:sync-vast
+      - name: Inspect canonical instance and logs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${VAST_API_KEY:-}"
+          timeout 30s uv run --locked vastai show instances --api-key "$VAST_API_KEY" --raw > "$RUNNER_TEMP/instances.json"
+          instance_id="$(python - "$RUNNER_TEMP/instances.json" "$TARGET_LABEL" <<'PY'
+          import json, sys
+          from pathlib import Path
+          payload = json.loads(Path(sys.argv[1]).read_text())
+          rows = payload if isinstance(payload, list) else payload.get('instances', [])
+          matches = [row for row in rows if str(row.get('label') or '') == sys.argv[2]]
+          if not matches:
+              print('')
+              raise SystemExit(0)
+          row = matches[0]
+          safe = {k: row.get(k) for k in ('id','label','actual_status','intended_status','cur_state','status_msg','gpu_name','dph_total','start_date','image_uuid')}
+          print(json.dumps(safe, sort_keys=True), file=sys.stderr)
+          print(row['id'])
+          PY
+          )"
+          if [[ -z "$instance_id" ]]; then
+            echo "target instance not present"
+            exit 0
+          fi
+          echo "instance_id=$instance_id"
+          timeout 30s uv run --locked vastai show instance "$instance_id" --api-key "$VAST_API_KEY" --raw || true
+          timeout 30s uv run --locked vastai logs "$instance_id" --api-key "$VAST_API_KEY" --tail 500 || true
