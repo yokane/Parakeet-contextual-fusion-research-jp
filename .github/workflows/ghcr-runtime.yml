@@ -41,12 +41,19 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Configure self-hosted cache contract
+        id: cache
+        shell: bash
+        env:
+          ACTIONS_CACHE_SCOPE: ${{ env.CACHE_SCOPE }}
+        run: bash scripts/ci/setup_actions_cache.sh
+
       - name: Install repository toolchain from mise.lock
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           version: 2026.8.16
           install: true
-          cache: true
+          cache: ${{ steps.cache.outputs.persistent != 'true' }}
 
       - name: Verify host research platform
         run: mise run platform:verify
@@ -93,9 +100,21 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.vendor=J-PACF-YOMI-TDT research
-          cache-from: type=gha,scope=${{ env.CACHE_SCOPE }}
-          cache-to: type=gha,scope=${{ env.CACHE_SCOPE }},mode=max
+          cache-from: ${{ env.BUILDKIT_CACHE_FROM }}
+          cache-to: ${{ env.BUILDKIT_CACHE_TO }}
           build-args: BASE_IMAGE=${{ steps.base.outputs.reference }}
+
+      - name: Commit persistent BuildKit cache generation
+        if: ${{ env.SELF_CACHE_PERSISTENT == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d "${BUILDKIT_CACHE_DIR}-next" || {
+            echo "BuildKit did not produce the expected local cache export" >&2
+            exit 2
+          }
+          rm -rf "${BUILDKIT_CACHE_DIR}"
+          mv "${BUILDKIT_CACHE_DIR}-next" "${BUILDKIT_CACHE_DIR}"
 
       - name: Verify built image on CUDA13 GPU
         shell: bash
