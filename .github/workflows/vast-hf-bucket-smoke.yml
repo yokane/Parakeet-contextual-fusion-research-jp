@@ -20,6 +20,7 @@ env:
   HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
   STORAGE_GB: "50"
   GPU_RAM_GB: "24"
+  GPU_ALLOWLIST: RTX_4090,RTX_3090
   PREDICTED_MINUTES: "20"
   MAX_COST_USD: "0.50"
   OFFER_LIMIT: "50"
@@ -67,12 +68,13 @@ jobs:
               raise SystemExit("MAX_COST_USD must be > 0 and <= 0.50")
           PY
 
-      - name: Build CUDA13 24GB Vast offer query
+      - name: Build modern 24GB Vast offer query
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p dist/providers dist/vast-smoke
           uv run --locked python scripts/providers/vast/build_search_query.py \
+            --gpu-name "$GPU_ALLOWLIST" \
             --num-gpus "1" \
             --gpu-ram ">=${GPU_RAM_GB}" \
             --output-json dist/providers/vast-search-query.json \
@@ -109,7 +111,7 @@ jobs:
           inventory = json.loads(Path("dist/providers/vast-inventory.json").read_text())
           offers = inventory.get("offers", [])
           if not offers:
-              raise SystemExit("No Vast offer satisfies CUDA13/24GB/storage/budget policy")
+              raise SystemExit("No RTX 4090/3090 Vast offer satisfies storage/budget policy")
           selected = offers[0]
           Path("dist/providers/vast-selected-offer.json").write_text(
               json.dumps(selected, indent=2, sort_keys=True) + "\n",
@@ -123,67 +125,12 @@ jobs:
           PY
           cat /tmp/vast-selected.env >> "$GITHUB_ENV"
 
-      - name: Create short-lived Vast GPU instance
-        id: create
+      - name: Build the Vast onstart payload
         shell: bash
         run: |
           set -euo pipefail
-          create_response="$(
-            uv run --locked vastai create instance "$VAST_OFFER_ID" \
-              --api-key "$VAST_API_KEY" \
-              --raw \
-              --image "$RUNTIME_IMAGE" \
-              --disk "$STORAGE_GB" \
-              --label "$VAST_LABEL" \
-              --login "-u ${GITHUB_ACTOR} -p ${GHCR_TOKEN} ghcr.io" \
-              --env "-e HF_TOKEN=${HF_TOKEN} -e HF_BUCKET=${HF_BUCKET} -e SMOKE_RUN_KEY=${SMOKE_RUN_KEY} -e EXPECTED_IMAGE=${RUNTIME_IMAGE}" \
-              --ssh \
-              --direct \
-              --cancel-unavail
-          )"
-          printf '%s\n' "$create_response" > dist/vast-smoke/create-response.json
-          instance_id="$(python - <<'PY'
-          import json
-          from pathlib import Path
-          payload = json.loads(Path("dist/vast-smoke/create-response.json").read_text())
-          value = payload.get("new_contract")
-          if value is None:
-              raise SystemExit("Vast create response did not contain new_contract")
-          print(int(value))
-          PY
-          )"
-          printf '%s\n' "$instance_id" > "$RUNNER_TEMP/vast-instance-id"
-          echo "VAST_INSTANCE_ID=$instance_id" >> "$GITHUB_ENV"
-          echo "Created Vast instance ${instance_id} from offer ${VAST_OFFER_ID}."
-
-      - name: Wait until GPU command execution is available
-        shell: bash
-        run: |
-          set -euo pipefail
-          ready=0
-          for attempt in $(seq 1 72); do
-            if timeout 10s uv run --locked vastai execute "$VAST_INSTANCE_ID" \
-              "nvidia-smi -L" \
-              --api-key "$VAST_API_KEY" \
-              > dist/vast-smoke/readiness.txt 2> dist/vast-smoke/readiness.err; then
-              ready=1
-              break
-            fi
-            echo "Vast instance not executable yet (attempt ${attempt}/72)."
-            sleep 10
-          done
-          if [[ "$ready" != 1 ]]; then
-            echo "Vast instance did not become executable in the bounded readiness window." >&2
-            tail -100 dist/vast-smoke/readiness.err >&2 || true
-            exit 1
-          fi
-          cat dist/vast-smoke/readiness.txt
-
-      - name: Generate GPU evidence inside Vast and upload to HF Bucket
-        shell: bash
-        run: |
-          set -euo pipefail
-          remote_script_b64="$(base64 -w0 <<'REMOTE'
+          cat > "$RUNNER_TEMP/vast-smoke-remote.sh" <<'REMOTE'
+          #!/usr/bin/env bash
           set -euo pipefail
           export JPA_CF_CONTAINER_RUNTIME=1
           work=/workspace/state/artifacts/vast-hf-smoke
@@ -219,7 +166,8 @@ jobs:
               "schema_version": 1,
               "provider": "vast",
               "run_key": os.environ["SMOKE_RUN_KEY"],
-              "vast_instance_id": int(os.environ["VAST_INSTANCE_ID"]),
+              "vast_label": os.environ["VAST_LABEL"],
+              "offer_id": int(os.environ["VAST_OFFER_ID"]),
               "expected_image": os.environ["EXPECTED_IMAGE"],
               "hostname": socket.gethostname(),
               "platform": platform.platform(),
@@ -246,14 +194,69 @@ jobs:
             "hf://buckets/${HF_BUCKET}/runs/${SMOKE_RUN_KEY}/vast-smoke" \
             --token "$HF_TOKEN"
           REMOTE
-          )"
+          remote_script_b64="$(base64 -w0 "$RUNNER_TEMP/vast-smoke-remote.sh")"
+          echo "REMOTE_SCRIPT_B64=$remote_script_b64" >> "$GITHUB_ENV"
 
-          remote_command="export VAST_INSTANCE_ID=${VAST_INSTANCE_ID}; printf '%s' '${remote_script_b64}' | base64 -d > /tmp/jpacf-vast-hf-smoke.sh && bash /tmp/jpacf-vast-hf-smoke.sh"
-          timeout 600s uv run --locked vastai execute "$VAST_INSTANCE_ID" \
-            "$remote_command" \
-            --api-key "$VAST_API_KEY" \
-            > dist/vast-smoke/execute-output.txt
-          cat dist/vast-smoke/execute-output.txt
+      - name: Create short-lived Vast GPU instance with onstart smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          create_response="$(
+            uv run --locked vastai create instance "$VAST_OFFER_ID" \
+              --api-key "$VAST_API_KEY" \
+              --raw \
+              --image "$RUNTIME_IMAGE" \
+              --disk "$STORAGE_GB" \
+              --label "$VAST_LABEL" \
+              --login "-u ${GITHUB_ACTOR} -p ${GHCR_TOKEN} ghcr.io" \
+              --env "-e HF_TOKEN=${HF_TOKEN} -e HF_BUCKET=${HF_BUCKET} -e SMOKE_RUN_KEY=${SMOKE_RUN_KEY} -e VAST_LABEL=${VAST_LABEL} -e VAST_OFFER_ID=${VAST_OFFER_ID} -e EXPECTED_IMAGE=${RUNTIME_IMAGE} -e REMOTE_SCRIPT_B64=${REMOTE_SCRIPT_B64}" \
+              --ssh \
+              --direct \
+              --onstart-cmd 'printf "%s" "$REMOTE_SCRIPT_B64" | base64 -d >/tmp/jpacf-vast-hf-smoke.sh && chmod 700 /tmp/jpacf-vast-hf-smoke.sh && /tmp/jpacf-vast-hf-smoke.sh' \
+              --cancel-unavail
+          )"
+          printf '%s\n' "$create_response" > dist/vast-smoke/create-response.json
+          instance_id="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          payload = json.loads(Path("dist/vast-smoke/create-response.json").read_text())
+          value = payload.get("new_contract")
+          if value is None:
+              raise SystemExit("Vast create response did not contain new_contract")
+          print(int(value))
+          PY
+          )"
+          printf '%s\n' "$instance_id" > "$RUNNER_TEMP/vast-instance-id"
+          echo "VAST_INSTANCE_ID=$instance_id" >> "$GITHUB_ENV"
+          echo "Created Vast instance ${instance_id} from offer ${VAST_OFFER_ID}."
+
+      - name: Poll HF Bucket for Vast-created success marker
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote="hf://buckets/${HF_BUCKET}/runs/${SMOKE_RUN_KEY}/vast-smoke"
+          local_dir="dist/vast-smoke/from-hf"
+          source scripts/hf/hf-identity.sh
+          found=0
+          for attempt in $(seq 1 60); do
+            rm -rf "$local_dir"
+            mkdir -p "$local_dir"
+            hf_bucket_cli buckets sync "$remote" "$local_dir" --token "$HF_TOKEN" \
+              > dist/vast-smoke/hf-poll.txt 2>&1 || true
+            if [[ -s "$local_dir/result.json" && -s "$local_dir/_SUCCESS" ]] \
+              && grep -Fxq "$SMOKE_RUN_KEY" "$local_dir/_SUCCESS"; then
+              found=1
+              echo "HF Bucket evidence appeared on attempt ${attempt}."
+              break
+            fi
+            echo "Waiting for Vast onstart artifact (${attempt}/60)."
+            sleep 10
+          done
+          if [[ "$found" != 1 ]]; then
+            echo "Vast did not publish the expected HF Bucket evidence within 10 minutes." >&2
+            cat dist/vast-smoke/hf-poll.txt >&2 || true
+            exit 1
+          fi
 
       - name: Verify the Vast-created artifact from GitHub runner
         shell: bash
@@ -261,13 +264,6 @@ jobs:
           set -euo pipefail
           remote="hf://buckets/${HF_BUCKET}/runs/${SMOKE_RUN_KEY}/vast-smoke"
           local_dir="dist/vast-smoke/from-hf"
-          mkdir -p "$local_dir"
-          source scripts/hf/hf-identity.sh
-          hf_bucket_cli buckets sync "$remote" "$local_dir" --token "$HF_TOKEN"
-          test -s "$local_dir/result.json"
-          test -s "$local_dir/_SUCCESS"
-          grep -Fx "$SMOKE_RUN_KEY" "$local_dir/_SUCCESS"
-
           python - <<'PY'
           import json
           import os
@@ -275,7 +271,8 @@ jobs:
           result = json.loads(Path("dist/vast-smoke/from-hf/result.json").read_text())
           assert result["provider"] == "vast"
           assert result["run_key"] == os.environ["SMOKE_RUN_KEY"]
-          assert result["vast_instance_id"] == int(os.environ["VAST_INSTANCE_ID"])
+          assert result["vast_label"] == os.environ["VAST_LABEL"]
+          assert result["offer_id"] == int(os.environ["VAST_OFFER_ID"])
           assert result["expected_image"] == os.environ["RUNTIME_IMAGE"]
           assert result["cuda_available"] is True
           assert result["cuda_device_count"] >= 1
@@ -294,6 +291,19 @@ jobs:
             echo "- evidence: \`${remote}\`"
             echo "- result: verified from a second client (GitHub runner)"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Capture Vast logs on failure
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          set +e
+          if [[ -s "$RUNNER_TEMP/vast-instance-id" ]]; then
+            id="$(cat "$RUNNER_TEMP/vast-instance-id")"
+            uv run --locked vastai logs "$id" \
+              --api-key "$VAST_API_KEY" \
+              --tail 200 \
+              > dist/vast-smoke/vast-container.log 2>&1 || true
+          fi
 
       - name: Destroy Vast instance and recover any same-label leftovers
         if: ${{ always() }}
@@ -336,9 +346,9 @@ jobs:
             dist/providers/vast-inventory.json
             dist/providers/vast-inventory.md
             dist/providers/vast-selected-offer.json
-            dist/vast-smoke/readiness.txt
-            dist/vast-smoke/readiness.err
-            dist/vast-smoke/execute-output.txt
+            dist/vast-smoke/create-response.json
+            dist/vast-smoke/hf-poll.txt
+            dist/vast-smoke/vast-container.log
             dist/vast-smoke/from-hf/
           if-no-files-found: warn
           retention-days: 30
