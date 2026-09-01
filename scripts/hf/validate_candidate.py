@@ -5,7 +5,14 @@ import argparse
 import json
 from pathlib import Path
 
-from prepare_candidate import BASE_MODEL, MODEL_FAMILY, MODEL_ID, load_release_manifest, sha256
+from prepare_candidate import (
+    BASE_MODEL,
+    MODEL_FAMILY,
+    MODEL_ID,
+    load_release_manifest,
+    reject_unexpected_candidate_files,
+    sha256,
+)
 
 
 def validate_candidate(candidate_dir: Path) -> dict[str, object]:
@@ -24,6 +31,7 @@ def validate_candidate(candidate_dir: Path) -> dict[str, object]:
         raise ValueError(f"unexpected base_model: {metadata.get('base_model')!r}")
 
     manifest = load_release_manifest(candidate_dir)
+    reject_unexpected_candidate_files(candidate_dir, manifest)
     manifest_hash = sha256(candidate_dir / "release_manifest.json")
     if metadata.get("release_manifest_sha256") != manifest_hash:
         raise ValueError("metadata.json does not match release_manifest.json SHA-256")
