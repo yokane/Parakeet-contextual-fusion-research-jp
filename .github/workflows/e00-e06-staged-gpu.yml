@@ -23,6 +23,9 @@ on:
         required: true
         default: "staged"
         type: string
+  push:
+    branches:
+      - run/e00-e06-selfhosted-20260901
 
 permissions:
   contents: read
@@ -39,13 +42,15 @@ jobs:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
       EVAL_DIR: data/generated/eval
-      RESULTS_DIR: results/${{ inputs.results_name }}
-      RUN_E05: ${{ inputs.run_e05 == 'never' && '0' || inputs.run_e05 }}
-      RUN_E06: ${{ inputs.run_e06 && '1' || '0' }}
-      E06_DRIVER: ${{ inputs.e06_driver }}
+      RESULTS_DIR: results/${{ github.event_name == 'push' && 'selfhosted-first' || inputs.results_name }}
+      RUN_E05: ${{ github.event_name == 'push' && 'auto' || (inputs.run_e05 == 'never' && '0' || inputs.run_e05) }}
+      RUN_E06: ${{ github.event_name == 'push' && '0' || (inputs.run_e06 && '1' || '0') }}
+      E06_DRIVER: ${{ github.event_name == 'push' && '' || inputs.e06_driver }}
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: false
 
       - name: Configure persistent self-hosted caches
         id: cache
@@ -98,7 +103,7 @@ jobs:
         if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: e00-e06-${{ inputs.results_name }}-${{ github.sha }}
+          name: e00-e06-${{ github.event_name == 'push' && 'selfhosted-first' || inputs.results_name }}-${{ github.sha }}
           path: |
             data/generated/eval/eval_provenance.json
             data/generated/eval/audio_coverage.json
