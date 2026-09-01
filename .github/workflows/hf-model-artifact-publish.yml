@@ -142,8 +142,8 @@ jobs:
           set -euo pipefail
           remote_path="runs/${{ inputs.source_run_id }}/promotion.json"
           existing="$(hf buckets list "${HF_BUCKET}/runs/${{ inputs.source_run_id }}" -R -q --token "${HF_TOKEN}" || true)"
-          if printf '%s\n' "${existing}" | grep -Fxq "${remote_path}"; then
-            echo "promotion record already exists: ${remote_path}" >&2
+          if printf '%s\n' "${existing}" | grep -Eq '(^|/)promotion\.json$'; then
+            echo "promotion record already exists under runs/${{ inputs.source_run_id }}" >&2
             exit 2
           fi
           hf buckets cp \
