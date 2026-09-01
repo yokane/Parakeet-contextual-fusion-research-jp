@@ -1,0 +1,100 @@
+name: HF Central Sequence Allocator
+run-name: HF allocate ${{ inputs.request_id }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      request_id:
+        description: "Globally unique request identifier supplied by the caller"
+        required: true
+        type: string
+      hf_bucket:
+        description: "Hugging Face Bucket in namespace/bucket format"
+        required: true
+        default: "saeeew/J-PACF-YOMI-tdt-bucket"
+        type: string
+      collection:
+        description: "Sequence collection"
+        required: true
+        type: choice
+        options: [candidates, experiments, config]
+      metadata_json:
+        description: "Optional allocation provenance JSON"
+        required: false
+        default: "{}"
+        type: string
+
+permissions:
+  contents: read
+
+# Global lock is intentional. Input normalization occurs inside the job, so a
+# bucket-dependent expression here could allow equivalent spellings to race.
+concurrency:
+  group: hf-central-sequence
+  cancel-in-progress: false
+
+jobs:
+  allocate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_BUCKET: ${{ inputs.hf_bucket }}
+      HF_ALLOCATOR_INTERNAL: "1"
+      HF_ALLOCATION_METADATA_JSON: ${{ inputs.metadata_json }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install Bucket-capable HF CLI
+        run: python -m pip install 'huggingface-hub>=1.9,<2'
+
+      - name: Allocate sequence
+        id: allocate
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || { echo "HF_TOKEN is missing" >&2; exit 2; }
+          ID="$(bash scripts/hf/hf-allocate-id.sh "${{ inputs.collection }}")"
+          echo "id=${ID}" >> "${GITHUB_OUTPUT}"
+
+      - name: Write allocation response
+        shell: bash
+        env:
+          ALLOCATION_ID: ${{ steps.allocate.outputs.id }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          Path("allocation.json").write_text(
+              json.dumps(
+                  {
+                      "schema_version": 1,
+                      "request_id": "${{ inputs.request_id }}",
+                      "allocation_id": os.environ["ALLOCATION_ID"],
+                      "bucket": os.environ["HF_BUCKET"],
+                      "collection": "${{ inputs.collection }}",
+                  },
+                  ensure_ascii=False,
+                  indent=2,
+                  sort_keys=True,
+              )
+              + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Publish allocation response
+        uses: actions/upload-artifact@v7
+        with:
+          name: hf-allocation-${{ inputs.request_id }}
+          path: allocation.json
+          retention-days: 1
+          if-no-files-found: error
