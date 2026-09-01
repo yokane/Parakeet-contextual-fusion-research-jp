@@ -63,8 +63,8 @@ jobs:
           install: true
           cache: true
 
-      - name: Materialize locked provider environment
-        run: mise run deps:sync-research
+      - name: Materialize locked RunPod provider environment
+        run: mise run deps:sync-runpod
 
       - name: Guard mutating request
         if: ${{ inputs.submit }}
