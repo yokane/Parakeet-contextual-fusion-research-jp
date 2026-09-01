@@ -4,10 +4,6 @@ language:
 license: cc-by-4.0
 library_name: nemo
 pipeline_tag: automatic-speech-recognition
-base_model:
-  - nvidia/parakeet-tdt_ctc-0.6b-ja
-datasets:
-  - saeeew/JP-HomophoneBench
 tags:
   - japanese
   - asr
@@ -21,6 +17,7 @@ tags:
   - proper-noun
   - jpacf
   - yomi
+  - jp-homophone-bench
 ---
 
 # J-PACF-YOMI-TDT
@@ -31,7 +28,9 @@ tags:
 - **YOMI**: pronunciation/reading-aware contextual disambiguation for Japanese
 - **TDT**: Token-and-Duration Transducer decoding based on `nvidia/parakeet-tdt_ctc-0.6b-ja`
 
-> **Current status:** research scaffold. A standalone fine-tuned `.nemo` checkpoint is **not published yet**. The current project evaluates a frozen Parakeet acoustic model with external/fusion scorers first, and only trains the lightweight phoneme head in E05. This Hub repository is therefore the canonical place for model cards, fusion contracts, scorer artifacts, validated checkpoints, and release manifests as the experiments mature.
+> **Current status: research scaffold.** A standalone fine-tuned `.nemo` checkpoint is **not published yet**. The current project evaluates a frozen Parakeet acoustic model with external/fusion scorers first, and only trains the lightweight phoneme head in E05. This Hub repository is the canonical distribution point for the model card, fusion contract, scorer artifacts, validated checkpoints, metrics, and release manifests as the experiments mature.
+
+The Hub YAML intentionally does **not** declare `base_model` or `datasets` yet. Hugging Face uses `base_model` for a derived-model relationship such as fine-tune/adapter/quantized/merge, while `datasets` conventionally describes datasets used to train a model. At the current scaffold stage, Parakeet is a frozen runtime dependency and JP-HomophoneBench is primarily an evaluation benchmark. These relationships are recorded explicitly below and in `research_manifest.json` without claiming a fine-tune that has not happened.
 
 ## Research goal
 
@@ -105,7 +104,17 @@ The expensive local acoustic/phoneme/context scorers are intended to be gated by
 
 Current NeMo `malsd_batch` decoding uses GPU Phrase Boosting keys under `rnnt_decoding.malsd.boosting_tree.*`, while NGPU-LM configuration remains under `rnnt_decoding.beam.*`.
 
-## Benchmark
+## Runtime base model
+
+The current frozen acoustic/runtime base is:
+
+- `nvidia/parakeet-tdt_ctc-0.6b-ja`
+- NeMo Hybrid FastConformer TDT + CTC
+- license: CC-BY-4.0
+
+When this project publishes a genuinely derived `.nemo` model, the Hub card will add an appropriate `base_model` / `base_model_relation` field for that release. Until then, the relationship is intentionally documented as a runtime dependency rather than a fine-tune.
+
+## Evaluation benchmark
 
 The primary benchmark is [`saeeew/JP-HomophoneBench`](https://huggingface.co/datasets/saeeew/JP-HomophoneBench).
 
@@ -125,28 +134,49 @@ Two configs are intentionally separated:
 - `homophone8`: public configuration excluding explicit NonCommercial source rows;
 - `homophone8-research`: larger mixed-license research configuration. Check row-level source licenses before reuse.
 
+The benchmark is currently used for evaluation/stress testing. Do not interpret its presence here as a statement that the current acoustic model was trained on it.
+
 ## TurboBias / GPU-PB saturation analysis
 
 The repository includes an explicit diminishing-return test for phrase boosting. Adjacent bias-strength settings are compared with paired bootstrap confidence intervals and exact McNemar tests. The default rule flags saturation when entity benefit has plateaued while contextual false-positive risk rises significantly.
 
 This is used to decide whether stronger phrase boosting is enough, or whether the next experiment should add phoneme/acoustic/entity-context discrimination.
 
-## Planned artifact layout
+## Artifact model
+
+J-PACF uses two release modes.
+
+### Scorer/config release
+
+Preferred while the NVIDIA acoustic backbone remains frozen:
 
 ```text
-README.md
-fusion_config.yaml
-research_manifest.json
-artifacts/
-  <release>/
-    J-PACF-YOMI-TDT.nemo        # only after a validated model artifact exists
-    phone_head.pt               # optional E05 scorer
-    metrics.json
-    saturation.json
-    release_manifest.json
+artifacts/<release>/
+├── fusion_config.yaml
+├── research_manifest.json
+├── phone_head.pt          # optional E05 artifact
+├── metrics.json           # optional
+├── saturation.json        # optional
+├── environment.json       # optional
+├── RELEASE_NOTES.md       # optional
+└── release_manifest.json  # size + SHA-256 + Git provenance
 ```
 
-Until a validated checkpoint is published, **do not interpret this Hub repository as a drop-in replacement for the NVIDIA base model**.
+This avoids copying a ~0.6B base checkpoint when the research contribution is an external scorer/configuration.
+
+### Standalone checkpoint release
+
+Only after a validated ASR model artifact exists:
+
+```text
+artifacts/<release>/
+├── J-PACF-YOMI-TDT.nemo
+└── ...same reproducibility metadata...
+```
+
+Before publication, the GitHub workflow restores any supplied `.nemo` file with `nemo.collections.asr.models.ASRModel.restore_from(..., map_location="cpu")`. A release is therefore not treated as a checkpoint merely because a file has the `.nemo` suffix.
+
+Until such a validated checkpoint is published, **do not interpret this Hub repository as a drop-in replacement for the NVIDIA base model**.
 
 ## Reproducibility
 
@@ -154,21 +184,23 @@ Source code and workflows are maintained at:
 
 - `https://github.com/yokane/Parakeet-contextual-fusion-research-jp`
 
-Base acoustic model:
+Runtime acoustic model:
 
 - `nvidia/parakeet-tdt_ctc-0.6b-ja`
 
-Benchmark:
+Evaluation benchmark:
 
 - `saeeew/JP-HomophoneBench`
 
-The GitHub repository records the exact experiment stage, benchmark config/split, Git SHA, NeMo/PyTorch/CUDA environment, and category-aware metrics for GPU runs.
+The GitHub repository records the exact experiment stage, benchmark config/split, Git SHA, NeMo/PyTorch/CUDA environment, category-aware metrics, and release-file SHA-256 values.
 
 ## Licensing
 
 The **research source code** in the GitHub repository is Apache-2.0.
 
 The NVIDIA base model `nvidia/parakeet-tdt_ctc-0.6b-ja` is distributed under **CC-BY-4.0**. Model artifacts in this Hub repository that derive from or package that model are therefore documented under **CC-BY-4.0**, with attribution to the NVIDIA base model. Dataset rows retain their own source-level licensing/provenance in `JP-HomophoneBench`.
+
+Scorer-only artifacts that do not contain NVIDIA weights are still distributed under the repository-level model-card license unless a future release explicitly documents a narrower per-artifact license.
 
 ## Citation
 
