@@ -1,0 +1,100 @@
+name: e00-e06-staged-gpu
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_e05:
+        description: "E05 policy after the E04 evidence gate"
+        required: true
+        default: "auto"
+        type: choice
+        options: [auto, never, force]
+      run_e06:
+        description: "Run version-specific E06 after E05"
+        required: true
+        default: false
+        type: boolean
+      e06_driver:
+        description: "Repository-relative NeMo-3.0.0 E06 driver path; required only when run_e06=true"
+        required: false
+        type: string
+      results_name:
+        description: "Result directory suffix"
+        required: true
+        default: "staged"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e00-e06-staged-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  research:
+    runs-on: [self-hosted, linux, x64, cuda13]
+    timeout-minutes: 360
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
+      EVAL_DIR: data/generated/eval
+      RESULTS_DIR: results/${{ inputs.results_name }}
+      RUN_E05: ${{ inputs.run_e05 == 'never' && '0' || inputs.run_e05 }}
+      RUN_E06: ${{ inputs.run_e06 && '1' || '0' }}
+      E06_DRIVER: ${{ inputs.e06_driver }}
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Configure persistent self-hosted caches
+        id: cache
+        shell: bash
+        run: bash scripts/ci/setup_actions_cache.sh
+
+      - name: Install exact mise toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: ${{ steps.cache.outputs.persistent != 'true' }}
+
+      - name: Validate runner and prepare E00-E04 prerequisites
+        shell: bash
+        run: bash scripts/research/prepare_e00_e04.sh
+
+      - name: Run staged E00-E06 experiment ladder
+        shell: bash
+        run: bash experiments/run_staged_e00_e06.sh
+
+      - name: Persist immutable evidence to HF Bucket
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d "${RESULTS_DIR}" || exit 0
+          run_id="gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-e00-e06"
+          run_dir="dist/hf-runs/${run_id}"
+          uv run --locked python scripts/hf/build_run_bundle.py \
+            --results-dir "${RESULTS_DIR}" \
+            --output-dir "${run_dir}" \
+            --run-id "${run_id}" \
+            --workflow-kind e00-e06-staged \
+            --benchmark-index "${EVAL_DIR}/bench_index.jsonl" \
+            --execution-manifest "${EVAL_DIR}/nemo_eval.jsonl"
+          bash scripts/hf/hf-push-run.sh "${run_dir}"
+          echo "HF Bucket run: hf://buckets/${HF_BUCKET}/runs/${run_id}" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload short-lived GitHub artifact
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e00-e06-${{ inputs.results_name }}-${{ github.sha }}
+          path: |
+            data/generated/eval/eval_provenance.json
+            data/generated/eval/audio_coverage.json
+            data/generated/eval/bench_index.jsonl
+            data/generated/eval/nemo_eval.jsonl
+            ${{ env.RESULTS_DIR }}
+          if-no-files-found: warn
+          retention-days: 30
