@@ -29,4 +29,4 @@ for name in \
   BEAM_SIZE LM_ALPHA PB_ALPHA CTC_ALPHA PHONE_ALPHA BATCH_SIZE; do
   [[ -n "${!name:-}" ]] && args+=( -e "$name" )
 done
-exec docker "${args[@]}" "$IMAGE" /opt/jpacf/scripts/container/inside.sh "$@"
+exec docker "${args[@]}" "$IMAGE" bash /opt/jpacf/scripts/container/inside.sh "$@"
