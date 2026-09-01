@@ -64,10 +64,11 @@ def stable_prompt_candidates(
 def context_from_row(row: dict[str, Any], field: str | None) -> str | None:
     if not field:
         return None
-    if field in _FORBIDDEN_CONTEXT_FIELDS:
+    parts = field.split(".")
+    if any(part.lower() in _FORBIDDEN_CONTEXT_FIELDS for part in parts):
         raise ValueError(f"context field {field!r} is forbidden because it can leak the benchmark reference")
     value: Any = row
-    for part in field.split("."):
+    for part in parts:
         if not isinstance(value, dict) or part not in value:
             return None
         value = value[part]
