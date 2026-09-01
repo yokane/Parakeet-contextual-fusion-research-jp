@@ -2,6 +2,10 @@ category	target_surface	target_reading	candidate_surface	candidate_reading	notes
 near_homophone	カビ	かび	カミ	かみ	one-consonant near pair
 near_homophone	サラ	さら	ソラ	そら	one-vowel near pair
 near_homophone	ナニ	なに	ナミ	なみ	one-consonant near pair
+near_homophone	カサ	かさ	カタ	かた	one-consonant near pair
+near_homophone	ハナ	はな	ハマ	はま	one-consonant near pair
+near_homophone	コメ	こめ	コネ	こね	one-consonant near pair
+near_homophone	サケ	さけ	サテ	さて	one-consonant near pair
 voicing	カク	かく	ガク	がく	k-g voicing pair
 voicing	サカ	さか	ザカ	ざか	s-z voicing pair
 voicing	タコ	たこ	ダコ	だこ	t-d voicing pair
