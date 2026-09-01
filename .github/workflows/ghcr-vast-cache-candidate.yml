@@ -57,7 +57,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
         with:
           driver: docker-container
 
@@ -72,7 +72,7 @@ jobs:
 
       - name: Build and push cache candidate
         id: build
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
         with:
           context: .
           file: Dockerfile.vast-cache
@@ -92,13 +92,12 @@ jobs:
         run: |
           set -euo pipefail
           image="${REGISTRY}/${IMAGE_NAME}@${{ steps.build.outputs.digest }}"
+          mkdir -p "${RUNNER_TEMP}/jpacf-vast-cache-state"
           docker pull "$image"
           docker run --rm --gpus all \
             -e JPA_CF_STATE_ROOT=/workspace/state \
             -v "${RUNNER_TEMP}/jpacf-vast-cache-state:/workspace/state" \
-            "$image" \
-            bash /opt/jpacf/scripts/container/inside.sh \
-              python /opt/jpacf/scripts/container/verify_runtime.py --require-gpu
+            "$image"
 
       - name: Record candidate identity
         shell: bash
@@ -108,11 +107,13 @@ jobs:
           image="${REGISTRY}/${IMAGE_NAME}@${{ steps.build.outputs.digest }}"
           cat > dist/runtime/vast-cache-candidate.json <<JSON
           {
-            "schema_version": 1,
+            "schema_version": 2,
             "source_git_sha": "${GITHUB_SHA}",
             "image": "${image}",
             "digest": "${{ steps.build.outputs.digest }}",
-            "base_image": "${{ steps.base.outputs.reference }}"
+            "base_image": "${{ steps.base.outputs.reference }}",
+            "gpu_verified": true,
+            "execution_contract": "repo-owned-entrypoint"
           }
           JSON
           cat dist/runtime/vast-cache-candidate.json
