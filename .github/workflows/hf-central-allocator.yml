@@ -35,7 +35,7 @@ concurrency:
 
 jobs:
   allocate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -43,16 +43,34 @@ jobs:
       HF_ALLOCATOR_INTERNAL: "1"
       HF_ALLOCATION_METADATA_JSON: ${{ inputs.metadata_json }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: actions/setup-python@v7
+      - name: Configure cache contract
+        id: cache
+        shell: bash
+        run: bash scripts/ci/setup_actions_cache.sh
+
+      - name: Install repository toolchain from mise.lock
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          python-version: "3.11"
-          cache: pip
-          cache-dependency-path: pyproject.toml
+          version: 2026.8.16
+          install: true
+          cache: ${{ steps.cache.outputs.persistent != 'true' }}
 
-      - name: Install Bucket-capable HF CLI
-        run: python -m pip install 'huggingface-hub>=1.9,<2'
+      - name: Restore uv and HF caches
+        if: ${{ steps.cache.outputs.persistent != 'true' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ env.UV_CACHE_DIR }}
+            ${{ env.HF_HUB_CACHE }}
+            ${{ env.HF_XET_CACHE }}
+          key: hf-central-allocator-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('uv.lock', 'tools/hf-bucket/uv.lock') }}
+
+      - name: Materialize locked Bucket environment
+        run: |
+          mise run deps:sync
+          mise run hf:transport:sync
 
       - name: Allocate sequence
         id: allocate
@@ -68,7 +86,7 @@ jobs:
         env:
           ALLOCATION_ID: ${{ steps.allocate.outputs.id }}
         run: |
-          python - <<'PY'
+          uv run --locked python - <<'PY'
           import json
           import os
           from pathlib import Path
@@ -92,7 +110,7 @@ jobs:
           PY
 
       - name: Publish allocation response
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: hf-allocation-${{ inputs.request_id }}
           path: allocation.json
