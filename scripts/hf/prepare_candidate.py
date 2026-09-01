@@ -89,11 +89,33 @@ def prepare_candidate(release_dir: Path, output_dir: Path) -> dict[str, Any]:
         json.dumps(metadata, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+    (output_dir / "README.md").write_text(
+        "\n".join(
+            [
+                f"# {MODEL_FAMILY} candidate",
+                "",
+                "Immutable-by-policy development candidate for later validated promotion.",
+                "",
+                f"- Release: `{metadata['release']}`",
+                f"- Kind: `{metadata['release_kind']}`",
+                f"- Base model: `{BASE_MODEL}`",
+                f"- Source Git SHA: `{metadata['source_git_sha']}`",
+                f"- Release manifest SHA-256: `{metadata['release_manifest_sha256']}`",
+                "",
+                "The canonical accepted release, if promoted, is published under",
+                f"`{MODEL_ID}/artifacts/{metadata['release']}/`.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
     return metadata
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Prepare a validated J-PACF release as an HF Bucket candidate")
+    parser = argparse.ArgumentParser(
+        description="Prepare a validated J-PACF release as an HF Bucket candidate"
+    )
     parser.add_argument("--release-dir", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     args = parser.parse_args()
