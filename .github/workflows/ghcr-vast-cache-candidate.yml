@@ -1,0 +1,136 @@
+name: ghcr-vast-cache-candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/portable-ghcr-gpu-runtime]
+    paths:
+      - "locks/vast-cache-base.lock.json"
+      - ".github/workflows/ghcr-vast-cache-candidate.yml"
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: ghcr-vast-cache-candidate-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/jpacf-yomi-tdt-runtime-vast-cache
+  CACHE_SCOPE: jpacf-runtime-vast-cache-linux-amd64-cuda13
+
+jobs:
+  build-and-verify:
+    runs-on: [self-hosted, linux, x64, cuda13]
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          clean: false
+
+      - name: Configure persistent BuildKit cache
+        shell: bash
+        env:
+          ACTIONS_CACHE_SCOPE: ${{ env.CACHE_SCOPE }}
+        run: bash scripts/ci/setup_actions_cache.sh
+
+      - name: Isolate Docker client configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker_config="${RUNNER_TEMP}/docker-config-vast-cache"
+          rm -rf "$docker_config"
+          mkdir -p "$docker_config"
+          printf '{}\n' > "$docker_config/config.json"
+          echo "DOCKER_CONFIG=$docker_config" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Read cache-friendly immutable base
+        id: base
+        shell: bash
+        run: |
+          set -euo pipefail
+          reference="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          payload=json.loads(Path('locks/vast-cache-base.lock.json').read_text())
+          print(payload['reference'])
+          PY
+          )"
+          [[ "$reference" =~ @sha256:[0-9a-f]{64}$ ]]
+          echo "reference=$reference" >> "$GITHUB_OUTPUT"
+          echo "Candidate base: $reference" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Build and push cache candidate
+        id: build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            io.jpacf.vast-cache-candidate=true
+          cache-from: ${{ env.BUILDKIT_CACHE_FROM }}
+          cache-to: ${{ env.BUILDKIT_CACHE_TO }}
+          build-args: |
+            BASE_IMAGE=${{ steps.base.outputs.reference }}
+            SOURCE_REPOSITORY=${{ github.server_url }}/${{ github.repository }}
+
+      - name: Verify candidate through NVIDIA runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="${REGISTRY}/${IMAGE_NAME}@${{ steps.build.outputs.digest }}"
+          mkdir -p .jpacf-state-vast-cache
+          docker pull "$image"
+          docker run --rm --gpus all --ipc=host --shm-size 8g \
+            -v "$PWD/.jpacf-state-vast-cache:/workspace/state" \
+            "$image" \
+            bash /opt/jpacf/scripts/container/inside.sh \
+            python /opt/jpacf/scripts/container/verify_runtime.py --require-gpu
+
+      - name: Record candidate identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          digest='${{ steps.build.outputs.digest }}'
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          mkdir -p dist/vast-cache-runtime
+          cat > dist/vast-cache-runtime/runtime-image.json <<EOF
+          {
+            "schema_version": 1,
+            "status": "gpu-verified-vast-cache-candidate",
+            "source_git_sha": "${{ github.sha }}",
+            "base_reference": "${{ steps.base.outputs.reference }}",
+            "platform": "linux/amd64",
+            "nemo_toolkit": "3.0.0",
+            "torch": "2.12.0+cu132",
+            "digest": "$digest",
+            "reference": "${REGISTRY}/${IMAGE_NAME}@$digest",
+            "promotion_gate": "Vast args/entrypoint cold-start smoke"
+          }
+          EOF
+          cat dist/vast-cache-runtime/runtime-image.json
+
+      - name: Upload candidate identity
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: vast-cache-runtime-${{ github.sha }}
+          path: dist/vast-cache-runtime/runtime-image.json
+          if-no-files-found: error
+          retention-days: 30
