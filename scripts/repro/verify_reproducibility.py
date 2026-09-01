@@ -48,18 +48,30 @@ def verify_forbidden_alias() -> None:
 
 
 def verify_language_lockfiles() -> None:
-    requirements: list[tuple[str, tuple[str, ...]]] = [
-        ("mise.toml", ("mise.lock",)),
-        ("pyproject.toml", ("uv.lock",)),
-        ("Cargo.toml", ("Cargo.lock",)),
-        ("go.mod", ("go.sum",)),
-        ("package.json", ("pnpm-lock.yaml", "yarn.lock", "package-lock.json", "bun.lock")),
-    ]
-    for manifest, locks in requirements:
-        if not (ROOT / manifest).exists():
-            continue
-        if not any((ROOT / lock).exists() for lock in locks):
-            fail(f"{manifest} exists but none of its required lockfiles exist: {', '.join(locks)}")
+    tracked = {path.relative_to(ROOT) for path in tracked_files()}
+
+    if Path("mise.toml") in tracked and Path("mise.lock") not in tracked:
+        fail("mise.toml exists but mise.lock is not committed")
+
+    for manifest in sorted(path for path in tracked if path.name == "pyproject.toml"):
+        lock = manifest.parent / "uv.lock"
+        if lock not in tracked:
+            fail(f"{manifest} exists but adjacent uv.lock is not committed")
+
+    for manifest in sorted(path for path in tracked if path.name == "Cargo.toml"):
+        local = manifest.parent / "Cargo.lock"
+        if local not in tracked and Path("Cargo.lock") not in tracked:
+            fail(f"{manifest} exists but Cargo.lock is not committed")
+
+    for manifest in sorted(path for path in tracked if path.name == "go.mod"):
+        lock = manifest.parent / "go.sum"
+        if lock not in tracked:
+            fail(f"{manifest} exists but adjacent go.sum is not committed")
+
+    js_locks = ("pnpm-lock.yaml", "yarn.lock", "package-lock.json", "bun.lock")
+    for manifest in sorted(path for path in tracked if path.name == "package.json"):
+        if not any(manifest.parent / name in tracked for name in js_locks):
+            fail(f"{manifest} exists but no supported adjacent JavaScript lockfile is committed")
 
 
 def verify_mise_tools() -> None:
