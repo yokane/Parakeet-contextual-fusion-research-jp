@@ -14,6 +14,7 @@ args=(
   run --rm --gpus all --ipc=host --shm-size "${JPA_CF_SHM_SIZE:-8g}"
   -w /workspace/project
   -e HOME=/cache/home
+  -e JPA_CF_CONTAINER_RUNTIME=1
   -e JPA_CF_WORKSPACE=/workspace/project
   -e PYTHONPATH=/workspace/project/src:/opt/jpacf/src
   -e UV_PROJECT_ENVIRONMENT=/opt/jpacf/.venv
