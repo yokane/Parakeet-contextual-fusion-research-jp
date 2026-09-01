@@ -7,65 +7,30 @@ on:
       - .github/vast-diagnose.trigger
 
 permissions:
+  actions: write
   contents: read
 
 jobs:
-  destroy-failed-proof:
+  force-cancel-stale-run:
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 5
     env:
-      VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
-      TARGET_LABEL: jpacf-canonical-33567053241-1
-      EXPECTED_IMAGE: ghcr.io/yokane/jpacf-yomi-tdt-runtime@sha256:7eac031218b80c73f7fac871ed18b5279f6104c543b9d7c7732aaadd8ec57bdf
+      GH_TOKEN: ${{ github.token }}
+      STALE_RUN_ID: "33567053241"
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
-        with:
-          version: 2026.8.16
-          install: true
-          cache: true
-      - name: Materialize Vast CLI
+      - name: Force-cancel stale workflow controller
         shell: bash
         run: |
           set -euo pipefail
-          mise run deps:sync-vast
-      - name: Destroy only the failed canonical instance
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n "${VAST_API_KEY:-}"
-          timeout 30s uv run --locked vastai show instances --api-key "$VAST_API_KEY" --raw > "$RUNNER_TEMP/instances.json"
-          instance_id="$(python - "$RUNNER_TEMP/instances.json" "$TARGET_LABEL" "$EXPECTED_IMAGE" <<'PY'
-          import json, sys
-          from pathlib import Path
-          payload = json.loads(Path(sys.argv[1]).read_text())
-          rows = payload if isinstance(payload, list) else payload.get('instances', [])
-          matches = [row for row in rows if str(row.get('label') or '') == sys.argv[2]]
-          if not matches:
-              print('')
-              raise SystemExit(0)
-          if len(matches) != 1:
-              raise SystemExit(f'expected exactly one matching label, found {len(matches)}')
-          row = matches[0]
-          if str(row.get('image_uuid') or '') != sys.argv[3]:
-              raise SystemExit(f'refusing to destroy unexpected image: {row.get("image_uuid")}')
-          print(row['id'])
-          PY
-          )"
-          if [[ -z "$instance_id" ]]; then
-            echo "target instance already absent"
-            exit 0
-          fi
-          echo "destroying failed canonical instance id=$instance_id label=$TARGET_LABEL"
-          timeout 30s uv run --locked vastai destroy instance "$instance_id" --api-key "$VAST_API_KEY" -y
-          sleep 2
-          timeout 30s uv run --locked vastai show instances --api-key "$VAST_API_KEY" --raw > "$RUNNER_TEMP/after.json"
-          python - "$RUNNER_TEMP/after.json" "$TARGET_LABEL" <<'PY'
-          import json, sys
-          from pathlib import Path
-          payload = json.loads(Path(sys.argv[1]).read_text())
-          rows = payload if isinstance(payload, list) else payload.get('instances', [])
-          if any(str(row.get('label') or '') == sys.argv[2] for row in rows):
-              raise SystemExit('target instance still present after destroy')
-          print('target instance destroyed')
-          PY
+          endpoint="${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/runs/${STALE_RUN_ID}/force-cancel"
+          code="$(curl --silent --show-error --output "$RUNNER_TEMP/body" --write-out '%{http_code}' \
+            --request POST \
+            --header "Accept: application/vnd.github+json" \
+            --header "Authorization: Bearer ${GH_TOKEN}" \
+            --header "X-GitHub-Api-Version: 2022-11-28" \
+            "$endpoint")"
+          cat "$RUNNER_TEMP/body" || true
+          case "$code" in
+            202|409) echo "force-cancel accepted/already terminal: HTTP $code" ;;
+            *) echo "unexpected force-cancel response: HTTP $code" >&2; exit 1 ;;
+          esac
