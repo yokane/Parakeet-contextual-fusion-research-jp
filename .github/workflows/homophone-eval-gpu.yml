@@ -221,6 +221,7 @@ jobs:
           echo "HF Bucket run: hf://buckets/${HF_BUCKET}/runs/${run_id}" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload experiment artifact
+        if: ${{ always() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: homophone-eval-${{ inputs.results_name }}-${{ inputs.config_name }}-${{ inputs.split }}-${{ github.sha }}
