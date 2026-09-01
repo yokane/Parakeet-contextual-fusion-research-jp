@@ -1,0 +1,295 @@
+name: runtime-thin-vast-diagnostic
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [feat/portable-ghcr-gpu-runtime]
+    paths:
+      - ".github/workflows/runtime-thin-vast-diagnostic.yml"
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: runtime-thin-vast-diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  DIAG_IMAGE_NAME: ${{ github.repository_owner }}/jpacf-yomi-tdt-runtime-diag
+  DIAG_BASE_IMAGE: ghcr.io/yokane/jpacf-yomi-tdt-runtime@sha256:f289935222c9cf6a6db15b3b02bd6f47b94148b7e21d26e5c33cf228147b635e
+  STORAGE_GB: "60"
+  GPU_RAM_GB: "24"
+  GPU_ALLOWLIST: RTX_4090
+  MIN_INET_DOWN_MBPS: "1000"
+  MIN_RELIABILITY: "0.98"
+  PREDICTED_MINUTES: "30"
+  MAX_COST_USD: "0.35"
+  OFFER_LIMIT: "50"
+  WAIT_MAX_ATTEMPTS: "420"
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 70
+    env:
+      VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+      GHCR_TOKEN: ${{ github.token }}
+      VAST_LABEL: jpacf-runtime-diag-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+
+      - name: Create metadata-only diagnostic Dockerfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/jpacf-runtime-diag-build"
+          cat > "${RUNNER_TEMP}/jpacf-runtime-diag-build/Dockerfile" <<'DOCKERFILE'
+          ARG BASE_IMAGE
+          FROM ${BASE_IMAGE}
+          ENTRYPOINT ["/bin/bash", "-lc"]
+          CMD ["sleep infinity"]
+          DOCKERFILE
+
+      - name: Build and push thin diagnostic image
+        id: diag_build
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: ${{ runner.temp }}/jpacf-runtime-diag-build
+          file: ${{ runner.temp }}/jpacf-runtime-diag-build/Dockerfile
+          platforms: linux/amd64
+          push: true
+          provenance: false
+          sbom: false
+          tags: ${{ env.REGISTRY }}/${{ env.DIAG_IMAGE_NAME }}:sha-${{ github.sha }}
+          build-args: |
+            BASE_IMAGE=${{ env.DIAG_BASE_IMAGE }}
+
+      - name: Record thin image identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          digest='${{ steps.diag_build.outputs.digest }}'
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          image="${REGISTRY}/${DIAG_IMAGE_NAME}@${digest}"
+          echo "DIAG_RUNTIME_IMAGE=${image}" >> "$GITHUB_ENV"
+          mkdir -p dist/runtime-diag
+          cat > dist/runtime-diag/image.json <<JSON
+          {
+            "schema_version": 1,
+            "base_image": "${DIAG_BASE_IMAGE}",
+            "diagnostic_image": "${image}",
+            "source_git_sha": "${GITHUB_SHA}"
+          }
+          JSON
+
+      - name: Install exact mise toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: true
+
+      - name: Materialize Vast CLI environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          mise run deps:sync-vast
+          command -v jq >/dev/null
+          test -n "${VAST_API_KEY:-}"
+          test -n "${GHCR_TOKEN:-}"
+
+      - name: Select fast budget-compliant on-demand RTX 4090
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/providers
+          uv run --locked python scripts/providers/vast/build_search_query.py \
+            --gpu-name "$GPU_ALLOWLIST" --num-gpus 1 \
+            --gpu-ram ">=${GPU_RAM_GB}" \
+            --inet-down ">=${MIN_INET_DOWN_MBPS}" \
+            --reliability ">=${MIN_RELIABILITY}" \
+            --output-json dist/providers/runtime-diag-search-query.json \
+            > dist/providers/runtime-diag-search-query.txt
+          query="$(cat dist/providers/runtime-diag-search-query.txt)"
+          uv run --locked vastai search offers \
+            --api-key "$VAST_API_KEY" --raw --no-default --type on-demand \
+            --order 'inet_down-,dph_total' --storage "$STORAGE_GB" --limit "$OFFER_LIMIT" \
+            "$query" > dist/providers/runtime-diag-raw.json
+          uv run --locked python scripts/providers/vast/rank_offers.py \
+            --input dist/providers/runtime-diag-raw.json \
+            --predicted-minutes "$PREDICTED_MINUTES" \
+            --max-cost-usd "$MAX_COST_USD" \
+            --min-inet-down-mbps "$MIN_INET_DOWN_MBPS" \
+            --output dist/providers/runtime-diag-inventory.json \
+            > dist/providers/runtime-diag-inventory.md
+          cat dist/providers/runtime-diag-inventory.md >> "$GITHUB_STEP_SUMMARY"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload=json.loads(Path('dist/providers/runtime-diag-inventory.json').read_text())
+          offers=[row for row in payload.get('offers', []) if not row.get('is_bid')]
+          if not offers:
+              raise SystemExit('no budget-compliant on-demand RTX 4090 offer')
+          selected=max(offers, key=lambda row:(float(row.get('inet_down_mbps') or 0), -float(row.get('dph_total') or 999)))
+          Path('dist/providers/runtime-diag-selected.json').write_text(json.dumps(selected, indent=2, sort_keys=True)+'\n')
+          with open('/tmp/runtime-diag.env','w') as h:
+              h.write(f"VAST_OFFER_ID={selected['offer_id']}\n")
+              h.write(f"VAST_GPU_NAME={selected['gpu_name']}\n")
+              h.write(f"VAST_DPH_TOTAL={selected['dph_total']}\n")
+              h.write(f"VAST_INET_DOWN={selected['inet_down_mbps']}\n")
+              h.write(f"VAST_PREDICTED_COST={selected['predicted_cost_usd']}\n")
+          PY
+          cat /tmp/runtime-diag.env >> "$GITHUB_ENV"
+
+      - name: Build runtime diagnostic payload
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/runtime-diag.sh" <<'REMOTE'
+          #!/usr/bin/env bash
+          set -euxo pipefail
+          echo '=== runtime diagnostic: host ==='
+          id
+          uname -a
+          nvidia-smi
+          df -h
+          echo '=== runtime diagnostic: environment ==='
+          env | grep -E '^(PATH|VIRTUAL_ENV|UV_PROJECT_ENVIRONMENT|UV_CACHE_DIR|HOME|JPA_CF_)=' | sort || true
+          echo '=== runtime diagnostic: filesystem before repair ==='
+          ls -la /opt/jpacf
+          ls -la /opt/jpacf/.venv || true
+          find /opt/jpacf -maxdepth 3 -name pyvenv.cfg -o -name python -o -name python3 | sort || true
+          du -sh /opt/jpacf /workspace/state 2>/dev/null || true
+          echo '=== runtime diagnostic: tools before repair ==='
+          command -v python || true
+          python --version || true
+          command -v uv
+          uv --version
+          echo '=== runtime diagnostic: repair project environment on Vast ==='
+          mkdir -p /workspace/state/{uv,hf,xdg,torch,home,artifacts,generated,results,dist,vendor}
+          cd /opt/jpacf
+          unset VIRTUAL_ENV || true
+          export UV_PROJECT_ENVIRONMENT=/opt/jpacf/.venv
+          time uv sync --locked --python 3.12.3 --extra dev --extra gpu
+          echo '=== runtime diagnostic: filesystem after repair ==='
+          test -x /opt/jpacf/.venv/bin/python
+          ls -l /opt/jpacf/.venv/bin/python
+          du -sh /opt/jpacf/.venv /workspace/state/uv 2>/dev/null || true
+          /opt/jpacf/.venv/bin/python - <<'PY'
+          import json
+          import sys
+          import torch
+          payload = {
+              'python_executable': sys.executable,
+              'torch': torch.__version__,
+              'torch_compiled_cuda': torch.version.cuda,
+              'cuda_available': torch.cuda.is_available(),
+              'gpu_count': torch.cuda.device_count(),
+          }
+          if payload['cuda_available']:
+              payload['gpu_name'] = torch.cuda.get_device_name(0)
+              probe = torch.arange(1, 4097, device='cuda', dtype=torch.float32)
+              payload['cuda_probe'] = float((probe * probe).sum().item())
+              torch.cuda.synchronize()
+          print(json.dumps(payload, indent=2, sort_keys=True))
+          if not payload['cuda_available']:
+              raise SystemExit('CUDA unavailable after uv repair')
+          PY
+          echo '=== runtime diagnostic: verify repository runtime contract ==='
+          /opt/jpacf/.venv/bin/python /opt/jpacf/scripts/container/verify_runtime.py --require-gpu
+          REMOTE
+          sha256sum "$RUNNER_TEMP/runtime-diag.sh" > dist/runtime-diag/payload.sha256
+          echo "VAST_PAYLOAD_B64=$(base64 -w0 "$RUNNER_TEMP/runtime-diag.sh")" >> "$GITHUB_ENV"
+
+      - name: Create Vast diagnostic instance
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker_env="-e VAST_PAYLOAD_B64=${VAST_PAYLOAD_B64}"
+          response="$(uv run --locked vastai create instance "$VAST_OFFER_ID" \
+            --api-key "$VAST_API_KEY" --raw --image "$DIAG_RUNTIME_IMAGE" \
+            --disk "$STORAGE_GB" --label "$VAST_LABEL" \
+            --login "-u ${GITHUB_ACTOR} -p ${GHCR_TOKEN} ghcr.io" \
+            --env "$docker_env" --cancel-unavail \
+            --args 'echo "$VAST_PAYLOAD_B64" | base64 -d > /tmp/jpacf-runtime-diag.sh; bash /tmp/jpacf-runtime-diag.sh; rc=$?; echo "JPA_CF_DIAG_COMPLETE rc=$rc"; sleep infinity')"
+          printf '%s\n' "$response" > dist/runtime-diag/create-response.json
+          id="$(python -c "import json; print(int(json.load(open('dist/runtime-diag/create-response.json'))['new_contract']))")"
+          printf '%s\n' "$id" > "$RUNNER_TEMP/vast-instance-id"
+          echo "VAST_INSTANCE_ID=$id" >> "$GITHUB_ENV"
+
+      - name: Wait for diagnostic completion and capture logs
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > dist/runtime-diag/instance-status.jsonl
+          : > dist/runtime-diag/vast-container.log
+          complete=0
+          diag_rc=''
+          for attempt in $(seq 1 "$WAIT_MAX_ATTEMPTS"); do
+            raw="$(uv run --locked vastai show instance "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --raw 2>/dev/null || true)"
+            if [[ -n "$raw" ]]; then
+              printf '%s\n' "$raw" > "$RUNNER_TEMP/vast-status.json"
+              python - "$attempt" "$RUNNER_TEMP/vast-status.json" <<'PY' >> dist/runtime-diag/instance-status.jsonl
+          import json, sys
+          from pathlib import Path
+          row=json.loads(Path(sys.argv[2]).read_text())
+          msg=' | '.join(x.strip() for x in str(row.get('status_msg') or '').splitlines() if x.strip())
+          print(json.dumps({'attempt': int(sys.argv[1]), 'actual_status': row.get('actual_status') or '', 'status_msg': msg, 'dph_total': row.get('dph_total')}, sort_keys=True))
+          PY
+              actual="$(jq -r '.actual_status // empty' "$RUNNER_TEMP/vast-status.json")"
+              if [[ "$actual" =~ ^(exited|offline|stopped)$ ]]; then
+                uv run --locked vastai logs "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --tail 2000 > dist/runtime-diag/vast-container.log 2>&1 || true
+                cat dist/runtime-diag/vast-container.log
+                echo "Vast instance entered terminal state: $actual" >&2
+                exit 1
+              fi
+            fi
+            uv run --locked vastai logs "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --tail 2000 > dist/runtime-diag/vast-container.log 2>&1 || true
+            if grep -q 'JPA_CF_DIAG_COMPLETE rc=' dist/runtime-diag/vast-container.log; then
+              diag_rc="$(sed -n 's/.*JPA_CF_DIAG_COMPLETE rc=\([0-9][0-9]*\).*/\1/p' dist/runtime-diag/vast-container.log | tail -1)"
+              complete=1
+              break
+            fi
+            if (( attempt % 12 == 0 )); then
+              echo "runtime diagnostic wait ${attempt}/${WAIT_MAX_ATTEMPTS}"
+              tail -30 dist/runtime-diag/vast-container.log || true
+            fi
+            sleep 5
+          done
+          [[ "$complete" == 1 ]] || { tail -200 dist/runtime-diag/vast-container.log >&2; exit 1; }
+          cat dist/runtime-diag/vast-container.log
+          printf '%s\n' "$diag_rc" > dist/runtime-diag/diagnostic-exit-code.txt
+          [[ "$diag_rc" == 0 ]]
+
+      - name: Destroy Vast instance
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set +e
+          if [[ -s "$RUNNER_TEMP/vast-instance-id" ]]; then
+            id="$(cat "$RUNNER_TEMP/vast-instance-id")"
+            uv run --locked vastai destroy instance "$id" --api-key "$VAST_API_KEY" -y || true
+          fi
+
+      - name: Upload diagnostic evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: runtime-thin-vast-diagnostic-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/providers/runtime-diag-*
+            dist/runtime-diag/
+          if-no-files-found: warn
+          retention-days: 14
