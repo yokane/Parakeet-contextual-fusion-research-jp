@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import time
 from pathlib import Path
 from typing import Any
 
 import torch
+import transformers
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from parakeet_context_fusion.llm_selector import (
@@ -93,12 +95,22 @@ def main() -> None:
                 return_dict=True,
                 return_tensors="pt",
             ).to(model.device)
+
+            if torch.cuda.is_available():
+                torch.cuda.reset_peak_memory_stats()
+                torch.cuda.synchronize()
+            started = time.perf_counter()
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=args.max_new_tokens,
                 do_sample=False,
                 pad_token_id=tokenizer.eos_token_id,
             )
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            latency_ms = (time.perf_counter() - started) * 1000.0
+            peak_vram_bytes = int(torch.cuda.max_memory_allocated()) if torch.cuda.is_available() else None
+
             new_tokens = outputs[:, inputs["input_ids"].shape[-1] :]
             raw_output = tokenizer.batch_decode(
                 new_tokens,
@@ -148,6 +160,16 @@ def main() -> None:
                 "fallback_to_source_top1": fallback,
                 "parse_error": parse_error,
                 "raw_output": raw_output,
+                "runtime": {
+                    "latency_ms": latency_ms,
+                    "prompt_tokens": int(inputs["input_ids"].shape[-1]),
+                    "generated_tokens": int(new_tokens.shape[-1]),
+                    "peak_vram_bytes": peak_vram_bytes,
+                    "transformers_version": transformers.__version__,
+                    "torch_version": torch.__version__,
+                    "device_map": args.device_map,
+                    "dtype": args.dtype,
+                },
                 "generation": {
                     "do_sample": False,
                     "max_new_tokens": args.max_new_tokens,
