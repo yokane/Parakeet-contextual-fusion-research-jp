@@ -126,28 +126,37 @@ def test_bucket_layout_rejects_missing_root() -> None:
         module.validate_layout(listing, storage_config())
 
 
-def test_dockerfile_caches_dependencies_before_copying_source() -> None:
-    text = Path("Dockerfile").read_text(encoding="utf-8")
-    metadata_copy = text.index("COPY pyproject.toml uv.lock ./")
-    dependency_install = text.index("--no-install-project")
-    source_copy = text.index("COPY src ./src")
-    project_install = text.rindex("uv sync")
+def test_dockerfiles_cache_dependencies_before_copying_source() -> None:
+    dependency_base = Path("Dockerfile.runtime-base").read_text(encoding="utf-8")
+    runtime = Path("Dockerfile").read_text(encoding="utf-8")
+    combined = dependency_base + "\n" + runtime
+
+    metadata_copy = combined.index("COPY pyproject.toml uv.lock ./")
+    dependency_install = combined.index("--no-install-project")
+    source_copy = combined.index("COPY src ./src")
+    project_install = combined.rindex("uv sync")
 
     assert metadata_copy < dependency_install < source_copy < project_install
-    assert "--mount=type=cache,target=/root/.cache/uv" in text
-    assert "--mount=type=cache,target=/var/cache/apt,sharing=locked" in text
-    assert "--mount=type=cache,target=/var/lib/apt,sharing=locked" in text
+    assert "--mount=type=cache,target=/root/.cache/uv" in combined
+    assert "--mount=type=cache,target=/var/cache/apt,sharing=locked" in dependency_base
+    assert "--mount=type=cache,target=/var/lib/apt,sharing=locked" in dependency_base
 
 
-def test_ghcr_build_uses_runner_selected_buildkit_cache_contract() -> None:
-    text = Path(".github/workflows/ghcr-runtime.yml").read_text(encoding="utf-8")
-    assert "run: bash scripts/ci/setup_actions_cache.sh" in text
-    assert "cache-from: ${{ env.BUILDKIT_CACHE_FROM }}" in text
-    assert "cache-to: ${{ env.BUILDKIT_CACHE_TO }}" in text
-    assert "if: ${{ env.SELF_CACHE_PERSISTENT == 'true' }}" in text
-    assert 'test -f "${BUILDKIT_CACHE_DIR}/index.json"' in text
-    assert "BUILDKIT_CACHE_DIR}-next" not in text
-    assert "tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}" in text
+def test_ghcr_build_uses_registry_cache_and_direct_push_contract() -> None:
+    canonical = Path(".github/workflows/ghcr-runtime.yml").read_text(encoding="utf-8")
+    fallback = Path(".github/workflows/ghcr-runtime-vast-fallback.yml").read_text(encoding="utf-8")
+    builder = Path("scripts/ci/build_runtime_image.sh").read_text(encoding="utf-8")
+
+    assert "run: bash scripts/ci/build_runtime_image.sh" in canonical
+    assert "driver: docker-container" in fallback
+    assert "base-current" in builder
+    assert "runtime-current" in builder
+    assert "--cache-to type=inline" in builder
+    assert '--cache-from "type=registry,ref=${base_current}"' in builder
+    assert '--cache-from "type=registry,ref=${runtime_current}"' in builder
+    assert builder.count("--push") >= 2
+    assert "--load" not in builder
+    assert 'runtime_tag="${image_repo}:sha-${SOURCE_SHA}"' in builder
 
 
 def test_candidate_roundtrip_detects_tampering(tmp_path: Path) -> None:

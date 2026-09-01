@@ -7,13 +7,19 @@ def read(path: str) -> str:
 
 
 def test_dockerfile_bakes_gpu_environment_outside_source_mount() -> None:
-    dockerfile = read("Dockerfile")
-    assert "WORKDIR /opt/jpacf" in dockerfile
-    assert "UV_PROJECT_ENVIRONMENT=/opt/jpacf/.venv" in dockerfile
-    assert "--extra gpu" in dockerfile
-    assert "--extra dev" in dockerfile
-    assert "--extra research" not in dockerfile
-    assert "JPA_CF_STATE_ROOT=/workspace/state" in dockerfile
+    dependency_base = read("Dockerfile.runtime-base")
+    runtime = read("Dockerfile")
+    combined = dependency_base + "\n" + runtime
+
+    assert "WORKDIR /opt/jpacf" in dependency_base
+    assert "WORKDIR /opt/jpacf" in runtime
+    assert "UV_PROJECT_ENVIRONMENT=/opt/jpacf/.venv" in dependency_base
+    assert "UV_PYTHON_INSTALL_DIR=/opt/jpacf/.uv-python" in dependency_base
+    assert "--extra gpu" in dependency_base
+    assert "--extra dev" in dependency_base
+    assert "--extra research" not in combined
+    assert "JPA_CF_STATE_ROOT=/workspace/state" in dependency_base
+    assert "HOME=/workspace/state/home" in runtime
 
 
 def test_host_runner_uses_single_state_mount_and_digest_contract() -> None:

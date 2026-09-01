@@ -4,7 +4,9 @@ from pathlib import Path
 
 
 def dockerfile_text() -> str:
-    return Path("Dockerfile").read_text(encoding="utf-8")
+    dependency_base = Path("Dockerfile.runtime-base").read_text(encoding="utf-8")
+    runtime = Path("Dockerfile").read_text(encoding="utf-8")
+    return dependency_base + "\n" + runtime
 
 
 def test_managed_python_lives_outside_runtime_state_mount() -> None:
