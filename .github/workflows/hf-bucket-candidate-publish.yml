@@ -48,7 +48,7 @@ concurrency:
 
 jobs:
   candidate:
-    runs-on: [self-hosted, linux, gpu]
+    runs-on: [self-hosted, linux, x64, cuda13]
     timeout-minutes: 90
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -59,23 +59,32 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
+      - name: Configure self-hosted cache contract
+        id: cache
+        shell: bash
+        run: bash scripts/ci/setup_actions_cache.sh
+
       - name: Install repository toolchain from mise.lock
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
           version: 2026.8.16
           install: true
-          cache: true
+          cache: ${{ steps.cache.outputs.persistent != 'true' }}
 
       - name: Restore uv artifact cache
+        if: ${{ steps.cache.outputs.persistent != 'true' }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
-          path: .cache/uv
+          path: ${{ env.UV_CACHE_DIR }}
           key: hf-candidate-uv-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('uv.lock', 'tools/hf-bucket/uv.lock') }}
 
       - name: Materialize locked Python environments
         run: |
-          mise run deps:sync-nemo
+          mise run deps:sync-gpu
           mise run hf:transport:sync
+
+      - name: Verify authoritative CUDA13 platform
+        run: uv run --locked python scripts/repro/verify_platform.py --require-gpu
 
       - name: Validate inputs
         shell: bash
@@ -102,7 +111,7 @@ jobs:
         env:
           CHECKPOINT_PATH: ${{ inputs.checkpoint_path }}
         run: |
-          uv run --locked --extra nemo python - <<'PY'
+          uv run --locked python - <<'PY'
           import os
           import nemo.collections.asr as nemo_asr
           model = nemo_asr.models.ASRModel.restore_from(os.environ["CHECKPOINT_PATH"], map_location="cpu")
