@@ -14,9 +14,19 @@ HF_MODEL_REPO = "saeeew/J-PACF-YOMI-tdt"
 HF_BENCHMARK_REPO = "saeeew/JP-HomophoneBench"
 
 [tasks."deps:sync"]
-description = "Materialize the Python environment from uv.lock without changing it"
+description = "Materialize the CPU/dev Python environment from uv.lock without changing it"
 run = "uv sync --locked --extra dev"
 sources = ["pyproject.toml", "uv.lock"]
+
+[tasks."deps:sync-nemo"]
+description = "Materialize the NeMo ASR environment from the same immutable uv.lock"
+run = "uv sync --locked --extra dev --extra nemo"
+sources = ["pyproject.toml", "uv.lock"]
+
+[tasks."hf:transport:sync"]
+description = "Materialize the isolated HF Bucket CLI from its own uv.lock"
+run = "uv sync --project tools/hf-bucket --locked"
+sources = ["tools/hf-bucket/pyproject.toml", "tools/hf-bucket/uv.lock"]
 
 [tasks.lint]
 description = "Run Python lint from the locked environment"
@@ -75,6 +85,7 @@ description = "Intentional lock refresh; run only in the maintenance workflow"
 run = [
   "mise lock",
   "uv lock",
+  "uv lock --project tools/hf-bucket",
   "mise run hf:resolve-revisions",
   "mise run container:resolve-base",
   "mise run spdx:generate",
