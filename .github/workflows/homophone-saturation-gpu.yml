@@ -54,6 +54,7 @@ jobs:
     timeout-minutes: 240
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
       MODEL_NAME: nvidia/parakeet-tdt_ctc-0.6b-ja
       NEMO_ROOT: /opt/NeMo
       MANIFEST: data/generated/saturation/nemo_eval.jsonl
@@ -62,7 +63,13 @@ jobs:
       NGPU_LM: ${{ inputs.ngpu_lm_path }}
       SWEEP_ROOT: results/saturation
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
+
+      - name: Restore pip download cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/pip
+          key: homophone-saturation-pip-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pyproject.toml') }}
 
       - name: Check GPU and NeMo environment
         shell: bash
@@ -87,7 +94,7 @@ jobs:
 
       - name: Install evaluation dependencies
         run: |
-          python -m pip install 'datasets>=4,<5' 'huggingface-hub>=0.34,<2' soundfile pyarrow
+          python -m pip install 'datasets>=4,<5' 'huggingface-hub>=1.9,<2' soundfile pyarrow
           python -m pip install --no-deps -e .
 
       - name: Normalize PB alpha sweep
@@ -273,8 +280,24 @@ jobs:
             --min-risk-increase 0.02 \
             --alpha 0.05
 
+      - name: Persist immutable saturation run to HF Bucket
+        shell: bash
+        run: |
+          set -euo pipefail
+          run_id="gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-saturation"
+          run_dir="dist/hf-runs/${run_id}"
+          python scripts/hf/build_run_bundle.py \
+            --results-dir "${SWEEP_ROOT}" \
+            --output-dir "${run_dir}" \
+            --run-id "${run_id}" \
+            --workflow-kind homophone-saturation \
+            --benchmark-index "${BENCH_INDEX}" \
+            --execution-manifest "${MANIFEST}"
+          bash scripts/hf/hf-push-run.sh "${run_dir}"
+          echo "HF Bucket run: hf://buckets/${HF_BUCKET}/runs/${run_id}" >> "${GITHUB_STEP_SUMMARY}"
+
       - name: Upload saturation artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: homophone-saturation-${{ inputs.artifact_suffix }}-${{ inputs.config_name }}-${{ inputs.split }}
           path: |
