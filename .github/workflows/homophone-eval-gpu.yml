@@ -82,6 +82,12 @@ jobs:
             --rehydrate-audio \
             --require-audio
           python scripts/validate_eval_manifest.py "${MANIFEST}" --require-audio
+      - name: Record acoustic category coverage
+        run: |
+          python scripts/validate_audio_coverage.py \
+            --provenance data/generated/eval/eval_provenance.json \
+            --min-total 1 \
+            --output data/generated/eval/audio_coverage.json
       - name: Record reproducibility environment
         shell: bash
         run: |
@@ -167,6 +173,7 @@ jobs:
           name: homophone-eval-${{ inputs.results_name }}-${{ inputs.config_name }}-${{ inputs.split }}
           path: |
             data/generated/eval/eval_provenance.json
+            data/generated/eval/audio_coverage.json
             data/generated/eval/bench_index.jsonl
             data/generated/eval/nemo_eval.jsonl
             data/generated/eval/context_phrases.txt
