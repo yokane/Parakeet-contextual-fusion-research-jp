@@ -5,8 +5,9 @@ import argparse
 import json
 import math
 import random
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import pyarrow.parquet as pq
 
