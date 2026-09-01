@@ -84,7 +84,7 @@ jobs:
           test -d "${RESULTS_DIR}" || exit 0
           run_id="gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-e00-e06"
           run_dir="dist/hf-runs/${run_id}"
-          uv run --locked python scripts/hf/build_run_bundle.py \
+          uv run --locked --no-sync python scripts/hf/build_run_bundle.py \
             --results-dir "${RESULTS_DIR}" \
             --output-dir "${run_dir}" \
             --run-id "${run_id}" \
