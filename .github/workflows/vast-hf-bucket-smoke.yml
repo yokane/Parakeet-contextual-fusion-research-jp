@@ -45,8 +45,12 @@ jobs:
           install: true
           cache: true
 
-      - name: Materialize locked Vast provider environment
-        run: mise run deps:sync-vast
+      - name: Materialize locked Vast and HF transport environments
+        shell: bash
+        run: |
+          set -euo pipefail
+          mise run deps:sync-vast
+          mise run hf:transport:sync
 
       - name: Validate smoke contract
         shell: bash
@@ -67,6 +71,22 @@ jobs:
           if not (0 < budget <= 0.50):
               raise SystemExit("MAX_COST_USD must be > 0 and <= 0.50")
           PY
+
+      - name: Preflight HF Bucket write before any Vast spend
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/vast-smoke
+          probe="dist/vast-smoke/hf-preflight.txt"
+          roundtrip="dist/vast-smoke/hf-preflight-roundtrip.txt"
+          remote="hf://buckets/${HF_BUCKET}/_auth-probe/vast-smoke/${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.txt"
+          printf 'run=%s\nattempt=%s\nsha=%s\n' \
+            "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" > "$probe"
+          source scripts/hf/hf-identity.sh
+          hf_bucket_cli buckets cp "$probe" "$remote" --token "$HF_TOKEN"
+          hf_bucket_cli buckets cp "$remote" "$roundtrip" --token "$HF_TOKEN"
+          cmp "$probe" "$roundtrip"
+          hf_bucket_cli buckets rm "$remote" -y --token "$HF_TOKEN"
 
       - name: Build modern 24GB Vast offer query
         shell: bash
@@ -189,10 +209,13 @@ jobs:
 
           printf '%s\n' "$SMOKE_RUN_KEY" > "$work/_SUCCESS"
           source /opt/jpacf/scripts/hf/hf-identity.sh
-          hf_bucket_cli buckets sync \
-            "$work" \
-            "hf://buckets/${HF_BUCKET}/runs/${SMOKE_RUN_KEY}/vast-smoke" \
-            --token "$HF_TOKEN"
+          remote="hf://buckets/${HF_BUCKET}/runs/${SMOKE_RUN_KEY}/vast-smoke"
+          for name in runtime-verify.txt result.json _SUCCESS; do
+            hf_bucket_cli buckets cp \
+              "$work/$name" \
+              "$remote/$name" \
+              --token "$HF_TOKEN"
+          done
           REMOTE
           remote_script_b64="$(base64 -w0 "$RUNNER_TEMP/vast-smoke-remote.sh")"
           echo "REMOTE_SCRIPT_B64=$remote_script_b64" >> "$GITHUB_ENV"
@@ -241,8 +264,11 @@ jobs:
           for attempt in $(seq 1 60); do
             rm -rf "$local_dir"
             mkdir -p "$local_dir"
-            hf_bucket_cli buckets sync "$remote" "$local_dir" --token "$HF_TOKEN" \
-              > dist/vast-smoke/hf-poll.txt 2>&1 || true
+            : > dist/vast-smoke/hf-poll.txt
+            for name in result.json _SUCCESS runtime-verify.txt; do
+              hf_bucket_cli buckets cp "$remote/$name" "$local_dir/$name" --token "$HF_TOKEN" \
+                >> dist/vast-smoke/hf-poll.txt 2>&1 || true
+            done
             if [[ -s "$local_dir/result.json" && -s "$local_dir/_SUCCESS" ]] \
               && grep -Fxq "$SMOKE_RUN_KEY" "$local_dir/_SUCCESS"; then
               found=1
@@ -263,7 +289,6 @@ jobs:
         run: |
           set -euo pipefail
           remote="hf://buckets/${HF_BUCKET}/runs/${SMOKE_RUN_KEY}/vast-smoke"
-          local_dir="dist/vast-smoke/from-hf"
           python - <<'PY'
           import json
           import os
@@ -289,7 +314,7 @@ jobs:
             echo "- predicted ${PREDICTED_MINUTES} min cost: \$${VAST_PREDICTED_COST}"
             echo "- runtime: \`${RUNTIME_IMAGE}\`"
             echo "- evidence: \`${remote}\`"
-            echo "- result: verified from a second client (GitHub runner)"
+            echo "- result: GPU-generated artifact round-tripped through HF Bucket"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Capture Vast logs on failure
@@ -301,7 +326,7 @@ jobs:
             id="$(cat "$RUNNER_TEMP/vast-instance-id")"
             uv run --locked vastai logs "$id" \
               --api-key "$VAST_API_KEY" \
-              --tail 200 \
+              --tail 300 \
               > dist/vast-smoke/vast-container.log 2>&1 || true
           fi
 
@@ -346,6 +371,8 @@ jobs:
             dist/providers/vast-inventory.json
             dist/providers/vast-inventory.md
             dist/providers/vast-selected-offer.json
+            dist/vast-smoke/hf-preflight.txt
+            dist/vast-smoke/hf-preflight-roundtrip.txt
             dist/vast-smoke/create-response.json
             dist/vast-smoke/hf-poll.txt
             dist/vast-smoke/vast-container.log
