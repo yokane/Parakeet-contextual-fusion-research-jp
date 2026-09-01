@@ -8,6 +8,7 @@ on:
       - "mise.toml"
       - "pyproject.toml"
       - "tools/hf-bucket/pyproject.toml"
+      - "stack.lock.yaml"
       - "locks/actions.lock.json"
       - "locks/upstream-sources.json"
       - "locks/sbom.lock.json"
@@ -24,7 +25,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 40
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       GITHUB_TOKEN: ${{ github.token }}
@@ -40,23 +41,23 @@ jobs:
           install: true
           cache: true
 
-      - name: Resolve mise and Python dependency locks
+      - name: Resolve Linux x86_64 tool and Python locks
         shell: bash
         run: |
           set -euo pipefail
-          mise lock
+          mise lock --platforms linux-x64
           uv lock
           uv lock --project tools/hf-bucket
           uv sync --locked --extra dev
           uv sync --project tools/hf-bucket --locked
 
-      - name: Resolve Hugging Face revisions
+      - name: Resolve Hugging Face revisions and model file hashes
         run: uv run --locked python scripts/repro/resolve_hf_revisions.py --write locks/hf-revisions.lock.json
 
       - name: Set up exact Buildx action
         uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
 
-      - name: Resolve base container digest
+      - name: Resolve CUDA13 base container digest
         run: bash scripts/repro/resolve_container_digest.sh locks/upstream-sources.json locks/containers.lock.json
 
       - name: Generate SPDX inventory
@@ -80,7 +81,7 @@ jobs:
             echo "Lock snapshot already current"
             exit 0
           fi
-          git commit -m "build: refresh immutable environment locks"
+          git commit -m "build: refresh Linux CUDA13 immutable locks"
           git push origin "HEAD:${GITHUB_REF_NAME}"
 
       - name: Upload resolved lock snapshot
