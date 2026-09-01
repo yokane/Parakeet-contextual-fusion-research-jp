@@ -6,11 +6,11 @@ import json
 import math
 import random
 from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import pyarrow.parquet as pq
-
 
 MetricFn = Callable[[dict[str, Any]], float | None]
 
