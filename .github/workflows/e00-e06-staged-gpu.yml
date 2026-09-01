@@ -44,8 +44,7 @@ jobs:
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
-      EVAL_DIR: data/generated/eval
-      RESULTS_DIR: results/${{ inputs.results_name }}
+      JPA_CF_RESULTS_NAME: ${{ inputs.results_name }}
       RUN_E05: ${{ inputs.run_e05 == 'never' && '0' || inputs.run_e05 }}
       RUN_E06: ${{ inputs.run_e06 && '1' || '0' }}
       E06_DRIVER: ${{ inputs.e06_driver }}
@@ -89,20 +88,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -d "${JPA_CF_STATE_ROOT}/results/${{ inputs.results_name }}" || exit 0
-          run_id="gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-e00-e06"
-          bash scripts/container/run.sh bash -lc "
-            run_dir='dist/hf-runs/${run_id}'
+          test -d "${JPA_CF_STATE_ROOT}/results/${JPA_CF_RESULTS_NAME}" || exit 0
+          export JPA_CF_EVIDENCE_RUN_ID="gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-e00-e06"
+          bash scripts/container/run.sh bash -lc '
+            run_dir="${JPA_CF_STATE_ROOT}/dist/hf-runs/${JPA_CF_EVIDENCE_RUN_ID}"
             uv run --locked --no-sync python scripts/hf/build_run_bundle.py \
-              --results-dir '${RESULTS_DIR}' \
-              --output-dir \"\${run_dir}\" \
-              --run-id '${run_id}' \
+              --results-dir "${RESULTS_DIR}" \
+              --output-dir "${run_dir}" \
+              --run-id "${JPA_CF_EVIDENCE_RUN_ID}" \
               --workflow-kind e00-e06-staged \
-              --benchmark-index '${EVAL_DIR}/bench_index.jsonl' \
-              --execution-manifest '${EVAL_DIR}/nemo_eval.jsonl'
-            bash scripts/hf/hf-push-run.sh \"\${run_dir}\"
-          "
-          echo "HF Bucket run: hf://buckets/${HF_BUCKET}/runs/${run_id}" >> "${GITHUB_STEP_SUMMARY}"
+              --benchmark-index "${EVAL_DIR}/bench_index.jsonl" \
+              --execution-manifest "${EVAL_DIR}/nemo_eval.jsonl"
+            bash scripts/hf/hf-push-run.sh "${run_dir}"
+          '
+          echo "HF Bucket run: hf://buckets/${HF_BUCKET}/runs/${JPA_CF_EVIDENCE_RUN_ID}" >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Upload short-lived GitHub artifact
         if: ${{ always() }}
