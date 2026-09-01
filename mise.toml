@@ -21,6 +21,11 @@ description = "Materialize the Linux/amd64 CPU/static environment from uv.lock"
 run = "uv sync --locked --extra dev"
 sources = ["pyproject.toml", "uv.lock"]
 
+[tasks."deps:sync-research"]
+description = "Materialize provider-control tooling without the heavy NeMo GPU extra"
+run = "uv sync --locked --extra dev --extra research"
+sources = ["pyproject.toml", "uv.lock"]
+
 [tasks."deps:sync-gpu"]
 description = "Materialize the canonical NeMo 3 + CUDA 13 research environment"
 run = "uv sync --locked --extra dev --extra gpu --extra research"
