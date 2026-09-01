@@ -26,7 +26,7 @@ concurrency:
 
 jobs:
   promote:
-    runs-on: [self-hosted, linux, gpu]
+    runs-on: [self-hosted, linux, x64, cuda13]
     timeout-minutes: 90
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
@@ -35,13 +35,34 @@ jobs:
       FETCH_ROOT: artifacts/promotion-fetch
       RELEASE_ROOT: dist/hf-model-promotion
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Restore pip download cache
-        uses: actions/cache@v6
+      - name: Configure self-hosted cache contract
+        id: cache
+        shell: bash
+        run: bash scripts/ci/setup_actions_cache.sh
+
+      - name: Install repository toolchain from mise.lock
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
-          path: ~/.cache/pip
-          key: hf-promotion-pip-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pyproject.toml') }}
+          version: 2026.8.16
+          install: true
+          cache: ${{ steps.cache.outputs.persistent != 'true' }}
+
+      - name: Restore uv artifact cache
+        if: ${{ steps.cache.outputs.persistent != 'true' }}
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.UV_CACHE_DIR }}
+          key: hf-promotion-uv-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('uv.lock', 'tools/hf-bucket/uv.lock') }}
+
+      - name: Materialize locked GPU and Bucket environments
+        run: |
+          mise run deps:sync-gpu
+          mise run hf:transport:sync
+
+      - name: Verify authoritative CUDA13 platform
+        run: uv run --locked python scripts/repro/verify_platform.py --require-gpu
 
       - name: Validate promotion inputs
         shell: bash
@@ -63,16 +84,13 @@ jobs:
             }
           fi
 
-      - name: Install Bucket-capable Hub client
-        run: python -m pip install 'huggingface-hub>=1.9,<2'
-
       - name: Fetch and validate candidate
         shell: bash
         run: |
           set -euo pipefail
           destination="${FETCH_ROOT}/${{ inputs.candidate_id }}"
           bash scripts/hf/hf-fetch-candidate.sh "${{ inputs.candidate_id }}" "${destination}"
-          candidate_release="$(python - "${destination}/release_manifest.json" <<'PY'
+          candidate_release="$(uv run --locked python - "${destination}/release_manifest.json" <<'PY'
           import json
           import sys
           from pathlib import Path
@@ -90,7 +108,7 @@ jobs:
           set -euo pipefail
           checkpoint="${FETCH_ROOT}/${{ inputs.candidate_id }}/J-PACF-YOMI-TDT.nemo"
           if [[ -f "${checkpoint}" ]]; then
-            CHECKPOINT_PATH="${checkpoint}" python - <<'PY'
+            CHECKPOINT_PATH="${checkpoint}" uv run --locked python - <<'PY'
           import os
           import nemo.collections.asr as nemo_asr
           model = nemo_asr.models.ASRModel.restore_from(os.environ["CHECKPOINT_PATH"], map_location="cpu")
@@ -108,11 +126,11 @@ jobs:
           mkdir -p "${release_dir}"
           cp -a "${source}/." "${release_dir}/"
           rm -f "${release_dir}/.candidate-id" "${release_dir}/metadata.json"
-          python - "${release_dir}/promotion.json" <<'PY'
+          uv run --locked python - "${release_dir}/promotion.json" <<'PY'
           import json
           import os
           import sys
-          from datetime import datetime, timezone
+          from datetime import UTC, datetime
           from pathlib import Path
           payload = {
               "schema_version": 1,
@@ -121,7 +139,7 @@ jobs:
               "model_repo": os.environ["HF_MODEL_REPO"],
               "bucket": os.environ["HF_BUCKET"],
               "source_run_id": "${{ inputs.source_run_id }}" or None,
-              "promoted_at": datetime.now(timezone.utc).isoformat(),
+              "promoted_at": datetime.now(UTC).isoformat(),
               "source_git_sha": os.environ.get("GITHUB_SHA"),
           }
           Path(sys.argv[1]).write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -129,7 +147,7 @@ jobs:
 
       - name: Publish validated release to Model Repo
         run: |
-          python scripts/publish_hf_model_release.py \
+          uv run --locked python scripts/publish_hf_model_release.py \
             --repo-id "${HF_MODEL_REPO}" \
             --release "${{ inputs.release_name }}" \
             --release-dir "${RELEASE_ROOT}/${{ inputs.release_name }}" \
@@ -140,19 +158,20 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          source scripts/hf/hf-identity.sh
           remote_path="runs/${{ inputs.source_run_id }}/promotion.json"
-          existing="$(hf buckets list "${HF_BUCKET}/runs/${{ inputs.source_run_id }}" -R -q --token "${HF_TOKEN}" || true)"
+          existing="$(hf_bucket_cli buckets list "${HF_BUCKET}/runs/${{ inputs.source_run_id }}" -R -q --token "${HF_TOKEN}" || true)"
           if printf '%s\n' "${existing}" | grep -Eq '(^|/)promotion\.json$'; then
             echo "promotion record already exists under runs/${{ inputs.source_run_id }}" >&2
             exit 2
           fi
-          hf buckets cp \
+          hf_bucket_cli buckets cp \
             --token "${HF_TOKEN}" \
             "${RELEASE_ROOT}/${{ inputs.release_name }}/promotion.json" \
             "hf://buckets/${HF_BUCKET}/${remote_path}"
 
       - name: Upload promotion evidence
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: jpacf-promotion-${{ inputs.candidate_id }}-${{ inputs.release_name }}
           path: ${{ env.RELEASE_ROOT }}/${{ inputs.release_name }}
