@@ -37,7 +37,11 @@ args=(
   -v "$STATE_ROOT/dist:/workspace/project/dist"
   -v "$STATE_ROOT/vendor:/workspace/project/.vendor"
 )
-[[ -n "${HF_TOKEN:-}" ]] && args+=( -e HF_TOKEN )
-[[ -n "${HF_BUCKET:-}" ]] && args+=( -e HF_BUCKET )
-[[ -n "${CUDA_VISIBLE_DEVICES:-}" ]] && args+=( -e CUDA_VISIBLE_DEVICES )
+for name in \
+  HF_TOKEN HF_BUCKET CUDA_VISIBLE_DEVICES \
+  HF_CONFIG HF_SPLIT EVAL_DIR RESULTS_DIR RUN_E05 RUN_E06 E06_DRIVER \
+  MANIFEST CONTEXT_PHRASES NGPU_LM MODEL_NEMO NEMO_ROOT KENLM_ROOT \
+  BEAM_SIZE LM_ALPHA PB_ALPHA CTC_ALPHA PHONE_ALPHA BATCH_SIZE; do
+  [[ -n "${!name:-}" ]] && args+=( -e "$name" )
+done
 exec docker "${args[@]}" "$IMAGE" "$@"
