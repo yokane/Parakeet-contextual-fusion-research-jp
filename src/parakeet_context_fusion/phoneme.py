@@ -1,12 +1,5 @@
 from __future__ import annotations
 
-try:
-    import torch
-    from torch import nn
-except ModuleNotFoundError:
-    torch = None
-    nn = None
-
 from .phone_distance import (
     DEFAULT_PHONE_COSTS,
     SPECIAL_MORAS,
@@ -17,6 +10,13 @@ from .phone_distance import (
     substitution_cost,
     weighted_phone_distance,
 )
+
+try:
+    import torch
+    from torch import nn
+except ModuleNotFoundError:
+    torch = None
+    nn = None
 
 __all__ = [
     "DEFAULT_PHONE_COSTS",
