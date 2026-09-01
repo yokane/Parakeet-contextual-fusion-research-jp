@@ -6,11 +6,11 @@ on:
       config_name:
         description: "JP-HomophoneBench HF config"
         required: true
-        default: "homophone8"
+        default: "homophone8-audio"
         type: choice
-        options: [homophone8, homophone8-research]
+        options: [homophone8-audio, homophone8, homophone8-research]
       split:
-        description: "Evaluation split"
+        description: "Evaluation split; homophone8-audio publishes test only"
         required: true
         default: "test"
         type: choice
@@ -72,11 +72,7 @@ jobs:
         run: mise run deps:sync-gpu
 
       - name: Materialize isolated HF Bucket transport
-        shell: bash
-        run: |
-          set -euo pipefail
-          mise run hf:transport:sync
-          echo "${GITHUB_WORKSPACE}/tools/hf-bucket/.venv/bin" >> "$GITHUB_PATH"
+        run: mise run hf:transport:sync
 
       - name: Verify authoritative GPU research platform
         run: uv run --locked python scripts/repro/verify_platform.py --require-gpu
@@ -107,11 +103,14 @@ jobs:
             --require-audio
           uv run --locked python scripts/validate_eval_manifest.py "${MANIFEST}" --require-audio
 
-      - name: Record acoustic category coverage
+      - name: Enforce exact and near acoustic coverage
         run: |
           uv run --locked python scripts/validate_audio_coverage.py \
             --provenance data/generated/eval/eval_provenance.json \
-            --min-total 1 \
+            --required-category exact_homophone \
+            --required-category near_homophone \
+            --min-per-category 5 \
+            --min-total 10 \
             --output data/generated/eval/audio_coverage.json
 
       - name: Record reproducibility environment
@@ -125,7 +124,6 @@ jobs:
           import platform
           import subprocess
           from importlib import metadata
-
           import torch
 
           def command(*args):
