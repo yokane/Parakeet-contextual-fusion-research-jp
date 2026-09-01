@@ -14,7 +14,7 @@ from parakeet_context_fusion.model_io import restore_locked_asr_model
 def flatten_nbest(value: Any) -> list[Any]:
     if hasattr(value, "n_best_hypotheses"):
         return list(value.n_best_hypotheses or [])
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, list | tuple):
         if len(value) == 1 and hasattr(value[0], "n_best_hypotheses"):
             return list(value[0].n_best_hypotheses or [])
         return list(value)
