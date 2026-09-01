@@ -46,6 +46,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install ruff
+          ruff check --fix scripts/analyze_saturation.py
           ruff check scripts/analyze_saturation.py
           bash -n experiments/*.sh
           if git diff --quiet; then
