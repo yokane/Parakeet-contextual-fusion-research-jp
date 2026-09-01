@@ -13,11 +13,11 @@ fail(){ printf '[hf-push-candidate] ERROR: %s\n' "$*" >&2; exit 1; }
 SOURCE="${1:-}"
 [[ $# -eq 1 && -d "$SOURCE" ]] || fail "Usage: $0 <candidate-directory>"
 [[ -n "${HF_TOKEN:-}" ]] || fail "HF_TOKEN is required"
-command -v hf >/dev/null 2>&1 || fail "hf CLI is unavailable"
+command -v uv >/dev/null 2>&1 || fail "uv is unavailable; enter through mise"
 command -v gh >/dev/null 2>&1 || fail "gh CLI is unavailable"
 
 if [[ -z "${HF_BUCKET:-}" ]]; then
-  HF_BUCKET="$(python - <<'PY'
+  HF_BUCKET="$(uv run --locked python - <<'PY'
 import json
 from pathlib import Path
 print(json.loads(Path('configs/hf-storage.json').read_text(encoding='utf-8'))['bucket'])
@@ -28,8 +28,8 @@ BUCKET="$(hf_normalize_bucket_id "$HF_BUCKET")" || fail "invalid HF_BUCKET: $HF_
 SOURCE="$(cd -- "$SOURCE" >/dev/null 2>&1 && pwd -P)"
 [[ ! -e "$SOURCE/.candidate-id" ]] || fail "refusing to republish a fetched candidate containing .candidate-id"
 
-python scripts/hf/validate_candidate.py "$SOURCE" >/dev/null
-export JPA_CF_RELEASE="$(python - "$SOURCE/metadata.json" <<'PY'
+uv run --locked python scripts/hf/validate_candidate.py "$SOURCE" >/dev/null
+export JPA_CF_RELEASE="$(uv run --locked python - "$SOURCE/metadata.json" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -42,18 +42,18 @@ REMOTE="hf://buckets/${BUCKET}/candidates/${CANDIDATE_ID}"
 PLAN="$(mktemp -t jpacf-candidate-plan.XXXXXX.jsonl)"
 trap 'rm -f "$PLAN"' EXIT
 
-hf buckets sync \
+hf_bucket_cli buckets sync \
   --token "$HF_TOKEN" \
   "$SOURCE" \
   "$REMOTE" \
   --plan "$PLAN"
 
-SUMMARY="$(python scripts/hf/validate_sync_plan.py "$PLAN" --expected-dest "$REMOTE")"
+SUMMARY="$(uv run --locked python scripts/hf/validate_sync_plan.py "$PLAN" --expected-dest "$REMOTE")"
 UPLOAD_COUNT="$(printf '%s\n' "$SUMMARY" | sed -n 's/^upload_count=//p')"
 [[ "$UPLOAD_COUNT" =~ ^[1-9][0-9]*$ ]] || fail "sync plan did not contain a positive upload count"
 log "Validated fresh candidate plan: ${UPLOAD_COUNT} uploads"
 
-hf buckets sync --token "$HF_TOKEN" --apply "$PLAN"
+hf_bucket_cli buckets sync --token "$HF_TOKEN" --apply "$PLAN"
 log "Candidate ID: $CANDIDATE_ID"
 log "Published: $REMOTE"
 printf '%s\n' "$CANDIDATE_ID"
