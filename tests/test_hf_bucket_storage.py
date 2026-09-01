@@ -61,7 +61,11 @@ def test_upload_only_sync_plan_is_accepted(tmp_path: Path) -> None:
 def test_sync_plan_rejects_non_upload_operations(action: str) -> None:
     module = load_script("validate_sync_plan")
     rows = [
-        {"type": "header", "source": "/tmp/source", "dest": "hf://buckets/x/y/candidates/candidate-000001"},
+        {
+            "type": "header",
+            "source": "/tmp/source",
+            "dest": "hf://buckets/x/y/candidates/candidate-000001",
+        },
         {"type": "operation", "action": action, "path": "old.bin", "reason": "mutation"},
     ]
     with pytest.raises(ValueError, match="only upload operations"):
@@ -71,11 +75,17 @@ def test_sync_plan_rejects_non_upload_operations(action: str) -> None:
 def test_sync_plan_rejects_wrong_destination() -> None:
     module = load_script("validate_sync_plan")
     rows = [
-        {"type": "header", "source": "/tmp/source", "dest": "hf://buckets/x/y/candidates/candidate-000001"},
+        {
+            "type": "header",
+            "source": "/tmp/source",
+            "dest": "hf://buckets/x/y/candidates/candidate-000001",
+        },
         {"type": "operation", "action": "upload", "path": "metadata.json"},
     ]
     with pytest.raises(ValueError, match="unexpected sync destination"):
-        module.validate_fresh_upload_plan(rows, "hf://buckets/x/y/candidates/candidate-000002")
+        module.validate_fresh_upload_plan(
+            rows, "hf://buckets/x/y/candidates/candidate-000002"
+        )
 
 
 def canonical_bucket_listing() -> list[str]:
@@ -110,3 +120,23 @@ def test_bucket_layout_rejects_missing_root() -> None:
     listing = [path for path in canonical_bucket_listing() if path != "runs/README.md"]
     with pytest.raises(ValueError, match="runs"):
         module.validate_layout(listing, storage_config())
+
+
+def test_dockerfile_caches_dependencies_before_copying_source() -> None:
+    text = Path("Dockerfile").read_text(encoding="utf-8")
+    metadata_copy = text.index("COPY pyproject.toml ./")
+    dependency_install = text.index('project = tomllib.loads(Path("pyproject.toml")')
+    source_copy = text.index("COPY src ./src")
+    editable_install = text.index("python -m pip install --no-deps -e .")
+
+    assert metadata_copy < dependency_install < source_copy < editable_install
+    assert "--mount=type=cache,target=/root/.cache/pip" in text
+    assert "--mount=type=cache,target=/var/cache/apt,sharing=locked" in text
+    assert "--mount=type=cache,target=/var/lib/apt,sharing=locked" in text
+
+
+def test_ghcr_build_exports_both_gha_and_registry_caches() -> None:
+    text = Path(".github/workflows/ghcr-runtime.yml").read_text(encoding="utf-8")
+    assert "type=gha,scope=${{ env.CACHE_SCOPE }}" in text
+    assert "type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache" in text
+    assert "type=raw,value=sha-${{ github.sha }}" in text
