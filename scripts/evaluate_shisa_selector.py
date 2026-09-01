@@ -24,6 +24,10 @@ def mean(values: list[float]) -> float | None:
 def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
     selector_rows = [row for row in rows if row.get("selector_parse_ok") is not None]
     entity_rows = [row for row in rows if row.get("selected_entity_correct") is not None]
+    latencies = [float(row["latency_ms"]) for row in rows if row.get("latency_ms") is not None]
+    prompt_tokens = [float(row["prompt_tokens"]) for row in rows if row.get("prompt_tokens") is not None]
+    generated_tokens = [float(row["generated_tokens"]) for row in rows if row.get("generated_tokens") is not None]
+    peak_vram = [int(row["peak_vram_bytes"]) for row in rows if row.get("peak_vram_bytes") is not None]
     return {
         "count": len(rows),
         "selected_cer": mean([float(row["selected_cer"]) for row in rows if row.get("selected_cer") is not None]),
@@ -43,6 +47,10 @@ def aggregate(rows: list[dict[str, Any]]) -> dict[str, Any]:
         "cer_improved": sum(bool(row.get("cer_improved")) for row in rows),
         "cer_damaged": sum(bool(row.get("cer_damaged")) for row in rows),
         "cer_unchanged": sum(bool(row.get("cer_unchanged")) for row in rows),
+        "mean_latency_ms": mean(latencies),
+        "mean_prompt_tokens": mean(prompt_tokens),
+        "mean_generated_tokens": mean(generated_tokens),
+        "max_peak_vram_bytes": max(peak_vram) if peak_vram else None,
     }
 
 
@@ -62,6 +70,7 @@ def main() -> None:
         if bench is None:
             raise RuntimeError(f"E07a row does not match benchmark ID: {benchmark_id!r}")
         selector = result.get("selector") or {}
+        runtime = selector.get("runtime") or {}
         source_text = str(selector.get("source_top1_text") or "")
         selected_text = str(result.get("selector_selected_text") or source_text)
         reference = str(bench.get("text") or "")
@@ -94,6 +103,12 @@ def main() -> None:
             "prompt_sha256": selector.get("prompt_sha256"),
             "model": selector.get("model"),
             "revision": selector.get("revision"),
+            "latency_ms": runtime.get("latency_ms"),
+            "prompt_tokens": runtime.get("prompt_tokens"),
+            "generated_tokens": runtime.get("generated_tokens"),
+            "peak_vram_bytes": runtime.get("peak_vram_bytes"),
+            "transformers_version": runtime.get("transformers_version"),
+            "torch_version": runtime.get("torch_version"),
         }
         output.append(row)
 
