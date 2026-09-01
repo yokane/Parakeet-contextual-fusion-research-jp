@@ -89,6 +89,7 @@ jobs:
           mkdir -p "${RESULTS_DIR}"
           python - <<'PY'
           import json
+          import os
           import platform
           import subprocess
 
@@ -108,7 +109,8 @@ jobs:
               "cuda_runtime": torch.version.cuda,
               "gpu": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
           }
-          with open("${RESULTS_DIR}/environment.json", "w", encoding="utf-8") as handle:
+          results_dir = os.environ["RESULTS_DIR"]
+          with open(f"{results_dir}/environment.json", "w", encoding="utf-8") as handle:
               json.dump(report, handle, ensure_ascii=False, indent=2, sort_keys=True)
               handle.write("\n")
           print(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
