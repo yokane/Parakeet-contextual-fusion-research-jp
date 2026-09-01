@@ -2,10 +2,6 @@ name: ghcr-runtime-vast-fallback
 
 on:
   workflow_dispatch:
-  push:
-    branches: [feat/portable-ghcr-gpu-runtime]
-    paths:
-      - .github/ghcr-runtime-vast-fallback.trigger
 
 permissions:
   contents: read
