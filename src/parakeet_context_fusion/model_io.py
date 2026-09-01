@@ -96,9 +96,13 @@ def restore_locked_asr_model(
     lock_path: Path = Path("locks/hf-revisions.lock.json"),
     required_revision: str | None = None,
     cache_dir: Path | None = None,
+    device: str | None = None,
 ) -> Any:
     identity = load_locked_model_identity(lock_path, required_revision=required_revision)
     path = materialize_locked_model(identity, cache_dir=cache_dir)
     import nemo.collections.asr as nemo_asr
+    import torch
 
-    return nemo_asr.models.ASRModel.restore_from(str(path))
+    model = nemo_asr.models.ASRModel.restore_from(str(path))
+    resolved_device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    return model.to(resolved_device)
