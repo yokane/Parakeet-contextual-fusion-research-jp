@@ -1,0 +1,37 @@
+name: force-cancel-stale-runtime
+
+on:
+  push:
+    branches: [feat/portable-ghcr-gpu-runtime]
+    paths:
+      - .github/force-cancel-stale-runtime.trigger
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  force-cancel:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Force-cancel stale runtime runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for run_id in 33560405572 33562240053 33560219007; do
+            code="$(curl -L -sS -o "$RUNNER_TEMP/force-cancel-${run_id}.json" -w '%{http_code}' \
+              -X POST \
+              -H 'Accept: application/vnd.github+json' \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "${GITHUB_API_URL}/repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/force-cancel")"
+            if [[ "$code" != 202 && "$code" != 409 ]]; then
+              cat "$RUNNER_TEMP/force-cancel-${run_id}.json" >&2 || true
+              echo "unexpected status ${code} for run ${run_id}" >&2
+              exit 1
+            fi
+            echo "run ${run_id}: HTTP ${code}"
+          done
