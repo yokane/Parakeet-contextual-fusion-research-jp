@@ -1,79 +1,113 @@
-# GHCR Build Optimization, Vast.ai Verification, and Hugging Face Storage Architecture
+# GHCR Build最適化・Vast.ai GPU検証・Hugging Faceストレージ設計
 
-This document records the architecture, failure modes, fixes, and operating rules introduced while making the J-PACF-YOMI-TDT GPU runtime portable across GitHub Actions, WSL2/self-hosted runners, and Vast.ai.
+このドキュメントは、J-PACF-YOMI-TDT のGPU研究環境を **GitHub Actions / WSL2・self-hosted runner / Vast.ai** で同一条件に近づけるために行った、Docker build最適化、Vast対応、Hugging Face対応の設計判断・失敗事例・修正内容・運用ルールを記録する。
 
-It complements [`portable-gpu-runtime.md`](portable-gpu-runtime.md): that guide explains how to use the final runtime; this document explains why the runtime is built and operated this way.
+[`portable-gpu-runtime.md`](portable-gpu-runtime.md) が「完成したruntimeをどう使うか」を説明するのに対し、本書は **なぜ現在の構成になったのか** を説明する。
 
-The final architecture was introduced by PR #10, `feat(gpu): make GHCR the portable research runtime`.
+最終構成は PR #10 `feat(gpu): make GHCR the portable research runtime` で `main` に導入された。
 
-## 1. Goals
+---
 
-The research environment contains a large CUDA/PyTorch/NeMo dependency root filesystem. The implementation therefore optimizes for reproducibility, portability, and bounded provider cost rather than merely producing a Docker image.
+## 1. 最終的な責務分離
 
-The main goals are:
-
-1. use one authoritative GPU user-space environment everywhere;
-2. avoid reinstalling Python/PyTorch/NeMo on every GPU host;
-3. avoid rebuilding or re-exporting the CUDA/NeMo rootfs for ordinary source commits;
-4. identify runtimes by immutable digest instead of mutable tag;
-5. verify the exact published digest on a real GPU;
-6. separate immutable software from mutable research state;
-7. make important state transferable between WSL2, self-hosted runners, and Vast hosts;
-8. keep provider-local caches disposable;
-9. record enough evidence to reproduce source, runtime, GPU, and storage identity;
-10. always destroy paid Vast instances after proof collection.
+今回の設計では、環境・高速なローカル状態・プロバイダー間で持ち運ぶ状態を明確に分離した。
 
 ```text
-Git source
-   |
-   v
+Git repository
+  source / workflow / experiment definitions
+              |
+              v
 GHCR dependency base
-   |
-   v
+  CUDA / Python / PyTorch / NeMo / system dependencies
+              |
+              v
 GHCR thin runtime
-   |
-   +--> /workspace/state
-   |      fast provider-local state
-   |
-   +--> HF Bucket
-          transferable state and evidence
+  source / scripts / configs / experiments
+              |
+              +-------------------------------+
+              |                               |
+              v                               v
+/workspace/state                         HF Bucket
+高速なprovider-local state              転送可能なstate / evidence
+              |                               |
+              |                               +-- runtime/sha-<git-sha>/
+              |                               +-- workspace-cache/<key>/
+              |                               +-- runs/<run-id>/
+              |
+              +-- hf/
+              +-- uv/
+              +-- xdg/
+              +-- torch/
+              +-- artifacts/
+              +-- generated/
+              +-- results/
+              +-- dist/
 ```
 
-The storage rule is:
+要約すると次の3層になる。
 
 ```text
 GHCR image       = immutable environment
-/workspace/state = fast local working set
-HF Bucket        = cross-provider transferable state/evidence
+/workspace/state = fast provider-local working state
+HF Bucket        = cross-provider transferable state / evidence
 ```
 
-## 2. Two-layer Docker architecture
+Vast Volumeやself-hosted runner上のローカルディスクは高速なキャッシュとして有効だが、プロバイダーを跨ぐsource of truthにはしない。
 
-The runtime is split into:
+---
+
+## 2. Docker imageを dependency base と thin runtime に分割した理由
+
+GPU runtimeは次の2つのDockerfileへ分割した。
 
 ```text
-Dockerfile.runtime-base  -> expensive dependency-sensitive layer
-Dockerfile               -> source-sensitive thin runtime layer
+Dockerfile.runtime-base
+  -> 変更頻度が低く、構築コストが高いdependency layer
+
+Dockerfile
+  -> 変更頻度が高いsource/runtime layer
 ```
 
-`Dockerfile.runtime-base` owns the expensive pieces:
+### `Dockerfile.runtime-base` が持つもの
 
-- NVIDIA CUDA base image;
-- system build dependencies;
-- Python 3.12.3;
-- uv 0.12.1;
-- torch 2.12.0+cu132;
-- NeMo 3.0.0;
-- locked Python dependencies;
-- isolated Hugging Face Bucket transport tooling.
+主に次を固定する。
 
-The normal `Dockerfile` starts from the exact dependency-base digest and copies source-controlled project material such as `src/`, `scripts/`, `schemas/`, `configs/`, `experiments/`, `hf_model/`, and `locks/`.
+```text
+NVIDIA CUDA base image
+system packages / build tools
+Python 3.12.3
+uv 0.12.1
+torch 2.12.0+cu132
+NeMo 3.0.0
+locked Python dependencies
+isolated Hugging Face Bucket transport environment
+```
 
-This prevents an ordinary source edit from invalidating the CUDA/NeMo installation layers.
+### `Dockerfile` が持つもの
 
-### Dependency-base key
+dependency baseの**厳密なdigest**を親にして、source依存部分のみをコピーする。
 
-`scripts/ci/build_runtime_image.sh` hashes only files capable of changing the expensive dependency rootfs:
+```text
+src/
+scripts/
+schemas/
+configs/
+experiments/
+hf_model/
+locks/
+README.md
+mise.toml / mise.lock / stack.lock.yaml
+```
+
+これにより、通常のPython sourceやexperiment scriptの変更だけでCUDA/NeMoのインストール層を毎回作り直すことを避ける。
+
+---
+
+## 3. dependency base key
+
+`scripts/ci/build_runtime_image.sh` は、高コストなdependency rootfsを変化させうる入力だけから `base_key` を計算する。
+
+対象は次の通り。
 
 ```text
 Dockerfile.runtime-base
@@ -84,81 +118,237 @@ locks/containers.lock.json
 tools/hf-bucket/**
 ```
 
-The resulting tag is:
+概念的には以下である。
 
 ```text
-ghcr.io/yokane/jpacf-yomi-tdt-runtime:base-<base-key>
+base_key = sha256(expensive dependency inputs)
 ```
 
-CI checks for the tag with `docker buildx imagetools inspect`. If it exists, the dependency image is reused rather than rebuilt.
+生成されるimmutable tagは次の形式。
 
-A helper tag, `base-current`, is used as a cache source. It is not the authoritative runtime identity.
+```text
+ghcr.io/yokane/jpacf-yomi-tdt-runtime:base-<base_key>
+```
 
-### Digest chaining
+build前にregistry上の存在を次で確認する。
 
-The dependency tag is resolved to an immutable reference:
+```bash
+docker buildx imagetools inspect "$base_tag"
+```
+
+存在すればdependency baseを再buildせず再利用する。
+
+さらにcache source用として次を維持する。
+
+```text
+:base-current
+```
+
+ただし `base-current` はcache用のmutable tagであり、実験runtimeのidentityには使用しない。
+
+---
+
+## 4. digest chaining
+
+base tagを見つけた、または新規buildした後、必ずdigestを解決する。
 
 ```text
 ghcr.io/yokane/jpacf-yomi-tdt-runtime@sha256:<base-digest>
 ```
 
-That exact reference is supplied as `BASE_IMAGE` to the thin runtime build.
+thin runtime buildには、この**digest-pinned reference**を `BASE_IMAGE` として渡す。
 
-The runtime is published under source-oriented and cache-helper tags and then resolved to an immutable digest. Authoritative GPU proof and experiments consume the digest form.
+そのため、親imageのmutable tagが後から別内容へ移動しても、同じruntime buildが暗黙に異なるdependency rootfsを参照することを防げる。
 
-## 3. Direct-to-registry Buildx
-
-### Failure that motivated the change
-
-The hosted build was able to finish the expensive Docker stages, but failed while exporting the very large final image into the hosted runner's local Docker Engine image store.
+runtime側は次のtagを作成する。
 
 ```text
-Docker stages complete
-      |
-      v
-large local image export/unpack
-      |
-      v
-hosted runner shutdown / exit 143
+:sha-<SOURCE_SHA>
+:runtime-current
 ```
 
-This was an image-store I/O problem, not a Python or NeMo dependency failure.
+そして最終的に次のdigest referenceへ解決する。
 
-### Final solution
+```text
+ghcr.io/yokane/jpacf-yomi-tdt-runtime@sha256:<runtime-digest>
+```
 
-The hosted fallback workflow configures Buildx with the `docker-container` driver and the build script uses `--push`.
+**GPU検証とauthoritative experimentはtagではなくdigestを使用する。**
 
-The canonical hosted path deliberately does not use `--load`.
+---
 
-With the `docker-container` driver, build results are not automatically loaded into the local Docker Engine image store. `--push` exports the result directly to GHCR. This removes the failure path where the multi-gigabyte CUDA/NeMo rootfs had to be materialized in the hosted runner's Docker daemon after the build.
+## 5. GitHub-hosted runnerで発生したDocker build問題
 
-After publishing, the workflow validates the remote manifest with:
+### 症状
+
+CUDA/NeMoを含むDocker buildそのものは完了していたが、最後の巨大image export時にhosted runnerが終了した。
+
+```text
+Docker build stages complete
+        |
+        v
+final imageをlocal Docker image storeへexport / unpack
+        |
+        v
+runner shutdown / exit 143
+```
+
+重要なのは、これはPython・PyTorch・NeMoのinstall failureではなく、**巨大imageをrunner側Docker EngineへmaterializeするI/O failure**だった点である。
+
+### 誤った対処になりやすいもの
+
+この症状に対して以下を調整しても本質的な改善にならない。
+
+```text
+pip/uv retryを増やす
+NeMo versionを変更する
+Python buildをやり直す
+DockerfileのRUNを細分化するだけ
+```
+
+build stage後のexport path自体を変える必要があった。
+
+---
+
+## 6. `docker-container` Buildx + `--push`
+
+hosted fallbackではBuildx driverを次にした。
+
+```yaml
+with:
+  driver: docker-container
+```
+
+そして `build_runtime_image.sh` は最終出力に `--push` を使用する。
 
 ```bash
-docker buildx imagetools inspect <runtime-digest-reference>
+docker buildx build \
+  ... \
+  --push \
+  --tag "$runtime_tag" \
+  --tag "$runtime_current"
 ```
 
-It does not pull the image back into the same hosted runner merely to validate it. Real execution validation happens later on a GPU host.
+意図的に使用しないものは次。
 
-## 4. Build caches
+```text
+--load
+```
 
-Both dependency and thin-runtime builds export inline cache metadata. Mutable helper tags such as `base-current` and `runtime-current` can be used as remote cache sources.
+`docker-container` driverではbuild resultは自動的にlocal Docker image storeへloadされない。
 
-The dependency Dockerfile also uses BuildKit cache mounts for apt and uv downloads. For apt, `sharing=locked` prevents parallel builds from concurrently modifying apt cache/database state.
+`--push` により、BuildKitからGHCRへ直接exportする。
 
-Cache state is an optimization only. A clean build must remain correct if caches are missing, overwritten, or garbage-collected.
+```text
+BuildKit
+  |
+  +---- X ----> hosted Docker Engine local image store
+  |
+  +-----------> GHCR
+```
 
-### Remaining optimization opportunity
+これにより、以前runner shutdownを起こしていた巨大rootfsのlocal export/unpack経路を排除した。
 
-The thin `Dockerfile` still performs a final locked `uv sync` after source has been copied. A source change can therefore invalidate this final layer. Even if dependencies are unchanged, BuildKit may still need to materialize the large parent snapshot to execute that instruction.
+### build後の検証
 
-This is safer than the former local `--load` path, but it is not the theoretical minimum I/O. A future optimization can investigate keeping source importable through `PYTHONPATH=/opt/jpacf/src` or another mechanism that avoids mutating the environment for source-only changes while preserving the locked dependency contract.
+push後は次でremote manifestを確認する。
 
-## 5. Immutable Python versus mutable state
+```bash
+docker buildx imagetools inspect "$runtime_reference"
+```
 
-An early configuration put build-time user state under `/workspace/state/home`. uv-managed Python could then be installed below mutable user state, causing the project venv interpreter to resolve into a directory hidden later by the `/workspace/state` mount.
+ここで「検証のために同じhosted runnerへ巨大imageをpullし直す」ことはしない。
 
-The dependency image now explicitly uses:
+imageが実際にGPU上で動くかどうかは、Vastまたはself-hosted GPU runtimeで別途検証する。
+
+---
+
+## 7. BuildKit cacheの使い分け
+
+### registry / inline cache
+
+buildではinline cache metadataをexportする。
+
+```text
+--cache-to type=inline
+```
+
+cache sourceとしてmutable helper tagを利用する。
+
+```text
+:base-current
+:runtime-current
+```
+
+cacheは高速化のための補助であり、再現性の根拠ではない。
+
+再現性の根拠は以下である。
+
+```text
+locked inputs
+pinned parent digest
+source SHA
+published runtime digest
+```
+
+### `RUN --mount=type=cache`
+
+`Dockerfile.runtime-base` ではaptとuvでBuildKit cache mountを使用する。
+
+例:
+
+```dockerfile
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get update ...
+```
+
+```dockerfile
+RUN --mount=type=cache,target=/root/.cache/uv \
+    ...
+```
+
+aptには `sharing=locked` を使い、複数buildがapt cache/databaseへ同時書き込みすることを防ぐ。
+
+BuildKit cache mountはperformance optimizationであり、cacheがGC・破損・未生成でもbuild自体が成立する設計にする。
+
+---
+
+## 8. 現時点で残るDocker build最適化余地
+
+高コストdependency installは分離できているが、thin `Dockerfile` はsource copy後に次を実行している。
+
+```text
+uv sync --locked --python 3.12.3 --extra dev --extra gpu
+```
+
+そのためsource変更によって最終 `RUN` layerがinvalidateされると、dependency自体が変わっていなくてもBuildKitが巨大なparent snapshotを展開してその命令を実行する場合がある。
+
+これは従来の `--load` failureとは別問題であり、現在の構成でもbuild reliabilityは大きく改善している。
+
+将来的な候補は以下。
+
+```text
+PYTHONPATH=/opt/jpacf/src を中心にsourceを直接import可能にする
+source installとdependency syncをさらに分離する
+project metadataだけでinstallできるlayer設計を検討する
+```
+
+ただし、現在の「locked environmentを実験中に変化させない」というinvariantを壊してはならない。
+
+---
+
+## 9. `/workspace/state` がPythonを隠した問題
+
+初期実装ではbuild-timeの `HOME` を `/workspace/state/home` に寄せていた。
+
+uv-managed Pythonがuser state配下へinstallされると、`.venv/bin/python` の実体が `/workspace/state/...` 側へ向くことがある。
+
+その状態でruntime時にfresh volumeを `/workspace/state` へmountすると、imageにbakeしたPythonの実体がmountで隠れてしまう。
+
+### 修正後
+
+dependency imageでは以下を明示した。
 
 ```text
 UV_PROJECT_ENVIRONMENT=/opt/jpacf/.venv
@@ -166,73 +356,120 @@ UV_PYTHON_INSTALL_DIR=/opt/jpacf/.uv-python
 UV_PYTHON_INSTALL_BIN=0
 ```
 
-The image build verifies that `/opt/jpacf/.venv/bin/python` resolves below `/opt/jpacf/.uv-python/`.
+さらにbuild時に以下を検証する。
 
-Only runtime-writable data is redirected to `/workspace/state`, including `HOME`, Hugging Face caches, uv cache, XDG cache, torch cache, artifacts, generated data, results, and distribution evidence.
+```bash
+readlink -f /opt/jpacf/.venv/bin/python
+```
 
-The invariant is:
+解決先が必ず次の配下であることをassertする。
+
+```text
+/opt/jpacf/.uv-python/
+```
+
+runtimeに入ってから初めて、write可能なstateを `/workspace/state` へ向ける。
+
+```text
+HOME=/workspace/state/home
+HF_HOME=/workspace/state/hf
+UV_CACHE_DIR=/workspace/state/uv
+XDG_CACHE_HOME=/workspace/state/xdg
+TORCH_HOME=/workspace/state/torch
+```
+
+最終invariantは次。
 
 ```text
 /opt/jpacf        immutable executable environment
-/workspace/state  mutable cache/result state
+/workspace/state  mutable runtime state
 ```
 
-Never mount provider state over `/opt/jpacf`.
+**persistent volumeを `/opt/jpacf` へmountしてはいけない。**
 
-## 6. UID/GID handling on self-hosted runners
+---
 
-A verification container that runs as root can create root-owned directories in persistent `.jpacf-state`. A later staged workflow running as the runner user may then be unable to write them.
+## 10. self-hosted runnerのUID/GID問題
 
-The shared container wrapper therefore uses the host UID/GID for normal research execution. GPU verification and HF publication paths use the common wrapper rather than ad-hoc root containers.
+GPU verificationをraw `docker run` でroot実行すると、persistent `.jpacf-state` 内のdirectoryがroot-ownedになることがあった。
 
-This keeps persistent state writable across repeated self-hosted runs.
+その後のstaged workflowがrunner userで書き込むとpermission failureになる。
 
-## 7. Vast.ai as an execution target
+現在は共通wrapper `scripts/container/run.sh` を通し、通常のresearch executionではhost UID/GIDを使う。
 
-Vast is not treated as the source of the Python/NeMo environment. It runs the exact GHCR digest directly.
+```text
+--user "$(id -u):$(id -g)"
+```
 
-Vast supplies:
+GPU verificationとHF publicationも同じwrapperを使うことで、self-hosted runner上のstate ownershipを統一した。
+
+---
+
+## 11. Vast.aiの位置づけ
+
+Vastは「環境を構築する場所」ではなく、**GHCR上のexact runtime digestをGPUで実行する場所**として扱う。
+
+Vast側が提供するもの:
 
 ```text
 GPU
-NVIDIA host driver/runtime
+NVIDIA host driver / container runtime
 local disk
 network
 container execution
 ```
 
-The GHCR image supplies:
+GHCR image側が提供するもの:
 
 ```text
 Python
 PyTorch
 CUDA user-space
 NeMo
-research code
+research source/scripts
 HF Bucket transport tooling
 ```
 
-The canonical paid fallback workflow is `.github/workflows/ghcr-runtime-vast-fallback.yml` and is manual (`workflow_dispatch`) by design.
+そのため、Vast instance上で別途mise/Python/NeMoを構築する必要はない。
 
-Its flow is:
+---
+
+## 12. Canonical Vast fallback workflow
+
+manual workflow:
+
+```text
+.github/workflows/ghcr-runtime-vast-fallback.yml
+```
+
+現在は `workflow_dispatch` のみで起動する。
+
+有料GPU proofを通常のsource/docs pushで自動発火させないためである。
+
+処理フロー:
 
 ```text
 build
-  -> publish exact runtime digest to GHCR
+  -> dependency baseをreuse/build
+  -> thin runtimeをGHCRへdirect push
+  -> exact runtime digestを出力
 
 verify-vast
-  -> choose budget-compliant RTX 4090 offer
-  -> create instance using exact digest
-  -> wait for GPU proof marker
-  -> write runtime identity
-  -> publish evidence to HF Bucket
-  -> destroy instance
-  -> upload short-lived GitHub artifact
+  -> offer search
+  -> budget/帯域条件でranking
+  -> exact digestでVast instance作成
+  -> GPU proof marker待機
+  -> runtime identity作成
+  -> HF Bucketへpublication
+  -> Vast instance destroy
+  -> GitHub artifact upload
 ```
 
-## 8. Vast offer selection
+---
 
-The current canonical policy targets:
+## 13. Vast offer selection
+
+現在のcanonical policyは次。
 
 ```text
 GPU              RTX 4090
@@ -244,61 +481,97 @@ predicted window 30 minutes
 max predicted    0.35 USD
 ```
 
-The workflow ranks offers with repository scripts. High image download bandwidth matters because a fresh Vast host may spend more time pulling and extracting the large CUDA/NeMo image than running the actual CUDA probe.
+単純な最低価格ではなく、特に `inet_down` を重視する。
 
-For short jobs, a slightly higher hourly price can be cheaper in total wall-clock cost if registry throughput is substantially better.
+理由はruntime imageが大きく、fresh Vast hostではGPU計算よりもGHCRからのpull/extract時間の方が支配的になりうるため。
 
-## 9. Vast argv/shell quoting failure
+短時間verificationでは、極端に安いがnetworkが遅いhostより、若干hourly priceが高くても高速download可能なhostの方がwall-clockと総コストの双方で有利になることがある。
 
-An early provider command attempted to pass a nested shell program through Vast `--args`. The runtime entrypoint ultimately executes argv directly, so Vast delivered the quoted shell expression as a single executable argument.
+---
 
-The container then attempted to execute a pathname containing the whole `bash -lc ...` string and exited before GPU verification.
+## 14. Vast `--args` shell quoting failure
 
-The image itself was valid; the provider argv boundary was wrong.
+初期のVast proofでは、`--args` に概念的に次のようなshell expressionを渡した。
 
-The fix is `scripts/container/vast_verify.sh`, passed as one absolute executable:
+```text
+bash -lc "python ...; rc=$?; ..."
+```
+
+しかしruntime entrypointは最終的にargvをそのまま `exec` する。
+
+Vast CLI/API境界でquoted shell commandが1つのargumentとして渡されたため、containerはshellを起動するのではなく、**shell expression全体を1つのexecutable pathとして実行しようとした**。
+
+結果:
+
+```text
+... bash -lc '...' : No such file or directory
+```
+
+Docker image自体は正常で、provider argv contractの問題だった。
+
+### 修正
+
+専用の実行可能scriptを追加した。
+
+```text
+scripts/container/vast_verify.sh
+```
+
+Vastへ渡すのは1つのabsolute executableのみ。
 
 ```text
 --args /opt/jpacf/scripts/container/vast_verify.sh
 ```
 
-The verifier script:
+scriptは次を行う。
 
 ```text
-runs verify_runtime.py --require-gpu
-captures the return code
-prints JPA_CF_CANONICAL_VERIFY rc=<code>
-exits immediately on failure
-keeps the container alive only after successful proof
+verify_runtime.py --require-gpu を実行
+return codeを取得
+JPA_CF_CANONICAL_VERIFY rc=<rc> を出力
+失敗なら即exit
+成功時のみevidence回収のためcontainerを維持
 ```
 
-This removes nested shell quoting from the Vast API/CLI/container boundary.
+これによりVast API/CLI境界からnested shell quotingを排除した。
 
-## 10. Vast fail-fast and cleanup
+workflowはinstance作成前に `vast_verify.sh` がexecutableであることも検証する。
 
-A paid verification must not wait for a long workflow timeout after the container has already failed.
+---
 
-The current wait loop:
+## 15. Vast fail-fastと課金停止
 
-1. polls raw instance status;
-2. records `actual_status`;
-3. fetches logs with command-level timeouts;
-4. succeeds only after `JPA_CF_CANONICAL_VERIFY rc=0`;
-5. fails immediately on a non-zero proof marker;
-6. fails immediately if the instance is `exited` before success;
-7. is bounded by an outer attempt count.
+有料providerでは「workflow timeoutまで待てば安全」では不十分である。
 
-The destroy step runs with `always()` semantics and destroys the recorded instance ID even if earlier verification or publication steps fail.
+現在のwait loopは次の順で判定する。
 
-Provider CLI operations are also individually bounded with `timeout` so a hung CLI call cannot indefinitely bypass cleanup.
+1. `vastai show instance --raw` でstatus取得
+2. `actual_status` をevidenceへ記録
+3. container log取得
+4. `JPA_CF_CANONICAL_VERIFY rc=0` なら成功
+5. non-zero markerなら即失敗
+6. marker未出力のまま `actual_status == exited` なら即失敗
+7. bounded retry countを超えたら失敗
 
-## 11. GPU verification contract
+さらにprovider CLI自体を `timeout` で囲み、Vast CLIのhangでworkflow全体がcleanupへ進めなくなることを防ぐ。
 
-A successful proof is intentionally stronger than `nvidia-smi`.
+instance destroy stepは次の意味を持つ。
 
-The verifier checks the software/runtime contract and performs a real CUDA tensor computation.
+```yaml
+if: ${{ always() }}
+```
 
-Expected properties include:
+verificationやHF publicationが失敗しても、保存済みinstance IDに対してdestroyを試行する。
+
+---
+
+## 16. GPU verification contract
+
+成功条件は `nvidia-smi` が表示できることではない。
+
+container内からPyTorchでCUDAを初期化し、GPU tensorを確保して実際のcomputeを行い、synchronizeまで成功することを検証する。
+
+期待するruntime identity:
 
 ```text
 platform             linux/amd64
@@ -312,7 +585,7 @@ GPU count            >= 1
 state writable       hf/uv/xdg/torch = true
 ```
 
-A canonical Vast proof after the final fixes recorded:
+最終修正後のcanonical Vast proofでは次を記録した。
 
 ```text
 source SHA
@@ -346,42 +619,67 @@ GitHub evidence artifact
   9825427447
 ```
 
-The proof emitted `JPA_CF_CANONICAL_VERIFY rc=0`. The instance was destroyed after HF publication and evidence upload.
-
-These values are historical proof data, not permanent configuration. Future authoritative runs must record their own digest and provider metadata.
-
-## 12. Hugging Face responsibilities
-
-GHCR and Hugging Face have separate roles:
+proof marker:
 
 ```text
-GHCR      executable immutable environment
-HF Bucket transferable files, caches, identities, and experiment evidence
+JPA_CF_CANONICAL_VERIFY rc=0
 ```
 
-The project does not copy the full GPU root filesystem through HF Bucket. Conversely, important evidence should not exist only inside an ephemeral provider disk.
+HF publicationとGitHub artifact upload後、instance `49592872` はdestroyされた。
 
-### Isolated HF transport environment
+これらの値はhistorical evidenceであり、将来runの固定設定ではない。今後のauthoritative runは毎回新しいdigest/provider metadataを記録する。
 
-HF Bucket transport is isolated under `/opt/jpacf/tools/hf-bucket`.
+---
 
-`scripts/hf/hf-identity.sh` exposes `hf_bucket_cli`. Inside the authoritative container, it runs the pre-materialized transport project with locked `--no-sync` behavior so an experiment upload cannot silently resynchronize or mutate the ASR environment.
+## 17. Hugging Faceの責務
 
-Outside the canonical container, the helper may synchronize the transport project normally.
+GHCRとHugging Faceは競合するstorageではなく役割が異なる。
 
-## 13. HF Bucket namespace
+```text
+GHCR
+  executable immutable environment
 
-The project bucket is:
+HF Bucket
+  transferable files / cache / runtime identity / experiment evidence
+```
+
+GPU rootfs全体をHF Bucketで運ばない。
+
+一方で、実験evidenceやcross-providerで再利用したいartifactをVast local diskだけに残さない。
+
+---
+
+## 18. HF transport environmentの分離
+
+Hugging Face Bucket CLI用environmentはASR runtimeと分離し、次に配置する。
+
+```text
+/opt/jpacf/tools/hf-bucket
+```
+
+`scripts/hf/hf-identity.sh` の `hf_bucket_cli` がtransportを担当する。
+
+canonical container内では、すでにimage build時にmaterialize済みのtransport environmentを使い、`--no-sync` で実行する。
+
+これによりevidence uploadの途中でuvがtransport dependencyを再解決・再同期し、ASR runtimeのlocked stateへ影響することを防ぐ。
+
+container外では必要に応じてisolated transport projectのみ同期する。
+
+---
+
+## 19. HF Bucket namespace
+
+project bucket:
 
 ```text
 hf://buckets/saeeew/J-PACF-YOMI-tdt-bucket
 ```
 
-The logical layout is:
+namespaceは責務ごとに分ける。
 
 ```text
 runtime/sha-<git-sha>/
-  verified runtime identity and provider proof
+  verified runtime identity / provider proof
 
 workspace-cache/<deterministic-key>/
   artifacts/
@@ -391,38 +689,55 @@ runs/<run-id>/
   immutable experiment evidence
 ```
 
-This separates runtime identity, reusable materialized research state, and experiment results.
+### runtime identity
 
-## 14. Runtime identity publication
+GPU verification成功後に `runtime-image.json` を作成する。
 
-After GPU proof, the workflow writes `runtime-image.json` with source SHA, platform, CUDA/PyTorch/NeMo contract, dependency-base digest, runtime digest, execution contract, state mount, GPU verification status, and provider metadata where relevant.
+主な内容:
 
-The verified identity is synchronized to:
+```text
+source_git_sha
+platform
+CUDA major
+NeMo version
+torch version
+runtime_base_reference
+runtime digest
+full image reference
+gpu_verified
+execution_contract
+state_mount
+Vast provider metadata（Vast proof時）
+```
+
+そして次へsyncする。
 
 ```text
 hf://buckets/saeeew/J-PACF-YOMI-tdt-bucket/runtime/sha-<source-sha>
 ```
 
-For the canonical proof above:
+canonical proof例:
 
 ```text
 hf://buckets/saeeew/J-PACF-YOMI-tdt-bucket/runtime/sha-5c9c79856093eded02f67dfe148f56e99f607a9b
 ```
 
-This gives a provider-independent lookup from source revision to the runtime digest that actually passed GPU verification.
+これによりGit source SHAから「実際にGPUで検証を通過したruntime digest」をprovider非依存で参照できる。
 
-## 15. Cross-provider workspace cache
+---
 
-Not every cache should be transferred between providers.
+## 20. cross-provider workspace cache
 
-The project transfers expensive reproducible research material:
+すべてのlocal cacheをHFへ同期するのではなく、再生成コストが高くprovider間で価値のあるものだけを転送する。
+
+転送対象:
 
 ```text
 artifacts/
 generated/
 ```
 
-Disposable package/download caches stay provider-local:
+provider-localに残すもの:
 
 ```text
 hf/
@@ -431,69 +746,150 @@ xdg/
 torch/
 ```
 
-A deterministic key is generated by `scripts/container/cache-key.sh`. Remote data is stored under:
+local package/download cacheは巨大になりやすく、lockから再生成可能なのでcross-provider transferの費用対効果が低い。
 
-```text
-hf://buckets/<bucket>/workspace-cache/<key>
+### deterministic key
+
+keyはrepositoryのinput/lock/materialization contractから生成する。
+
+```bash
+KEY="$(bash scripts/container/cache-key.sh)"
 ```
 
-Published cache keys are treated as immutable. If relevant inputs change, a new key is produced instead of overwriting an existing cache.
-
-`scripts/hf/hf-sync-workspace-cache.sh` uses a plan/apply publication pattern for `artifacts/` and `generated/` and refuses to overwrite an already published key.
-
-This makes the workspace cache behave more like content-addressed research material than a mutable network directory.
-
-## 16. Provider-local persistence versus HF Bucket
-
-A Vast Volume or self-hosted `.jpacf-state` remains useful for speed, but it is not the cross-provider source of truth.
-
-Provider-local state is optimized for repeated access on the same host and can contain large disposable caches. HF Bucket is optimized for portability, deterministic reusable material, runtime identity, and immutable evidence.
-
-The intended strategy is:
+remote path:
 
 ```text
-local state first for speed
-+
-HF Bucket for portability and evidence
+hf://buckets/<bucket>/workspace-cache/<KEY>
 ```
 
-## 17. End-to-end canonical flow
+既存keyはimmutableとして扱い、上書きしない。
+
+inputが変化したらnew keyを生成する。
+
+### plan/apply
+
+`scripts/hf/hf-sync-workspace-cache.sh` はpush時にHF syncのplan/applyを利用する。
 
 ```text
-1. read pinned NVIDIA base digest
-2. calculate dependency-base key
-3. reuse existing base or build once
-4. resolve dependency base to immutable digest
-5. build thin source runtime
-6. push directly from Buildx to GHCR
-7. resolve exact runtime digest
-8. select GPU target
-9. run exact digest on real NVIDIA GPU
-10. execute CUDA tensor proof
-11. record runtime identity
-12. sync identity/evidence to HF Bucket
-13. destroy paid Vast instance when applicable
-14. use verified digest for experiments
+artifacts upload planを生成
+generated upload planを生成
+planをapply
 ```
 
-Experiment execution then restores deterministic HF workspace material when available, prepares missing artifacts, runs the experiment ladder, and publishes immutable run evidence.
+既存keyが存在する場合はpublicationを拒否する。
 
-## 18. Required GitHub secrets
+これによりworkspace cacheを「mutable共有folder」ではなく、content-addressedに近いresearch materialとして扱う。
 
-The orchestration paths use repository secrets named:
+---
+
+## 21. Vast VolumeとHF Bucketの違い
+
+### Vast Volume / self-hosted local state
+
+利点:
+
+```text
+同一hostで高速
+大量の一時cacheを保持可能
+再起動時のmaterializationを削減
+```
+
+欠点:
+
+```text
+provider/host placementに依存
+別Vast hostへ自動で追従するとは限らない
+単体ではauthoritative evidenceにならない
+```
+
+### HF Bucket
+
+利点:
+
+```text
+cross-provider
+明示的namespace
+runtime identityやimmutable evidenceに向く
+新しいGPU hostでartifactを復元可能
+```
+
+欠点:
+
+```text
+local diskよりnetwork latencyがある
+全package cacheをlive filesystemのように置く用途には向かない
+```
+
+したがって最終方針は次。
+
+```text
+provider-local state = speed
+HF Bucket            = portability + evidence
+```
+
+---
+
+## 22. End-to-end canonical flow
+
+```text
+1. pinned NVIDIA base digestを読む
+        |
+2. dependency base keyを計算
+        |
+3. base-<key>をreuse、なければ一度だけbuild
+        |
+4. dependency baseをdigestへ解決
+        |
+5. thin source runtimeをbuild
+        |
+6. BuildxからGHCRへdirect push
+        |
+7. exact runtime digestを解決
+        |
+8. GPU targetを選択
+        |
+9. exact digestをreal NVIDIA GPUで起動
+        |
+10. CUDA tensor compute proof
+        |
+11. runtime identityを記録
+        |
+12. HF Bucketへidentity/evidenceをsync
+        |
+13. Vast使用時はpaid instanceをdestroy
+        |
+14. verified digestでexperiment実行
+```
+
+experiment側では必要に応じて以下を追加する。
+
+```text
+HF workspace-cache restore
+ -> missing artifacts/generatedをprepare
+ -> E00-E06 / E07a実行
+ -> immutable run evidence publication
+```
+
+---
+
+## 23. GitHub Actionsで必要なsecret名
+
+orchestrationではrepository secretとして次を使用する。
 
 ```text
 VAST_API_KEY
 HF_TOKEN
 ```
 
-GitHub's workflow token is used for GHCR operations with package permissions.
+GHCRにはworkflow tokenをpackage permission付きで使用する。
 
-Secret values must never be committed into repository files, Docker layers, build metadata, or diagnostic artifacts.
+secret valueをrepository file、Docker layer、build metadata、diagnostic artifactへ保存してはならない。
 
-## 19. Operational commands
+---
 
-Resolve the promoted runtime to an immutable digest:
+## 24. 代表的な運用コマンド
+
+### promoted runtimeをdigestへ解決
 
 ```bash
 export JPA_CF_IMAGE="$(
@@ -502,101 +898,117 @@ export JPA_CF_IMAGE="$(
 )"
 ```
 
-Verify on local/self-hosted Linux with NVIDIA Docker support:
+### local / self-hosted NVIDIA runtimeで検証
 
 ```bash
 bash scripts/container/run.sh \
   python /opt/jpacf/scripts/container/verify_runtime.py --require-gpu
 ```
 
-Generate a deterministic workspace cache key:
+### workspace cache key生成
 
 ```bash
 KEY="$(bash scripts/container/cache-key.sh)"
 ```
 
-Restore workspace material:
+### workspace cache restore
 
 ```bash
 bash scripts/container/run.sh \
   bash scripts/hf/hf-sync-workspace-cache.sh pull "$KEY"
 ```
 
-Publish a new immutable workspace cache:
+### new immutable workspace cache publish
 
 ```bash
 bash scripts/container/run.sh \
   bash scripts/hf/hf-sync-workspace-cache.sh push "$KEY"
 ```
 
-Paid canonical Vast verification is performed through the manual `ghcr-runtime-vast-fallback` GitHub Actions workflow.
+### 有料Vast canonical proof
 
-## 20. Troubleshooting matrix
+GitHub Actionsのmanual workflowを使用する。
 
-| Symptom | Likely layer | First checks |
+```text
+ghcr-runtime-vast-fallback
+```
+
+---
+
+## 25. Troubleshooting matrix
+
+| 症状 | 主な原因layer | 最初に確認するもの |
 |---|---|---|
-| Docker stages finish, runner dies during export | hosted Docker image-store I/O | confirm `docker-container` Buildx and `--push`; reject `--load` |
-| dependency base rebuilds after ordinary source edit | base-key scope | inspect `base_key` inputs in `build_runtime_image.sh` |
-| project Python disappears after mounting state | interpreter placed under mutable state | verify `/opt/jpacf/.uv-python` invariant |
-| self-hosted staged run cannot write persistent state | root-owned files | use the shared wrapper and host UID/GID |
-| Vast exits with a path containing an entire shell command | provider argv quoting | pass `vast_verify.sh` as a single executable path |
-| Vast waits after container already died | polling not fail-fast | inspect `actual_status` and proof-marker handling |
-| Vast keeps charging after failure | cleanup path | verify persisted instance ID and `always()` destroy step |
-| HF upload unexpectedly changes ASR environment | transport env not isolated | use `hf_bucket_cli` and locked container transport |
-| a new provider lacks materialized artifacts | local volume treated as portable | restore deterministic HF workspace cache |
-| tag and evidence disagree | mutable tag used as identity | resolve and record `@sha256:` before execution |
+| Docker stage完了後にrunnerがexport中に終了 | hosted Docker image-store I/O | `docker-container` + `--push`、`--load`を使っていないか |
+| source変更だけでdependency baseが再build | base key scope | `build_runtime_image.sh` の `base_key` inputs |
+| state mount後にproject Pythonが消える | interpreterがmutable state配下 | `/opt/jpacf/.uv-python` invariant |
+| self-hosted staged runでpermission denied | root-owned persistent state | shared wrapperとhost UID/GID |
+| Vast logでshell command全体がpath扱い | provider argv quoting | `vast_verify.sh` absolute path |
+| Vast container終了後もworkflowが待つ | fail-fast不足 | `actual_status == exited` とproof marker判定 |
+| Vast課金が止まらない | cleanup path | persisted instance ID / `always()` destroy |
+| HF upload時にruntime dependencyが変わる | transport env混在 | isolated `hf_bucket_cli` / container `--no-sync` |
+| 新GPU hostにartifactがない | local volumeをportableと誤認 | HF `workspace-cache/<key>` restore |
+| tagとevidenceのruntimeが一致しない | mutable tagをidentityに使用 | execution前の `@sha256:` resolve |
 
-## 21. Architecture invariants
+---
 
-Future changes should preserve these rules:
+## 26. 今後も維持すべきarchitecture invariant
 
-1. Do not put managed Python under `/workspace/state`.
-2. Do not mount provider state over `/opt/jpacf`.
-3. Do not use `--load` in the large hosted canonical build path.
-4. Do not promote a runtime solely because it built successfully; verify the exact digest on a real GPU.
-5. Do not use mutable tags as experiment identity.
-6. Do not let ad-hoc root containers create persistent self-hosted research state.
-7. Do not pass complicated quoted shell programs through the Vast `--args` boundary.
-8. Do not make paid Vast cleanup depend on success of earlier steps.
-9. Do not resynchronize HF transport dependencies into the locked ASR runtime during research execution.
-10. Do not overwrite deterministic HF workspace-cache keys.
-11. Do not treat a Vast Volume as the cross-provider source of truth.
-12. Do not pull a just-pushed huge hosted image back into the same runner merely to validate its manifest.
+1. managed Pythonを `/workspace/state` 配下へ置かない。
+2. persistent provider stateを `/opt/jpacf` にmountしない。
+3. hosted canonical buildで巨大imageへ `--load` を使わない。
+4. build成功だけでruntimeをpromoteせず、exact digestをreal GPUで検証する。
+5. experiment identityにmutable tagを使用しない。
+6. ad-hoc root containerでself-hosted persistent stateを作らない。
+7. Vast `--args` に複雑なquoted shell programを渡さない。
+8. Vast destroyを前step成功に依存させない。
+9. research run中にHF transport dependencyをASR runtimeへ再同期しない。
+10. deterministic HF workspace-cache keyを上書きしない。
+11. Vast Volumeをcross-provider source of truthとみなさない。
+12. hosted runner上でpush直後の巨大imageをmanifest確認目的だけでpull-backしない。
 
-## 22. Upstream documentation used to validate the design
+---
 
-The implementation was checked against current upstream documentation through Context7.
+## 27. Context7で確認したupstream documentation
 
-Docker:
+今回の設計はContext7経由で現行upstream documentationを再確認した。
+
+### Docker
 
 - <https://docs.docker.com/build/builders/drivers/>
 - <https://docs.docker.com/build/exporters/image-registry/>
 - <https://docs.docker.com/build/cache/backends/registry/>
 - <https://docs.docker.com/build/cache/optimize/>
 
-Relevant Docker behavior confirmed by the current documentation:
+確認した重要点:
 
-- `docker-container` does not automatically load results into the local Docker image store;
-- `--push` exports the result to a registry;
-- `--load` is the explicit local-image-store path for non-default builders;
-- cache exporters/importers can be used independently of immutable image identity;
-- `RUN --mount=type=cache` is a performance optimization and must not be required for runtime correctness.
+```text
+docker-container driverはbuild resultをlocal image storeへ自動loadしない
+--pushでregistry exporterへ直接出力できる
+--loadはnon-default builderのresultをlocal image storeへloadする明示的経路
+cache exporter/importerはfinal immutable image identityと分離可能
+RUN --mount=type=cacheはperformance optimizationでありruntime correctnessに依存させない
+```
 
-Hugging Face Hub:
+### Hugging Face Hub
 
 - <https://huggingface.co/docs/huggingface_hub/guides/cli>
 - <https://huggingface.co/docs/huggingface_hub/guides/buckets>
 
-Relevant HF behavior confirmed by the current documentation:
+確認した重要点:
 
-- bucket sync supports local-to-bucket and bucket-to-local directory synchronization;
-- synchronization can use a `--plan` and `--apply` two-phase flow;
-- authentication is supplied separately from the data being synchronized;
-- normal sync transfers only the files that require an operation.
+```text
+hf buckets syncはlocal -> bucket / bucket -> localのdirectory syncを扱える
+--plan / --apply によるtwo-phase syncが可能
+authenticationはsync対象dataとは分離して与える
+通常syncでは必要なoperationだけが転送対象になる
+```
 
-## 23. Related repository files
+---
 
-Core build/runtime:
+## 28. 関連ファイル
+
+### Docker / runtime
 
 ```text
 Dockerfile.runtime-base
@@ -609,7 +1021,7 @@ scripts/container/verify_runtime.py
 scripts/container/vast_verify.sh
 ```
 
-Vast orchestration:
+### Vast
 
 ```text
 .github/workflows/ghcr-runtime-vast-fallback.yml
@@ -617,7 +1029,7 @@ scripts/providers/vast/build_search_query.py
 scripts/providers/vast/rank_offers.py
 ```
 
-Hugging Face storage:
+### Hugging Face
 
 ```text
 configs/hf-storage.json
@@ -626,13 +1038,13 @@ scripts/hf/hf-sync-workspace-cache.sh
 tools/hf-bucket/
 ```
 
-Usage guide:
+### 利用手順
 
 ```text
 docs/portable-gpu-runtime.md
 ```
 
-Regression contracts:
+### regression contract
 
 ```text
 tests/test_container_contract.py
@@ -641,4 +1053,4 @@ tests/test_hf_bucket_storage.py
 tests/test_self_hosted_cache_contract.py
 ```
 
-When this architecture changes, update both the implementation and the regression tests so these invariants remain machine-checkable.
+このarchitectureを変更する場合、implementationだけでなくcontract testも同時に更新し、重要invariantをmachine-checkableな状態に維持する。
