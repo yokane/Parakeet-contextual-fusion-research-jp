@@ -38,7 +38,7 @@ if [[ -f "${EXECUTION_MANIFEST}" ]]; then
   bundle_args+=(--execution-manifest "${EXECUTION_MANIFEST}")
 fi
 
-python scripts/hf/build_run_bundle.py "${bundle_args[@]}"
+uv run --locked python scripts/hf/build_run_bundle.py "${bundle_args[@]}"
 bash scripts/hf/hf-push-run.sh "${BUNDLE}"
 
 echo "E07a Bucket run: hf://buckets/saeeew/J-PACF-YOMI-tdt-bucket/runs/${RUN_ID}"
