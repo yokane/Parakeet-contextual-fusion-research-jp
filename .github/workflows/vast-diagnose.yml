@@ -10,12 +10,13 @@ permissions:
   contents: read
 
 jobs:
-  inspect:
+  destroy-failed-proof:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     env:
       VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
       TARGET_LABEL: jpacf-canonical-33567053241-1
+      EXPECTED_IMAGE: ghcr.io/yokane/jpacf-yomi-tdt-runtime@sha256:7eac031218b80c73f7fac871ed18b5279f6104c543b9d7c7732aaadd8ec57bdf
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
@@ -28,13 +29,13 @@ jobs:
         run: |
           set -euo pipefail
           mise run deps:sync-vast
-      - name: Inspect canonical instance and logs
+      - name: Destroy only the failed canonical instance
         shell: bash
         run: |
           set -euo pipefail
           test -n "${VAST_API_KEY:-}"
           timeout 30s uv run --locked vastai show instances --api-key "$VAST_API_KEY" --raw > "$RUNNER_TEMP/instances.json"
-          instance_id="$(python - "$RUNNER_TEMP/instances.json" "$TARGET_LABEL" <<'PY'
+          instance_id="$(python - "$RUNNER_TEMP/instances.json" "$TARGET_LABEL" "$EXPECTED_IMAGE" <<'PY'
           import json, sys
           from pathlib import Path
           payload = json.loads(Path(sys.argv[1]).read_text())
@@ -43,16 +44,28 @@ jobs:
           if not matches:
               print('')
               raise SystemExit(0)
+          if len(matches) != 1:
+              raise SystemExit(f'expected exactly one matching label, found {len(matches)}')
           row = matches[0]
-          safe = {k: row.get(k) for k in ('id','label','actual_status','intended_status','cur_state','status_msg','gpu_name','dph_total','start_date','image_uuid')}
-          print(json.dumps(safe, sort_keys=True), file=sys.stderr)
+          if str(row.get('image_uuid') or '') != sys.argv[3]:
+              raise SystemExit(f'refusing to destroy unexpected image: {row.get("image_uuid")}')
           print(row['id'])
           PY
           )"
           if [[ -z "$instance_id" ]]; then
-            echo "target instance not present"
+            echo "target instance already absent"
             exit 0
           fi
-          echo "instance_id=$instance_id"
-          timeout 30s uv run --locked vastai show instance "$instance_id" --api-key "$VAST_API_KEY" --raw || true
-          timeout 30s uv run --locked vastai logs "$instance_id" --api-key "$VAST_API_KEY" --tail 500 || true
+          echo "destroying failed canonical instance id=$instance_id label=$TARGET_LABEL"
+          timeout 30s uv run --locked vastai destroy instance "$instance_id" --api-key "$VAST_API_KEY" -y
+          sleep 2
+          timeout 30s uv run --locked vastai show instances --api-key "$VAST_API_KEY" --raw > "$RUNNER_TEMP/after.json"
+          python - "$RUNNER_TEMP/after.json" "$TARGET_LABEL" <<'PY'
+          import json, sys
+          from pathlib import Path
+          payload = json.loads(Path(sys.argv[1]).read_text())
+          rows = payload if isinstance(payload, list) else payload.get('instances', [])
+          if any(str(row.get('label') or '') == sys.argv[2] for row in rows):
+              raise SystemExit('target instance still present after destroy')
+          print('target instance destroyed')
+          PY
