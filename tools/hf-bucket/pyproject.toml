@@ -1,0 +1,10 @@
+[project]
+name = "jpacf-hf-bucket-tooling"
+version = "0.1.0"
+requires-python = "==3.11.*"
+dependencies = [
+  "huggingface-hub==1.29.0",
+]
+
+[tool.uv]
+package = false
