@@ -152,11 +152,12 @@ jobs:
           docker run --rm \
             -e HF_TOKEN \
             -e HF_BUCKET \
+            -e GITHUB_SHA \
             -e HF_TRANSPORT_PROJECT=/opt/jpacf/tools/hf-bucket \
             -v "$PWD:/workspace/project" \
             -w /workspace/project \
             "$image" \
-            bash -lc 'source scripts/hf/hf-identity.sh; hf_bucket_cli buckets sync dist/runtime "hf://buckets/${HF_BUCKET}/runtime/sha-${GITHUB_SHA:-unknown}" --token "$HF_TOKEN"'
+            bash -lc 'source scripts/hf/hf-identity.sh; hf_bucket_cli buckets sync dist/runtime "hf://buckets/${HF_BUCKET}/runtime/sha-${GITHUB_SHA}" --token "$HF_TOKEN"'
 
       - name: Upload runtime identity
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
