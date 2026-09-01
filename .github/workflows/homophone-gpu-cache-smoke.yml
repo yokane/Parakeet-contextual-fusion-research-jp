@@ -6,6 +6,7 @@ on:
     branches: [feat/hf-bucket-ghcr-cache]
     paths:
       - "locks/hf-revisions.lock.json"
+      - ".github/workflows/homophone-gpu-cache-smoke.yml"
 
 permissions:
   contents: read
