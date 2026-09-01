@@ -1,2 +1,3 @@
-run-once: 2026-09-02
-purpose: build canonical GHCR on hosted Actions and verify immutable digest on Vast RTX 4090
+run-once: 2026-09-02-plain-docker
+source: previous-commit
+purpose: build canonical GHCR with plain Docker and verify immutable digest on Vast RTX 4090
