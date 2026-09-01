@@ -52,6 +52,15 @@ jobs:
         shell: bash
         run: bash scripts/ci/setup_actions_cache.sh
 
+      - name: Isolate mise from runner user configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > "${RUNNER_TEMP}/mise-global.toml"
+          : > "${RUNNER_TEMP}/mise-system.toml"
+          echo "MISE_GLOBAL_CONFIG_FILE=${RUNNER_TEMP}/mise-global.toml" >> "${GITHUB_ENV}"
+          echo "MISE_SYSTEM_CONFIG_FILE=${RUNNER_TEMP}/mise-system.toml" >> "${GITHUB_ENV}"
+
       - name: Install exact mise toolchain
         uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
         with:
