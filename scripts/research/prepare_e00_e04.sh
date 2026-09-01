@@ -25,9 +25,9 @@ done
 mise install --locked
 mise run deps:sync-gpu
 mise run hf:transport:sync
-uv run --locked python scripts/repro/verify_platform.py --require-gpu
+uv run --locked --no-sync python scripts/repro/verify_platform.py --require-gpu
 
-benchmark_revision="$(uv run --locked python - <<'PY'
+benchmark_revision="$(uv run --locked --no-sync python - <<'PY'
 import json
 from pathlib import Path
 payload = json.loads(Path('locks/hf-revisions.lock.json').read_text(encoding='utf-8'))
@@ -37,7 +37,7 @@ PY
 [[ "${benchmark_revision}" =~ ^[0-9a-f]{40}$ ]] || exit 2
 
 rm -rf "${EVAL_DIR}"
-uv run --locked python scripts/materialize_hf_eval.py \
+uv run --locked --no-sync python scripts/materialize_hf_eval.py \
   --repo-id saeeew/JP-HomophoneBench \
   --revision "${benchmark_revision}" \
   --config "${HF_CONFIG}" \
@@ -45,8 +45,8 @@ uv run --locked python scripts/materialize_hf_eval.py \
   --output-dir "${EVAL_DIR}" \
   --rehydrate-audio \
   --require-audio
-uv run --locked python scripts/validate_eval_manifest.py "${EVAL_DIR}/nemo_eval.jsonl" --require-audio
-uv run --locked python scripts/validate_audio_coverage.py \
+uv run --locked --no-sync python scripts/validate_eval_manifest.py "${EVAL_DIR}/nemo_eval.jsonl" --require-audio
+uv run --locked --no-sync python scripts/validate_audio_coverage.py \
   --provenance "${EVAL_DIR}/eval_provenance.json" \
   --required-category exact_homophone \
   --required-category near_homophone \
@@ -54,7 +54,7 @@ uv run --locked python scripts/validate_audio_coverage.py \
   --min-total 10 \
   --output "${EVAL_DIR}/audio_coverage.json"
 
-uv run --locked python scripts/materialize_locked_model.py --output "${MODEL_NEMO}"
+uv run --locked --no-sync python scripts/materialize_locked_model.py --output "${MODEL_NEMO}"
 
 checkout_exact() {
   local url="$1" destination="$2" revision="$3"
