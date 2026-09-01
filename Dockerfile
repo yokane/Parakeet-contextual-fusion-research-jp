@@ -36,6 +36,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
       cmake \
       curl \
       git \
+      libboost-program-options-dev \
+      libboost-system-dev \
+      libboost-test-dev \
+      libboost-thread-dev \
       libsndfile1 \
       ninja-build \
     && rm -rf /var/lib/apt/lists/*
