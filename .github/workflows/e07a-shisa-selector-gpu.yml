@@ -1,0 +1,141 @@
+name: e07a-shisa-selector-gpu
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_run_id:
+        description: "Immutable HF Bucket run containing E05_phone_rerank.jsonl"
+        required: true
+        type: string
+      results_name:
+        description: "Local result directory suffix"
+        required: true
+        default: "e07a-shisa"
+        type: string
+      top_k:
+        description: "N-best hypotheses exposed to Shisa"
+        required: true
+        default: "8"
+        type: string
+      seed:
+        description: "Stable candidate shuffle seed"
+        required: true
+        default: "7"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e07a-shisa-selector-${{ inputs.source_run_id }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  select:
+    runs-on: [self-hosted, linux, x64, cuda13]
+    timeout-minutes: 180
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
+      RESULTS_DIR: results/${{ inputs.results_name }}
+      SHISA_MODEL: shisa-ai/shisa-v2-qwen2.5-7b
+      SHISA_REVISION: 2ba1a59
+      SHISA_TOP_K: ${{ inputs.top_k }}
+      SHISA_SEED: ${{ inputs.seed }}
+      SHISA_DTYPE: bfloat16
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Configure self-hosted cache contract
+        id: cache
+        shell: bash
+        run: bash scripts/ci/setup_actions_cache.sh
+
+      - name: Install exact mise toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: ${{ steps.cache.outputs.persistent != 'true' }}
+
+      - name: Materialize locked CUDA13 and Bucket environments
+        run: |
+          mise run deps:sync-gpu
+          mise run hf:transport:sync
+
+      - name: Verify authoritative GPU platform
+        run: uv run --locked python scripts/repro/verify_platform.py --require-gpu
+
+      - name: Validate inputs and HF identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || { echo "HF_TOKEN is missing" >&2; exit 2; }
+          [[ "${{ inputs.source_run_id }}" =~ ^[A-Za-z0-9._-]+$ ]] || {
+            echo "source_run_id must be path-safe" >&2
+            exit 2
+          }
+          [[ "${SHISA_TOP_K}" =~ ^[1-9][0-9]*$ ]] || { echo "top_k must be a positive integer" >&2; exit 2; }
+          [[ "${SHISA_SEED}" =~ ^[0-9]+$ ]] || { echo "seed must be a non-negative integer" >&2; exit 2; }
+          source scripts/hf/hf-identity.sh
+          hf_bucket_cli auth whoami --token "${HF_TOKEN}"
+
+      - name: Fetch immutable E05 source run from HF Bucket
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/hf/hf-identity.sh
+          rm -rf dist/e07a-source
+          mkdir -p dist/e07a-source
+          hf_bucket_cli buckets sync \
+            --token "${HF_TOKEN}" \
+            "hf://buckets/${HF_BUCKET}/runs/${{ inputs.source_run_id }}" \
+            dist/e07a-source
+          test -f dist/e07a-source/evidence/results/E05_phone_rerank.jsonl || {
+            echo "Source run does not contain evidence/results/E05_phone_rerank.jsonl" >&2
+            exit 2
+          }
+          test -f dist/e07a-source/evidence/inputs/bench_index.jsonl || {
+            echo "Source run does not contain evidence/inputs/bench_index.jsonl" >&2
+            exit 2
+          }
+
+      - name: Run deterministic Shisa N-best selector
+        shell: bash
+        env:
+          INPUT: dist/e07a-source/evidence/results/E05_phone_rerank.jsonl
+          BENCHMARK_INDEX: dist/e07a-source/evidence/inputs/bench_index.jsonl
+          MANIFEST: dist/e07a-source/evidence/inputs/nemo_eval.jsonl
+        run: |
+          set -euo pipefail
+          mkdir -p "${RESULTS_DIR}"
+          uv run --locked \
+            --extra gpu \
+            --with 'transformers==4.57.3' \
+            --with 'accelerate>=1.10,<2' \
+            --with 'safetensors>=0.5' \
+            bash experiments/E07a_shisa_select.sh
+
+      - name: Publish append-only E07a run evidence
+        id: publish
+        shell: bash
+        env:
+          BENCHMARK_INDEX: dist/e07a-source/evidence/inputs/bench_index.jsonl
+          MANIFEST: dist/e07a-source/evidence/inputs/nemo_eval.jsonl
+        run: |
+          set -euo pipefail
+          run_id="gh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}-e07a"
+          bash scripts/hf/publish_e07a_run.sh "${run_id}"
+          echo "run_id=${run_id}" >> "${GITHUB_OUTPUT}"
+          echo "### E07a Shisa selector" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Source: \`hf://buckets/${HF_BUCKET}/runs/${{ inputs.source_run_id }}\`" >> "${GITHUB_STEP_SUMMARY}"
+          echo "Result: \`hf://buckets/${HF_BUCKET}/runs/${run_id}\`" >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload short-lived GitHub evidence copy
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: e07a-shisa-${{ inputs.results_name }}-${{ github.sha }}
+          path: ${{ env.RESULTS_DIR }}
+          if-no-files-found: error
+          retention-days: 30
