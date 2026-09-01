@@ -1,0 +1,123 @@
+name: hf-model-artifact-publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_name:
+        description: "Versioned artifact directory name, e.g. v0.1.0-e05"
+        required: true
+        type: string
+      checkpoint_path:
+        description: "Optional local .nemo path on the self-hosted runner"
+        required: false
+        default: ""
+        type: string
+      phone_head_path:
+        description: "Optional local .pt/.pth phoneme-head path"
+        required: false
+        default: ""
+        type: string
+      metrics_path:
+        description: "Optional metrics JSON path"
+        required: false
+        default: ""
+        type: string
+      saturation_path:
+        description: "Optional saturation JSON path"
+        required: false
+        default: ""
+        type: string
+      environment_path:
+        description: "Optional runtime environment JSON path"
+        required: false
+        default: ""
+        type: string
+      notes_path:
+        description: "Optional Markdown release notes path"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-model-artifact-publish-${{ inputs.release_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: [self-hosted, linux, gpu]
+    timeout-minutes: 60
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_MODEL_REPO: saeeew/J-PACF-YOMI-tdt
+      RELEASE_ROOT: dist/hf-model
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate release inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || { echo "HF_TOKEN secret is missing" >&2; exit 2; }
+          [[ "${{ inputs.release_name }}" != */* ]] || { echo "release_name must not contain /" >&2; exit 2; }
+          for path in \
+            "${{ inputs.checkpoint_path }}" \
+            "${{ inputs.phone_head_path }}" \
+            "${{ inputs.metrics_path }}" \
+            "${{ inputs.saturation_path }}" \
+            "${{ inputs.environment_path }}" \
+            "${{ inputs.notes_path }}"; do
+            if [[ -n "${path}" ]]; then
+              test -f "${path}" || { echo "Missing release input: ${path}" >&2; exit 2; }
+            fi
+          done
+      - name: Validate optional NeMo checkpoint
+        if: ${{ inputs.checkpoint_path != '' }}
+        shell: bash
+        env:
+          CHECKPOINT_PATH: ${{ inputs.checkpoint_path }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import nemo.collections.asr as nemo_asr
+
+          path = os.environ["CHECKPOINT_PATH"]
+          model = nemo_asr.models.ASRModel.restore_from(path, map_location="cpu")
+          print(type(model).__name__)
+          print("restored", path)
+          PY
+      - name: Install Hub client
+        run: python -m pip install 'huggingface-hub>=1,<2'
+      - name: Build release bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            --release "${{ inputs.release_name }}"
+            --output-root "${RELEASE_ROOT}"
+          )
+          [[ -z "${{ inputs.checkpoint_path }}" ]] || args+=(--checkpoint "${{ inputs.checkpoint_path }}")
+          [[ -z "${{ inputs.phone_head_path }}" ]] || args+=(--phone-head "${{ inputs.phone_head_path }}")
+          [[ -z "${{ inputs.metrics_path }}" ]] || args+=(--metrics "${{ inputs.metrics_path }}")
+          [[ -z "${{ inputs.saturation_path }}" ]] || args+=(--saturation "${{ inputs.saturation_path }}")
+          [[ -z "${{ inputs.environment_path }}" ]] || args+=(--environment "${{ inputs.environment_path }}")
+          [[ -z "${{ inputs.notes_path }}" ]] || args+=(--notes "${{ inputs.notes_path }}")
+          python scripts/build_hf_model_release.py "${args[@]}"
+      - name: Publish versioned release
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/publish_hf_model_release.py \
+            --repo-id "${HF_MODEL_REPO}" \
+            --release "${{ inputs.release_name }}" \
+            --release-dir "${RELEASE_ROOT}/${{ inputs.release_name }}" \
+            --commit-message "Publish J-PACF-YOMI-TDT ${{ inputs.release_name }} from GitHub ${GITHUB_SHA}"
+      - name: Upload immutable GitHub copy
+        uses: actions/upload-artifact@v4
+        with:
+          name: j-pacf-yomi-tdt-${{ inputs.release_name }}
+          path: ${{ env.RELEASE_ROOT }}/${{ inputs.release_name }}
+          if-no-files-found: error
+          retention-days: 90

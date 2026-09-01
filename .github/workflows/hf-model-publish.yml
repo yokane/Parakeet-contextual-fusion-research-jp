@@ -1,0 +1,52 @@
+name: hf-model-publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      private:
+        description: "Publish/keep model repository private"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hf-model-publish-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  publish-scaffold:
+    runs-on: ubuntu-24.04
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      HF_MODEL_REPO: saeeew/J-PACF-YOMI-tdt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Verify token and scaffold
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}" || { echo "HF_TOKEN secret is missing" >&2; exit 2; }
+          test -f hf_model/README.md
+          test -f hf_model/fusion_config.yaml
+          test -f hf_model/research_manifest.json
+      - name: Install Hub client
+        run: python -m pip install 'huggingface-hub>=1,<2'
+      - name: Publish model scaffold
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            --repo-id "${HF_MODEL_REPO}"
+            --folder hf_model
+            --commit-message "Sync J-PACF-YOMI-TDT scaffold from GitHub ${GITHUB_SHA}"
+          )
+          if [[ "${{ inputs.private }}" == "true" ]]; then
+            args+=(--private)
+          fi
+          python scripts/publish_hf_model.py "${args[@]}"

@@ -1,0 +1,73 @@
+schema_version: 1
+model_family: J-PACF-YOMI-TDT
+status: research-scaffold
+
+base_model:
+  repo_id: nvidia/parakeet-tdt_ctc-0.6b-ja
+  framework: nemo
+  license: cc-by-4.0
+  frozen_by_default: true
+
+benchmark:
+  repo_id: saeeew/JP-HomophoneBench
+  default_config: homophone8
+  research_config: homophone8-research
+  default_split: test
+
+decoding:
+  decoder_type: rnnt
+  strategy: malsd_batch
+  beam:
+    beam_size: 12
+    pruning_mode: late
+    blank_lm_score_mode: lm_weighted_full
+    allow_cuda_graphs: true
+
+ngpu_lm:
+  enabled: false
+  model_path: null
+  alpha: 0.2
+  config_namespace: rnnt_decoding.beam
+
+phrase_boosting:
+  enabled: false
+  key_phrases_file: null
+  context_score: 1.0
+  depth_scaling: 2.0
+  alpha: null
+  config_namespace: rnnt_decoding.malsd.boosting_tree
+
+local_ctc:
+  enabled: false
+  mode: nbest_rerank
+  window_margin_frames: 8
+  score_weight: null
+  length_normalization: true
+
+phoneme_scorer:
+  enabled: false
+  architecture: frozen_fastconformer_linear_ctc
+  checkpoint: null
+  score_weight: null
+  phone_symbols:
+    geminate: Q
+    moraic_nasal: N
+    long_vowel: ':'
+
+entity_context_scorer:
+  enabled: false
+  mode: future
+  score_weight: null
+
+saturation_analysis:
+  enabled: true
+  default_pb_alpha_sweep: [0.0, 0.25, 0.5, 1.0, 1.5, 2.0]
+  confidence: 0.95
+  bootstrap_samples: 10000
+  min_gain: 0.01
+  min_risk_increase: 0.02
+  mcnemar_alpha: 0.05
+
+notes:
+  - Values marked null are intentionally untuned and must be selected from held-out experiments.
+  - This file defines the research contract; it is not evidence that a standalone checkpoint has been trained.
