@@ -7,6 +7,8 @@ on:
     paths:
       - "locks/vast-cache-base.lock.json"
       - "Dockerfile.vast-cache"
+      - "scripts/container/inside.sh"
+      - "scripts/container/verify_runtime.py"
       - ".github/workflows/ghcr-vast-cache-candidate.yml"
 
 permissions:
@@ -55,83 +57,69 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Buildx
-        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
+        with:
+          driver: docker-container
 
       - name: Read cache-friendly immutable base
         id: base
         shell: bash
         run: |
           set -euo pipefail
-          reference="$(python - <<'PY'
-          import json
-          from pathlib import Path
-          payload=json.loads(Path('locks/vast-cache-base.lock.json').read_text())
-          print(payload['reference'])
-          PY
-          )"
-          [[ "$reference" =~ @sha256:[0-9a-f]{64}$ ]]
-          echo "reference=$reference" >> "$GITHUB_OUTPUT"
-          echo "Candidate base: $reference" >> "$GITHUB_STEP_SUMMARY"
+          base="$(python -c 'import json; print(json.load(open("locks/vast-cache-base.lock.json"))["images"]["vast_pytorch"]["reference"])')"
+          [[ "$base" =~ @sha256:[0-9a-f]{64}$ ]]
+          echo "reference=$base" >> "$GITHUB_OUTPUT"
 
       - name: Build and push cache candidate
         id: build
-        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
-          file: ./Dockerfile.vast-cache
+          file: Dockerfile.vast-cache
           platforms: linux/amd64
           push: true
-          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
-          labels: |
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
-            io.jpacf.vast-cache-candidate=true
-          cache-from: ${{ env.BUILDKIT_CACHE_FROM }}
-          cache-to: ${{ env.BUILDKIT_CACHE_TO }}
           build-args: |
             BASE_IMAGE=${{ steps.base.outputs.reference }}
-            SOURCE_REPOSITORY=${{ github.server_url }}/${{ github.repository }}
+          tags: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ github.sha }}
+          cache-from: ${{ env.BUILDKIT_CACHE_FROM }}
+          cache-to: ${{ env.BUILDKIT_CACHE_TO }}
+          provenance: false
+          sbom: false
 
       - name: Verify candidate through NVIDIA runtime
         shell: bash
         run: |
           set -euo pipefail
           image="${REGISTRY}/${IMAGE_NAME}@${{ steps.build.outputs.digest }}"
-          mkdir -p .jpacf-state-vast-cache
           docker pull "$image"
-          docker run --rm --gpus all --ipc=host --shm-size 8g \
-            -v "$PWD/.jpacf-state-vast-cache:/workspace/state" \
+          docker run --rm --gpus all \
+            -e JPA_CF_STATE_ROOT=/workspace/state \
+            -v "${RUNNER_TEMP}/jpacf-vast-cache-state:/workspace/state" \
             "$image" \
             bash /opt/jpacf/scripts/container/inside.sh \
-            python /opt/jpacf/scripts/container/verify_runtime.py --require-gpu
+              python /opt/jpacf/scripts/container/verify_runtime.py --require-gpu
 
       - name: Record candidate identity
         shell: bash
         run: |
           set -euo pipefail
-          digest='${{ steps.build.outputs.digest }}'
-          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
-          mkdir -p dist/vast-cache-runtime
-          cat > dist/vast-cache-runtime/runtime-image.json <<EOF
+          mkdir -p dist/runtime
+          image="${REGISTRY}/${IMAGE_NAME}@${{ steps.build.outputs.digest }}"
+          cat > dist/runtime/vast-cache-candidate.json <<JSON
           {
             "schema_version": 1,
-            "status": "gpu-verified-vast-cache-candidate",
-            "source_git_sha": "${{ github.sha }}",
-            "base_reference": "${{ steps.base.outputs.reference }}",
-            "platform": "linux/amd64",
-            "nemo_toolkit": "3.0.0",
-            "torch": "2.12.0+cu132",
-            "digest": "$digest",
-            "reference": "${REGISTRY}/${IMAGE_NAME}@$digest",
-            "promotion_gate": "Vast args/entrypoint cold-start smoke"
+            "source_git_sha": "${GITHUB_SHA}",
+            "image": "${image}",
+            "digest": "${{ steps.build.outputs.digest }}",
+            "base_image": "${{ steps.base.outputs.reference }}"
           }
-          EOF
-          cat dist/vast-cache-runtime/runtime-image.json
+          JSON
+          cat dist/runtime/vast-cache-candidate.json
 
       - name: Upload candidate identity
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: vast-cache-runtime-${{ github.sha }}
-          path: dist/vast-cache-runtime/runtime-image.json
-          if-no-files-found: error
+          name: ghcr-vast-cache-candidate-${{ github.run_id }}
+          path: dist/runtime/vast-cache-candidate.json
           retention-days: 30
