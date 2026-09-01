@@ -1,7 +1,7 @@
 services:
   research:
     image: ${JPA_CF_IMAGE:?Set JPA_CF_IMAGE to a GHCR tag or preferably an @sha256 digest}
-    entrypoint: ["/opt/jpacf/scripts/container/inside.sh"]
+    entrypoint: ["bash", "/opt/jpacf/scripts/container/inside.sh"]
     command: ["bash"]
     working_dir: /workspace/project
     stdin_open: true
