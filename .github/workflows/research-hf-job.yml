@@ -1,0 +1,96 @@
+name: research-hf-job
+
+on:
+  workflow_dispatch:
+    inputs:
+      experiment_id:
+        description: "Immutable experiment identifier"
+        required: true
+        type: string
+      image_reference:
+        description: "GHCR runtime in repository@sha256:<digest> form"
+        required: true
+        type: string
+      model_revision:
+        description: "nvidia/parakeet-tdt_ctc-0.6b-ja full 40-char revision"
+        required: true
+        type: string
+      dataset_revision:
+        description: "JP-HomophoneBench full 40-char revision"
+        required: true
+        type: string
+      command:
+        description: "Command inside the locked runtime"
+        required: true
+        default: "python scripts/repro/verify_platform.py --require-gpu"
+        type: string
+      flavor:
+        description: "HF Jobs GPU flavor"
+        required: true
+        default: "a10g-small"
+        type: string
+      timeout:
+        description: "HF Jobs timeout"
+        required: true
+        default: "2h"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: research-hf-job-${{ inputs.experiment_id }}
+  cancel-in-progress: false
+
+jobs:
+  submit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install exact mise toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: true
+
+      - name: Materialize locked submission environment
+        run: mise run deps:sync
+
+      - name: Build immutable HF Jobs contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          uv run --locked python scripts/providers/build_job_spec.py \
+            --provider hf-jobs \
+            --experiment-id "${{ inputs.experiment_id }}" \
+            --image "${{ inputs.image_reference }}" \
+            --model-revision "${{ inputs.model_revision }}" \
+            --dataset-revision "${{ inputs.dataset_revision }}" \
+            --source-sha "${{ github.sha }}" \
+            --command "${{ inputs.command }}" \
+            --output dist/providers/hf-job-spec.json
+
+      - name: Submit exact image to Hugging Face Jobs
+        run: |
+          uv run --locked python scripts/providers/hf_jobs/submit.py \
+            --spec dist/providers/hf-job-spec.json \
+            --flavor "${{ inputs.flavor }}" \
+            --timeout "${{ inputs.timeout }}" \
+            --namespace saeeew \
+            > dist/providers/hf-job-submission.json
+          cat dist/providers/hf-job-submission.json >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload submission evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hf-job-${{ inputs.experiment_id }}-${{ github.sha }}
+          path: |
+            dist/providers/hf-job-spec.json
+            dist/providers/hf-job-submission.json
+          if-no-files-found: error
+          retention-days: 30
