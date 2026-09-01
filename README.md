@@ -1,4 +1,6 @@
-[![Dataset on HF](https://huggingface.co/datasets/huggingface/badges/resolve/main/dataset-on-hf-md.svg)](https://huggingface.co/datasets/saeeew/JP-HomophoneBench)
+[![Dataset on HF](https://huggingface.co/datasets/huggingface/badges/resolve/main/dataset-on-hf-sm.svg)](https://huggingface.co/datasets/saeeew/JP-HomophoneBench)
+[![Model on HF](https://huggingface.co/datasets/huggingface/badges/resolve/main/model-on-hf-sm.svg)](https://huggingface.co/saeeew/J-PACF-YOMI-tdt)
+
 
 # Parakeet Contextual Fusion Research JP
 
