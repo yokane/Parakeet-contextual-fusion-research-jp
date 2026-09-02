@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo_root="$(git rev-parse --show-toplevel)"
+repo_root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
 cd "$repo_root"
 
 state_root="${JPA_CF_STATE_ROOT:-/workspace/state}"
@@ -19,6 +19,8 @@ sudo chown -R "$(id -u):$(id -g)" \
   "${MISE_DATA_DIR:-/home/vscode/.local/share/mise}" \
   "$cache_root" \
   "$state_root"
+
+git config --global --add safe.directory "$repo_root" 2>/dev/null || true
 
 # Keep the local toolchain aligned with GitHub Actions and fail if mise.lock
 # cannot satisfy the repository's Linux/x86_64 contract.
