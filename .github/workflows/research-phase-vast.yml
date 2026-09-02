@@ -13,7 +13,7 @@ on:
         required: false
         type: string
       image:
-        description: Optional immutable phase image override; blank uses the current source SHA tag
+        description: Optional phase image override; blank resolves phase-*-current to an immutable digest on main
         required: false
         type: string
       e06_driver:
@@ -122,13 +122,17 @@ jobs:
           test -n "${VAST_API_KEY:-}"
           image='${{ inputs.image }}'
           if [[ -z "$image" ]]; then
+            if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+              echo "Feature-branch Vast runs require an explicit image; refusing to use main's current locator implicitly." >&2
+              exit 2
+            fi
             case "$TASK" in
               e02-encode|e02-pack|E02) phase=e02 ;;
               e05-extract) phase=e05 ;;
               E00|E01|E03|E04|E06) phase="${TASK,,}" ;;
               *) echo "unsupported task: $TASK" >&2; exit 2 ;;
             esac
-            image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/jpacf-yomi-tdt-runtime:phase-${phase}-${GITHUB_SHA}"
+            image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/jpacf-yomi-tdt-runtime:phase-${phase}-current"
           fi
 
           resolved=""
@@ -140,16 +144,18 @@ jobs:
           else
             repo="${DOCKERHUB_REPOSITORY#docker.io/}"
             tag="${image##*:}"
-            if [[ -z "$repo" || "$repo" != */* ]]; then
-              echo "Source-matched phase image is unavailable in GHCR and Docker Hub fallback is not configured" >&2
+            if [[ -z "$repo" || "$repo" != */* || "$image" == *@* ]]; then
+              echo "Phase image locator is unavailable in GHCR and Docker Hub fallback is not usable" >&2
               exit 1
             fi
             image="docker.io/${repo}:${tag}"
             resolved="$(bash scripts/container/resolve-remote-image.sh "$image")"
           fi
+          [[ "$resolved" =~ @sha256:[0-9a-f]{64}$ ]]
           echo "PHASE_IMAGE=$resolved" >> "$GITHUB_ENV"
           echo "phase_image=$resolved" >> "$GITHUB_OUTPUT"
-          echo "- image: \`$resolved\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- image locator: \`$image\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- immutable image: \`$resolved\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Select budget-compliant RTX 4090
         if: ${{ steps.identity.outputs.snapshot_exists != 'true' }}
