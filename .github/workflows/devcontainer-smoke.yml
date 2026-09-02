@@ -1,0 +1,58 @@
+name: devcontainer-smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - ".devcontainer/**"
+      - "mise.toml"
+      - "mise.lock"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "tools/hf-bucket/**"
+      - ".github/workflows/devcontainer-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".devcontainer/**"
+      - "mise.toml"
+      - "mise.lock"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "tools/hf-bucket/**"
+      - ".github/workflows/devcontainer-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Build local development image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build \
+            --file .devcontainer/Dockerfile \
+            --build-arg MISE_VERSION=2026.8.16 \
+            --tag jpacf-devcontainer:ci \
+            .
+
+      - name: Verify devcontainer bootstrap prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm jpacf-devcontainer:ci bash -lc '
+            set -euo pipefail
+            test "$(uname -m)" = x86_64
+            test "$(id -un)" = vscode
+            test "$(mise --version | awk "{print \$2}")" = 2026.8.16
+            command -v git >/dev/null
+            command -v git-lfs >/dev/null
+            command -v ffmpeg >/dev/null
+            sudo -n true
+          '
