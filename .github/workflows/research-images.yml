@@ -19,7 +19,9 @@ on:
       - docker/phases/Dockerfile
       - scripts/ci/build_research_images.sh
       - scripts/research/**
+      - scripts/hf/hf-research-snapshot.sh
       - scripts/container/run-phase.sh
+      - scripts/container/vast_research_task.sh
       - configs/research/**
       - .github/workflows/research-images.yml
 
