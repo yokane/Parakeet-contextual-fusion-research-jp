@@ -28,7 +28,7 @@ RUN apt-get update \
 RUN curl -fsSL https://mise.run \
       | MISE_VERSION="v${MISE_VERSION}" MISE_INSTALL_PATH=/usr/local/bin/mise sh \
     && mise --version \
-    && test "$(mise --version | awk '{print $2}')" = "${MISE_VERSION}"
+    && test "$(mise --version | awk '{print $1}')" = "${MISE_VERSION}"
 
 ENV MISE_DATA_DIR=/home/vscode/.local/share/mise \
     MISE_CACHE_DIR=/home/vscode/.cache/mise \
