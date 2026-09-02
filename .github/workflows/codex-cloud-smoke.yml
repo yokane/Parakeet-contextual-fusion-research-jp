@@ -1,0 +1,38 @@
+name: codex-cloud-smoke
+
+on:
+  pull_request:
+    paths:
+      - AGENTS.md
+      - .github/workflows/codex-cloud-smoke.yml
+      - scripts/codex/**
+      - docs/codex-cloud.md
+      - mise.toml
+      - mise.lock
+      - pyproject.toml
+      - uv.lock
+      - tools/hf-bucket/**
+      - tests/test_codex_cloud_contract.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codex-cloud-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Bootstrap Codex-style locked environment
+        shell: bash
+        run: bash scripts/codex/setup.sh
+
+      - name: Run Codex canonical validation
+        shell: bash
+        run: bash scripts/codex/check.sh
