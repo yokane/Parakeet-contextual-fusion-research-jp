@@ -14,18 +14,22 @@ LABEL org.opencontainers.image.source="${SOURCE_REPOSITORY}" \
       io.jpacf.runtime.kind="experiment-phase"
 
 # The parent runtime already owns Python, CUDA, PyTorch, NeMo, uv, the project
-# environment, and the experiment implementation. Only small dispatch/contract
+# environment, and the HF transport environment. Only small dispatch/contract
 # files are overlaid here, so all targets share the same heavy rootfs layers.
 COPY scripts/container/run-phase.sh /opt/jpacf/scripts/container/run-phase.sh
 COPY scripts/container/vast_research_task.sh /opt/jpacf/scripts/container/vast_research_task.sh
+COPY scripts/hf/hf-research-snapshot.sh /opt/jpacf/scripts/hf/hf-research-snapshot.sh
 COPY scripts/research/check_phase_artifacts.py /opt/jpacf/scripts/research/check_phase_artifacts.py
+COPY scripts/research/snapshot_plan.py /opt/jpacf/scripts/research/snapshot_plan.py
 COPY scripts/research/rebase_eval_manifest.py /opt/jpacf/scripts/research/rebase_eval_manifest.py
 COPY scripts/research/e05_extract_gpu.sh /opt/jpacf/scripts/research/e05_extract_gpu.sh
 COPY configs/research/e00-e06-artifacts.yaml /opt/jpacf/configs/research/e00-e06-artifacts.yaml
 RUN chmod 0755 \
       /opt/jpacf/scripts/container/run-phase.sh \
       /opt/jpacf/scripts/container/vast_research_task.sh \
+      /opt/jpacf/scripts/hf/hf-research-snapshot.sh \
       /opt/jpacf/scripts/research/check_phase_artifacts.py \
+      /opt/jpacf/scripts/research/snapshot_plan.py \
       /opt/jpacf/scripts/research/rebase_eval_manifest.py \
       /opt/jpacf/scripts/research/e05_extract_gpu.sh
 
