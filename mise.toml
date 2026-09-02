@@ -60,7 +60,7 @@ run = "uv run --locked python -m compileall -q src scripts"
 
 [tasks."shell:syntax"]
 description = "Validate shell syntax"
-run = "find experiments scripts -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n"
+run = "find experiments scripts .devcontainer -type f -name '*.sh' -print0 | xargs -0 -n1 bash -n"
 
 [tasks."locks:verify"]
 description = "Verify immutable references and required language lockfiles"
