@@ -1,6 +1,5 @@
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 DOCKERFILE = ROOT / "docker" / "phases" / "Dockerfile"
 RUNNER = ROOT / "scripts" / "container" / "run-phase.sh"
