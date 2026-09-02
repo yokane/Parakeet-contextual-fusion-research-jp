@@ -50,7 +50,7 @@ jobs:
             set -euo pipefail
             test "$(uname -m)" = x86_64
             test "$(id -un)" = vscode
-            test "$(mise --version | awk "{print \$2}")" = 2026.8.16
+            test "$(mise --version | awk "{print \$1}")" = 2026.8.16
             command -v git >/dev/null
             command -v git-lfs >/dev/null
             command -v ffmpeg >/dev/null
