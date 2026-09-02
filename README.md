@@ -70,14 +70,24 @@ See `docs/releases/v0.1.0.md` for publication provenance, source counts, Actions
 
 ## Setup
 
+The recommended local development path is the repository Dev Container. Open the repository root in VS Code/Cursor and run **Dev Containers: Reopen in Container**. The container restores Python 3.12.3 and uv 0.12.1 from `mise.lock`, materializes the locked CPU/static environment, and prepares the isolated Hugging Face Bucket CLI environment.
+
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e '.[dev,g2p]'
-pytest
+mise run ci
 ```
 
-GPU experiments additionally require NVIDIA NeMo and CUDA. E07a keeps the repository's authoritative `uv.lock` unchanged and layers versioned Transformers packages onto the locked GPU runtime with `uv run --with`.
+See [`.devcontainer/README.md`](.devcontainer/README.md) for cache/state volumes, Hugging Face authentication, ARM-host notes, and the boundary between local CPU development and the canonical GPU runtime.
+
+For a manual Linux/x86_64 setup, use the same repository contract rather than an ad-hoc `pip install`:
+
+```bash
+mise --locked install
+mise run deps:sync
+mise run hf:transport:sync
+mise run test
+```
+
+GPU experiments additionally require the authoritative NVIDIA NeMo/CUDA runtime. The default Dev Container intentionally does not duplicate that environment. E07a keeps the repository's authoritative `uv.lock` unchanged and layers versioned Transformers packages onto the locked GPU runtime with `uv run --with`.
 
 ## Build and publish the fixed Dataset
 
@@ -257,6 +267,10 @@ Existing core workflows include:
 parakeet-context-fusion-ci.yml
   CPU lint / unit / compile / shell validation
 
+devcontainer-smoke.yml
+  build the local CPU/static development image
+  -> verify linux/amd64 + vscode user + pinned mise prerequisites
+
 homophone-eval-smoke.yml
   pull public HF homophone8:test
   -> build index/context/corpus
@@ -273,6 +287,7 @@ hf-bucket-candidate-publish.yml
 ## Repository layout
 
 ```text
+.devcontainer/         local CPU/static development environment
 .github/workflows/    CPU CI, HF publication, smoke and GPU evaluation
 configs/              experiment/evaluation/storage defaults
 data/                 benchmark metadata and CC0 seeds
