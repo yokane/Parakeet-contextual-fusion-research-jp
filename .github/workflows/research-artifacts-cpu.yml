@@ -40,6 +40,7 @@ jobs:
     timeout-minutes: 120
     env:
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      DOCKERHUB_REPOSITORY: ${{ secrets.DOCKERHUB_REPOSITORY }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -50,7 +51,8 @@ jobs:
           install: true
           cache: true
 
-      - name: Resolve research workspace
+      - name: Resolve immutable research snapshot
+        id: workspace
         shell: bash
         run: |
           set -euo pipefail
@@ -64,48 +66,67 @@ jobs:
           [[ "$key" =~ ^[A-Za-z0-9._-]+$ ]]
           state="${GITHUB_WORKSPACE}/.jpacf-state"
           mkdir -p "$state"
+          exists="$(bash scripts/hf/hf-research-snapshot.sh exists "$key" '${{ inputs.task }}')"
+          remote="$(bash scripts/hf/hf-research-snapshot.sh remote "$key" '${{ inputs.task }}')"
           echo "RESEARCH_KEY=$key" >> "$GITHUB_ENV"
           echo "JPA_CF_STATE_ROOT=$state" >> "$GITHUB_ENV"
-          echo "REMOTE=hf://buckets/${HF_BUCKET}/workspace-cache/e00-e06/${key}" >> "$GITHUB_ENV"
+          echo "snapshot_exists=$exists" >> "$GITHUB_OUTPUT"
+          echo "snapshot_remote=$remote" >> "$GITHUB_OUTPUT"
+          echo "- task: \`${{ inputs.task }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- research key: \`$key\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- output snapshot: \`$remote\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- already exists: \`$exists\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Reuse existing immutable snapshot
+        if: ${{ steps.workspace.outputs.snapshot_exists == 'true' }}
+        shell: bash
+        run: echo "Snapshot already exists; no CPU compute or registry pull is required." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Restore required snapshot inputs
+        if: ${{ steps.workspace.outputs.snapshot_exists != 'true' && inputs.task != 'common' }}
+        shell: bash
+        run: bash scripts/hf/hf-research-snapshot.sh pull "$RESEARCH_KEY" '${{ inputs.task }}' "$JPA_CF_STATE_ROOT"
+
+      - name: Build common benchmark/audio/context artifacts
+        if: ${{ steps.workspace.outputs.snapshot_exists != 'true' && inputs.task == 'common' }}
+        shell: bash
+        run: JPA_CF_STATE_ROOT="$JPA_CF_STATE_ROOT" bash scripts/research/prepare_common_artifacts.sh
 
       - name: Log in to GHCR for tool images
-        if: ${{ inputs.task != 'common' }}
+        if: ${{ steps.workspace.outputs.snapshot_exists != 'true' && inputs.task != 'common' }}
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build common benchmark/audio/context artifacts
-        if: ${{ inputs.task == 'common' }}
-        shell: bash
-        run: JPA_CF_STATE_ROOT="$JPA_CF_STATE_ROOT" bash scripts/research/prepare_common_artifacts.sh
-
-      - name: Restore reusable research state
-        if: ${{ inputs.task != 'common' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          source scripts/hf/hf-identity.sh
-          hf_bucket_cli buckets sync --token "$HF_TOKEN" "$REMOTE" "$JPA_CF_STATE_ROOT"
-
       - name: Estimate E02 KenLM on hosted CPU
-        if: ${{ inputs.task == 'e02-estimate' }}
+        if: ${{ steps.workspace.outputs.snapshot_exists != 'true' && inputs.task == 'e02-estimate' }}
         shell: bash
         env:
-          KENLM_IMAGE: ${{ inputs.kenlm_image }}
+          PREFERRED_IMAGE: ${{ inputs.kenlm_image }}
         run: |
           set -euo pipefail
           encoded="$JPA_CF_STATE_ROOT/artifacts/lm/lm_corpus.encoded.txt"
           encoding_meta="$JPA_CF_STATE_ROOT/artifacts/lm/encoding-metadata.json"
           test -s "$encoded"
           test -s "$encoding_meta"
-          docker pull "$KENLM_IMAGE"
+          image="$PREFERRED_IMAGE"
+          if ! docker pull "$image"; then
+            repo="${DOCKERHUB_REPOSITORY#docker.io/}"
+            tag="${image##*:}"
+            if [[ -z "$repo" || "$repo" != */* ]]; then
+              echo "GHCR tool image is unavailable and Docker Hub fallback is not configured" >&2
+              exit 1
+            fi
+            image="docker.io/${repo}:${tag}"
+            docker pull "$image"
+          fi
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/repo:ro" \
             -v "$JPA_CF_STATE_ROOT:/workspace/state" \
             -w /repo \
-            "$KENLM_IMAGE" \
+            "$image" \
             "python3 scripts/research/ngram_lm_pipeline.py estimate \
               --encoded-corpus /workspace/state/artifacts/lm/lm_corpus.encoded.txt \
               --encoding-metadata /workspace/state/artifacts/lm/encoding-metadata.json \
@@ -117,27 +138,32 @@ jobs:
               --metadata /workspace/state/artifacts/lm/estimation-metadata.json"
 
       - name: Train and apply E05 phone head on hosted CPU
-        if: ${{ inputs.task == 'e05-phone' }}
+        if: ${{ steps.workspace.outputs.snapshot_exists != 'true' && inputs.task == 'e05-phone' }}
         shell: bash
         env:
-          PHONE_IMAGE: ${{ inputs.phone_image }}
+          PREFERRED_IMAGE: ${{ inputs.phone_image }}
         run: |
           set -euo pipefail
-          docker pull "$PHONE_IMAGE"
+          image="$PREFERRED_IMAGE"
+          if ! docker pull "$image"; then
+            repo="${DOCKERHUB_REPOSITORY#docker.io/}"
+            tag="${image##*:}"
+            if [[ -z "$repo" || "$repo" != */* ]]; then
+              echo "GHCR tool image is unavailable and Docker Hub fallback is not configured" >&2
+              exit 1
+            fi
+            image="docker.io/${repo}:${tag}"
+            docker pull "$image"
+          fi
           docker run --rm \
             -v "$JPA_CF_STATE_ROOT:/workspace/state" \
             -e JPA_CF_STATE_ROOT=/workspace/state \
-            "$PHONE_IMAGE"
+            "$image"
 
-      - name: Persist reusable state to HF Bucket
+      - name: Publish immutable delta snapshot
+        if: ${{ steps.workspace.outputs.snapshot_exists != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
-          source scripts/hf/hf-identity.sh
-          plan="$RUNNER_TEMP/research-sync.jsonl"
-          hf_bucket_cli buckets sync --token "$HF_TOKEN" "$JPA_CF_STATE_ROOT" "$REMOTE" --plan "$plan"
-          hf_bucket_cli buckets sync --token "$HF_TOKEN" --apply "$plan"
-          echo "### Research artifact update" >> "$GITHUB_STEP_SUMMARY"
-          echo "- task: `${{ inputs.task }}`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- research key: `$RESEARCH_KEY`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- state: `$REMOTE`" >> "$GITHUB_STEP_SUMMARY"
+          bash scripts/hf/hf-research-snapshot.sh push "$RESEARCH_KEY" '${{ inputs.task }}' "$JPA_CF_STATE_ROOT"
+          echo "Published: ${{ steps.workspace.outputs.snapshot_remote }}" >> "$GITHUB_STEP_SUMMARY"
