@@ -1,50 +1,43 @@
 # E00–E06 研究Artifact・実行環境・処理手順
 
-この文書は `nvidia/parakeet-tdt_ctc-0.6b-ja` を基盤とする E00–E06 研究を、毎回CUDA/NeMo環境や研究資材を作り直さず、再現可能かつ低コストに反復するための運用契約です。
+この文書は `nvidia/parakeet-tdt_ctc-0.6b-ja` を基盤とする E00–E06 研究を、**CPUで可能な処理はGitHub-hosted、GPUが必要な処理だけVast**へ分離し、研究Artifact・container・HF Bucketを再利用しながら反復するための運用契約です。
 
-機械可読な対応表は [`configs/research/e00-e06-artifacts.yaml`](../configs/research/e00-e06-artifacts.yaml) にあります。
+機械可読な契約は [`configs/research/e00-e06-artifacts.yaml`](../configs/research/e00-e06-artifacts.yaml)、content-addressed snapshotの詳細は [`research-snapshot-fingerprints.md`](research-snapshot-fingerprints.md) を参照してください。
 
-GPUを借りる前には必ずArtifact readinessを確認します。
-
-```bash
-uv run --locked --no-sync python scripts/research/check_phase_artifacts.py E04 \
-  --state-root /workspace/state
-```
-
-## 1. 基本方針
-
-処理を3つのplaneへ分離します。
+## 1. 研究plane
 
 ```text
-GitHub-hosted CPU                          Vast GPU
------------------                          --------
-benchmark/audio materialization            model/tokenizer依存処理
-KenLM lmplz/build_binary                    E00/E01 decode
-E05 phone-head学習・rerank                  E02 tokenizer encode / pack / decode
-static validation                           E03 GPU phrase biasing
-                                            E04 hybrid CTC rerank
-                                            E05 encoder extraction
-                                            E06 in-beam integration
-             \                              /
-              \                            /
-               Hugging Face Bucket
-               immutable delta snapshots
-               + append-only run evidence
+Local / Dev Container / Codex Cloud
+  編集・lint・CPU unit test・workflow/Dockerfile開発
+                    |
+                    v
+GitHub-hosted CPU                         Vast GPU
+-----------------                         --------
+common benchmark/audio                    E00/E01 decode
+KenLM lmplz/build_binary                   E02 tokenizer encode / NeMo pack / decode
+E05 phone-head train/rerank                E03 GPU phrase biasing
+static/reproducibility checks              E04 hybrid CTC rerank
+thin image Buildx                          E05 encoder extraction
+                                           E06 in-beam integration
+                    \                     /
+                     \                   /
+                      Hugging Face Bucket
+                      immutable delta snapshots
+                      + append-only run evidence
 ```
 
-原則は次の通りです。
+原則:
 
-1. **CPUで可能な処理はGitHub-hosted runnerで行う。**
-2. **0.6B ASR model、CUDA、NeMo内部状態が必要な処理だけVastへ送る。**
-3. **Container registryにはsoftware environmentだけを置く。**
-4. **audio、trained LM、encoder tensor、phone head、結果はHF Bucketへ置く。**
-5. **GitHub Actions cacheへDocker layerや研究データを入れない。**
-6. **Vastを確保する前に必要Artifactの存在を確認する。**
-7. **既に完了したimmutable snapshotが存在するtaskは再計算しない。**
+1. CPUで完結する処理はGitHub-hosted runnerで実行する。
+2. ASR model forward、CUDA、NeMo tokenizer/decoder内部状態が必要な処理だけVastへ送る。
+3. GHCR/Docker Hubにはsoftware environmentだけを置く。
+4. audio、LM、encoder tensor、phone head、結果はHF Bucketへ置く。
+5. GitHub Actions cacheへDocker layerや研究Artifactを保存しない。
+6. GPU allocation前にsnapshot existenceとsource-matched imageを解決する。
+7. immutable snapshotが存在するtaskは再計算しない。
+8. mutable `*-current` imageはcanonical research executionに使わない。
 
 ## 2. 固定identity
-
-Public benchmark/model:
 
 ```text
 Dataset: saeeew/JP-HomophoneBench
@@ -52,188 +45,140 @@ Model:   saeeew/J-PACF-YOMI-tdt
 Bucket:  saeeew/J-PACF-YOMI-tdt-bucket
 ```
 
-実験で使うexact revisionは `locks/hf-revisions.lock.json` を唯一のsource of truthとします。
+exact revisionは `locks/hf-revisions.lock.json` をsource of truthとします。
 
-## 3. research key
+## 3. research key と stage fingerprint
 
-同じ研究資材を再利用する単位を `research_key` とします。
+データ/model側のidentity:
 
 ```bash
-uv run --locked --no-sync python scripts/research/research_key.py
+RESEARCH_KEY="$(uv run --locked --no-sync python scripts/research/research_key.py)"
 ```
 
 形式:
 
 ```text
-v1-bench-<12hex>-model-<12hex>-ng6
+v1-bench-<benchmark12>-model-<model12>-ng6
 ```
 
-workflow inputの `research_key` を空欄にすればlocked revisionから同じ値が導出されます。
+実装側のidentityはtaskごとの `stage-fingerprint` です。
 
-## 4. HF Bucketは「mutable workspace」ではなくimmutable delta snapshotにする
+```bash
+uv run --locked --no-sync python scripts/research/stage_fingerprints.py \
+  --task E04 --field fingerprint
+```
 
-既存の `workspace-cache/<key>` immutable契約を壊さないため、各taskは研究workspace全体を上書きしません。
+fingerprintは以下をSHA-256へ正規化します。
 
-Remote layout:
+- task固有の実装file/directory
+- task固定parameter
+- upstream stage fingerprint
+- E06のように必要なexternal implementation identity
+
+このためE05だけを修正した場合、common/KenLM/E00–E04は再利用し、`e05-phone`とそのconsumer E06だけをinvalidateできます。
+
+## 4. HF Bucket immutable delta snapshot
+
+Canonical remote layout:
 
 ```text
 hf://buckets/saeeew/J-PACF-YOMI-tdt-bucket/
 └── workspace-cache/
     └── e00-e06/
         └── <research-key>/
-            ├── common/
-            ├── e02-encode/
-            ├── e02-estimate/
-            ├── e02-pack/
-            ├── phase-e00/
-            ├── phase-e01/
-            ├── phase-e02/
-            ├── phase-e03/
-            ├── phase-e04/
-            ├── e05-extract/
-            ├── e05-phone/
-            └── phase-e06/
+            ├── common/<fingerprint>/
+            ├── e02-encode/<fingerprint>/
+            ├── e02-estimate/<fingerprint>/
+            ├── e02-pack/<fingerprint>/
+            ├── phase-e00/<fingerprint>/
+            ├── phase-e01/<fingerprint>/
+            ├── phase-e02/<fingerprint>/
+            ├── phase-e03/<fingerprint>/
+            ├── phase-e04/<fingerprint>/
+            ├── e05-extract/<fingerprint>/
+            ├── e05-phone/<fingerprint>/
+            └── phase-e06/<fingerprint>/
 ```
 
-各directoryは**一度作成したら上書き禁止**です。
+snapshotは**一度作成したら上書きしません**。継承Artifactを複製せず、各taskが新規生成したdeltaだけをpublishします。consumerは必要なsnapshotを `/workspace/state` へ `--no-delete` overlay restoreします。
 
-各taskは次の順で動きます。
-
-```text
-required snapshot(s)
-        |
-        | overlay restore
-        v
-/workspace/state
-        |
-        | current task only
-        v
-new artifacts
-        |
-        | selected paths only
-        v
-new immutable delta snapshot
-```
-
-つまり `common/` のaudioをE02/E03/E04 snapshotへ複製して保存しません。consumer側で必要なdeltaをlocal stateへoverlayします。
-
-snapshot操作は次で統一します。
+操作:
 
 ```bash
-bash scripts/hf/hf-research-snapshot.sh plan E04
+bash scripts/hf/hf-research-snapshot.sh plan   E04
+bash scripts/hf/hf-research-snapshot.sh remote "$RESEARCH_KEY" E04
 bash scripts/hf/hf-research-snapshot.sh exists "$RESEARCH_KEY" E04
 bash scripts/hf/hf-research-snapshot.sh pull   "$RESEARCH_KEY" E04 /workspace/state
 bash scripts/hf/hf-research-snapshot.sh push   "$RESEARCH_KEY" E04 /workspace/state
 ```
 
-各snapshotには次も保存されます。
+各snapshotには次を保存します。
 
 ```text
-.jpacf-snapshots/<stage>.json
+.jpacf-snapshots/<stage>-<fingerprint-prefix>.json
 ```
 
-ここにはsource Git SHA、task/stage、file size、SHA-256 inventoryを記録します。
+manifestには `research_key`, `task`, `stage`, `fingerprint`, `input_refs`, `output_ref`, source Git SHA、file size/SHA-256 inventoryを記録します。
 
-## 5. snapshot lineage
+## 5. 全task lineage
 
-| Task | Executor | 読み込むsnapshot | 新規snapshot |
+| Task | Executor | Input snapshot | Output snapshot |
 |---|---|---|---|
-| `common` | GitHub-hosted | - | `common` |
-| `e02-encode` | Vast | `common` | `e02-encode` |
-| `e02-estimate` | GitHub-hosted | `e02-encode` | `e02-estimate` |
-| `e02-pack` | Vast | `e02-encode`, `e02-estimate` | `e02-pack` |
-| `E00` | Vast | `common` | `phase-e00` |
-| `E01` | Vast | `common` | `phase-e01` |
-| `E02` | Vast | `common`, `e02-pack` | `phase-e02` |
-| `E03` | Vast | `common`, `e02-pack` | `phase-e03` |
-| `E04` | Vast | `common`, `e02-pack` | `phase-e04` |
-| `e05-extract` | Vast | `common` | `e05-extract` |
-| `e05-phone` | GitHub-hosted | `common`, `phase-e04`, `e05-extract` | `e05-phone` |
-| `E06` | Vast | `common`, `e02-pack`, `e05-extract`, `e05-phone` | `phase-e06` |
-
-同一 `research_key + output stage` がすでに存在する場合、CPU workflowは計算をskipし、Vast workflowは**GPU instanceを作成する前に終了**します。
+| `common` | GitHub-hosted | - | `common/<fp>` |
+| `e02-encode` | Vast | `common/<fp>` | `e02-encode/<fp>` |
+| `e02-estimate` | GitHub-hosted | `e02-encode/<fp>` | `e02-estimate/<fp>` |
+| `e02-pack` | Vast | `e02-encode/<fp>`, `e02-estimate/<fp>` | `e02-pack/<fp>` |
+| `E00` | Vast | `common/<fp>` | `phase-e00/<fp>` |
+| `E01` | Vast | `common/<fp>` | `phase-e01/<fp>` |
+| `E02` | Vast | `common/<fp>`, `e02-pack/<fp>` | `phase-e02/<fp>` |
+| `E03` | Vast | `common/<fp>`, `e02-pack/<fp>` | `phase-e03/<fp>` |
+| `E04` | Vast | `common/<fp>`, `e02-pack/<fp>` | `phase-e04/<fp>` |
+| `e05-extract` | Vast | `common/<fp>` | `e05-extract/<fp>` |
+| `e05-phone` | GitHub-hosted | `common/<fp>`, `phase-e04/<fp>`, `e05-extract/<fp>` | `e05-phone/<fp>` |
+| `E06` | Vast | `common/<fp>`, `e02-pack/<fp>`, `e05-extract/<fp>`, `e05-phone/<fp>` | `phase-e06/<fp>` |
 
 ## 6. Container image設計
 
-### 6.1 重いGPU runtimeは1つだけ
-
-authoritative parent:
+重いCUDA/NeMo rootfsは1つのauthoritative runtimeで共有します。
 
 ```text
 ghcr.io/yokane/jpacf-yomi-tdt-runtime@sha256:<digest>
 ```
 
-このparentが保持するもの:
+ここにLinux/amd64、CUDA 13、Python 3.12.3、uv 0.12.1、torch 2.12.0+cu132、NeMo 3.0.0を固定します。
 
-- Linux/amd64
-- CUDA 13
-- Python 3.12.3
-- uv 0.12.1
-- torch 2.12.0+cu132
-- NeMo 3.0.0
-- project runtime
-- HF Bucket transport environment
-
-phaseごとにこれらを再installしません。
-
-### 6.2 thin GPU phase image
+phase imageはsource Git SHAをtagへ含めます。
 
 ```text
 ghcr.io/yokane/jpacf-yomi-tdt-runtime:phase-e00-<git-sha>
-ghcr.io/yokane/jpacf-yomi-tdt-runtime:phase-e01-<git-sha>
-ghcr.io/yokane/jpacf-yomi-tdt-runtime:phase-e02-<git-sha>
-ghcr.io/yokane/jpacf-yomi-tdt-runtime:phase-e03-<git-sha>
-ghcr.io/yokane/jpacf-yomi-tdt-runtime:phase-e04-<git-sha>
-ghcr.io/yokane/jpacf-yomi-tdt-runtime:phase-e05-<git-sha>
+...
 ghcr.io/yokane/jpacf-yomi-tdt-runtime:phase-e06-<git-sha>
 ```
 
-E00/E01/E03/E04/E05/E06は `docker/phases/Dockerfile` のnamed targetです。
+E00/E01/E03/E04/E05/E06は `docker/phases/Dockerfile` のthin named targetです。E02だけはKenLM runtime binariesを追加する `docker/research/Dockerfile.e02` を使います。
 
-E02だけは `docker/research/Dockerfile.e02` を使い、KenLM runtime binariesを追加します。ただしKenLM compiler/source treeは含めません。
-
-### 6.3 独立CPU tool image
+CPU tool image:
 
 ```text
-ghcr.io/yokane/jpacf-yomi-tdt-tools:kenlm-<revision-short>
+ghcr.io/yokane/jpacf-yomi-tdt-tools:kenlm-4cb443e60b7b
 ghcr.io/yokane/jpacf-yomi-tdt-tools:phone-e05-<git-sha>
 ```
 
-KenLM image:
+KenLM compiler/source、audio、model checkpoint、LM、encoder tensor、resultsはimage layerへ入れません。
 
-```text
-Debian slim
-+ lmplz
-+ build_binary
-+ minimum runtime libraries
-```
+Buildは `docker-container` Buildx + direct `--push` を使い、`--load`とDocker `type=gha` cacheは使いません。既存immutable tagがremoteにあればbuild自体をskipします。
 
-E05 phone image:
-
-```text
-Python 3.12.3 slim
-+ CPU PyTorch
-+ PhoneCTCHead scripts
-```
-
-CUDA/NeMo/model checkpointは含めません。
+GHCR push/pullが利用できない場合のみ、repository secrets `DOCKERHUB_ACCESS_TOKEN` と `DOCKERHUB_REPOSITORY` を使って同一tagのpublic Docker Hub imageへfallbackします。GHCR成功時の二重mirrorは行いません。
 
 ## 7. Common Artifact — GitHub-hosted CPU
 
 Workflow:
 
 ```text
-research-artifacts-cpu
-  task=common
+research-artifacts-cpu / task=common
 ```
 
-Producer:
-
-```text
-scripts/research/prepare_common_artifacts.sh
-```
-
-Output snapshot `common/`:
+Output:
 
 ```text
 generated/eval/bench_index.jsonl
@@ -245,13 +190,13 @@ generated/eval/context_phrases.txt
 generated/eval/lm_corpus.txt
 ```
 
-`nemo_eval.jsonl` のabsolute audio pathはprovider間で変わるため、Vast restore後に `scripts/research/rebase_eval_manifest.py` が `/workspace/state/generated/eval/audio/...` へrebaseします。
+Vast restore後、`nemo_eval.jsonl` のabsolute audio pathは `scripts/research/rebase_eval_manifest.py` で `/workspace/state/generated/eval/audio/...` へrebaseします。
 
 ## 8. E00 — TDT greedy baseline
 
 Executor: **Vast GPU**
 
-Input snapshot:
+Input:
 
 ```text
 common
@@ -264,94 +209,57 @@ generated/eval/nemo_eval.jsonl
 generated/eval/audio/*
 ```
 
-Output snapshot `phase-e00/`:
+Output:
 
 ```text
 results/E00_tdt_greedy.jsonl
 ```
 
-目的はbeam/LM/context biasなしの基準性能を固定することです。
+beam/LM/context biasを使用しない基準性能です。
 
-## 9. E01 — TDT MAES/beam
+## 9. E01 — TDT beam
 
 Executor: **Vast GPU**
 
-Input:
+Input: `common`
 
-```text
-common
-```
-
-Output `phase-e01/`:
+Output:
 
 ```text
 results/E01_tdt_beam.jsonl
 ```
 
-beam size等のsearch parameterはrun evidenceに残します。
+E00との差からsearchだけによる改善を評価します。
 
 ## 10. E02 — KenLM / NGPU-LM
 
-E02は1つのcontainerで全部処理しません。dependency boundaryで3段階に分離します。
+E02はdependency boundaryで3段階に分離します。
 
 ```text
 lm_corpus.txt
-     |
-     | e02-encode / Vast
-     | exact NeMo + locked Parakeet tokenizer
-     v
+  |
+  | e02-encode / Vast
+  | locked Parakeet tokenizer + NeMo
+  v
 lm_corpus.encoded.txt
 encoding-metadata.json
-     |
-     | e02-estimate / GitHub-hosted CPU
-     | pinned KenLM lmplz/build_binary
-     v
+  |
+  | e02-estimate / GitHub-hosted CPU
+  | pinned KenLM lmplz/build_binary
+  v
 ja-6gram.arpa
 ja-6gram.binary
 estimation-metadata.json
-     |
-     | e02-pack / Vast
-     | exact NeMo NGramGPULanguageModel
-     v
+  |
+  | e02-pack / Vast
+  | NeMo NGramGPULanguageModel packaging
+  v
 ja-6gram.nemo
 package-metadata.json
-     |
-     | E02 / Vast
-     v
+  |
+  | E02 / Vast
+  v
 E02_ngpulm.jsonl
-```
-
-### 10.1 e02-encode — Vast
-
-Input snapshot:
-
-```text
-common
-```
-
-Output `e02-encode/`:
-
-```text
-artifacts/lm/lm_corpus.encoded.txt
-artifacts/lm/encoding-metadata.json
-```
-
-NeMoのsubword KenLM pathはtoken IDをUnicode symbolへ変換するため、ここだけlocked tokenizer/NeMo環境が必要です。
-
-ASR `.nemo` checkpointはVast local scratchへmaterializeしますが、snapshotへはpublishしません。
-
-### 10.2 e02-estimate — GitHub-hosted CPU
-
-Input:
-
-```text
-e02-encode
-```
-
-Tool image:
-
-```text
-jpacf-yomi-tdt-tools:kenlm-<revision>
 ```
 
 Pinned KenLM revision:
@@ -360,7 +268,22 @@ Pinned KenLM revision:
 4cb443e60b7bf2c0ddf3c745378f76cb59e254e5
 ```
 
-Output `e02-estimate/`:
+### e02-encode
+
+Vastでlocked tokenizerを使い、subword IDをKenLM用Unicode token corpusへ変換します。
+
+Output:
+
+```text
+artifacts/lm/lm_corpus.encoded.txt
+artifacts/lm/encoding-metadata.json
+```
+
+### e02-estimate
+
+GitHub-hosted CPUでKenLMを実行します。
+
+Output:
 
 ```text
 artifacts/lm/ja-6gram.arpa
@@ -368,47 +291,26 @@ artifacts/lm/ja-6gram.binary
 artifacts/lm/estimation-metadata.json
 ```
 
-### 10.3 e02-pack — Vast
+### e02-pack
 
-Inputs:
+Vastのexact NeMo runtimeでARPAをNGPU-LM `.nemo`へpackします。
 
-```text
-e02-encode
-e02-estimate
-```
-
-Output `e02-pack/`:
+Output:
 
 ```text
 artifacts/lm/ja-6gram.nemo
 artifacts/lm/package-metadata.json
 ```
 
-### 10.4 E02 decode — Vast
+### E02 decode
 
-Inputs:
-
-```text
-common
-e02-pack
-```
-
-Output `phase-e02/`:
-
-```text
-results/E02_ngpulm.jsonl
-```
+Vastで `common + e02-pack` をrestoreし、`results/E02_ngpulm.jsonl` を生成します。
 
 ## 11. E03 — GPU phrase/context biasing
 
 Executor: **Vast GPU**
 
-Inputs:
-
-```text
-common
-e02-pack
-```
+Inputs: `common`, `e02-pack`
 
 Required:
 
@@ -418,67 +320,46 @@ generated/eval/context_phrases.txt
 artifacts/lm/ja-6gram.nemo
 ```
 
-Output `phase-e03/`:
+Output:
 
 ```text
 results/E03_gpu_pb.jsonl
 ```
 
-追加のheavy dependency imageは不要です。NeMo word boosting/boosting-tree機能はcanonical runtimeを利用します。
+追加heavy imageは不要で、canonical NeMo runtimeのboosting-tree pathを使用します。
 
-## 12. E04 — local hybrid CTC N-best rerank
+## 12. E04 — hybrid CTC N-best rerank
 
 Executor: **Vast GPU**
 
-Inputs:
+Inputs: `common`, `e02-pack`
 
-```text
-common
-e02-pack
-```
-
-Outputs `phase-e04/`:
+Outputs:
 
 ```text
 results/E04_nbest.jsonl
 results/E04_ctc_rerank.jsonl
 ```
 
-locked modelのCTC branchを再実行するためGPU taskです。
+locked modelのCTC branchを使用するためGPU taskです。E05 CPU laneの入力にもなります。
 
 ## 13. E05 — frozen encoder phoneme CTC rerank
 
-E05はcanonical pathをGPU/CPUに分割します。
+Canonical E05はGPU/CPUへ分割します。
 
-### 13.1 encoder extraction — Vast
+### e05-extract — Vast
 
-Task:
+Input: `common`
 
-```text
-e05-extract
-```
-
-Input:
-
-```text
-common
-```
-
-Output `e05-extract/`:
+Output:
 
 ```text
 artifacts/encoder/*.pt
 ```
 
-0.6B Parakeet encoder forwardだけをVastへ残します。
+0.6B Parakeet encoder forwardだけをVastで実行します。
 
-### 13.2 phone-head train + rerank — GitHub-hosted CPU
-
-Task:
-
-```text
-e05-phone
-```
+### e05-phone — GitHub-hosted CPU
 
 Inputs:
 
@@ -488,7 +369,7 @@ phase-e04
 e05-extract
 ```
 
-Outputs `e05-phone/`:
+Outputs:
 
 ```text
 artifacts/phone_vocab.json
@@ -498,11 +379,9 @@ results/E04_phone_ready.jsonl
 results/E05_phone_rerank.jsonl
 ```
 
-small projectionの学習とCTC scoringはCPUで実行できるため、Vastを使用しません。
+small projectionの学習・CTC scoring・rerankはCPUで処理します。default imageはsource-matched `phone-e05-<GITHUB_SHA>` です。
 
-`run-phase.sh E05` はmonolithic debugging routeとして残しますが、canonical research workflowでは使用しません。
-
-## 14. E06 — version-isolated in-beam fusion
+## 14. E06 — in-beam fusion
 
 Executor: **Vast GPU**
 
@@ -515,335 +394,73 @@ e05-extract
 e05-phone
 ```
 
-Required:
+E06はNeMo decoder内部APIへ入るため、driverを明示します。
 
 ```text
-generated/eval/nemo_eval.jsonl
-generated/eval/context_phrases.txt
-artifacts/lm/ja-6gram.nemo
-artifacts/encoder/*.pt
-artifacts/phone_head.pt
-artifacts/phone_vocab.json
-E06_DRIVER=<pinned NeMo-3.0.0-specific driver>
+E06_DRIVER=/path/inside/image/to/e06_driver.py
+JPA_CF_E06_DRIVER_SHA256=<64hex>
 ```
 
-Output `phase-e06/`:
+GitHub Actions inputでは `e06_driver` と `e06_driver_sha256` を指定します。SHA-256が無い場合はVast allocation前にfailします。Vast container内でも実際のdriver fileを `sha256sum` し、指定digestと一致しなければ実験を開始しません。
+
+Output:
 
 ```text
 results/E06_inbeam.jsonl
 ```
 
-`patches/README.md` のpromotion gateを満たすdriverが作られるまでは、E06は意図的に明示driver指定を要求します。新しいCUDA baseは作らず、driver/patchだけを `phase-e06` へthin overlayする方針です。
+## 15. canonical workflowの実行順
 
-## 15. 推奨実験順序
-
-```text
-common (GitHub-hosted)
-  |
-  +------> E00 (Vast)
-  +------> E01 (Vast)
-  |
-  +------> e02-encode (Vast)
-             |
-             v
-          e02-estimate (GitHub-hosted)
-             |
-             v
-          e02-pack (Vast)
-             |
-             +------> E02 (Vast)
-             +------> E03 (Vast)
-             +------> E04 (Vast)
-                        |
-                        +--> e05-extract (Vast; commonから独立実行も可)
-                        |         |
-                        +---------+--> e05-phone (GitHub-hosted)
-                                         |
-                                      E05 result
-                                         |
-                                    promotion gate
-                                         |
-                                         v
-                                       E06 (Vast)
-```
-
-Canonical manual sequence:
+初回:
 
 ```text
-research-artifacts-cpu: task=common
-research-phase-vast:    task=E00
-research-phase-vast:    task=E01
-research-phase-vast:    task=e02-encode
-research-artifacts-cpu: task=e02-estimate
-research-phase-vast:    task=e02-pack
-research-phase-vast:    task=E02
-research-phase-vast:    task=E03
-research-phase-vast:    task=E04
-research-phase-vast:    task=e05-extract
-research-artifacts-cpu: task=e05-phone
-research-phase-vast:    task=E06   # promotion gate後のみ
+1. research-images
+2. research-artifacts-cpu task=common
+3. research-phase-vast task=E00
+4. research-phase-vast task=E01
+5. research-phase-vast task=e02-encode
+6. research-artifacts-cpu task=e02-estimate
+7. research-phase-vast task=e02-pack
+8. research-phase-vast task=E02
+9. research-phase-vast task=E03
+10. research-phase-vast task=E04
+11. research-phase-vast task=e05-extract
+12. research-artifacts-cpu task=e05-phone
+13. E04/E05のgainを確認
+14. research-phase-vast task=E06
 ```
 
-E00/E01とE02 preparationは独立しているため並列研究が可能です。
+各taskはoutput snapshotが既に存在すればskipされます。Vast workflowは存在確認を**instance作成前**に行います。
 
-## 16. Buildx / registry方針
+## 16. phase開始前のArtifact validation
 
-`research-images` workflowはGitHub-hosted CPU上でsoftware imageをbuildします。
-
-```text
-Buildx driver: docker-container
-output:        direct registry --push
---load:        使用しない
-Docker GHA cache: 使用しない
-```
-
-理由:
-
-- huge CUDA/NeMo parentはregistryにすでに存在する;
-- phase overlayは小さい;
-- `--load`するとmulti-GB parentをhost Docker image storeへmaterializeしてしまう;
-- immutable tagが存在すればbuild自体をskipできる;
-- Actions cacheをDocker layerで圧迫しない。
-
-Dockerのregistry exporter/cacheはfinal imageとcacheを分離できますが、このthin phase群では大量のregistry cache refを増やすより、immutable software tagの再利用を優先します。
-
-## 17. image build cache key
-
-KenLM tools:
-
-```text
-kenlm-<KENLM_REVISION short>
-```
-
-E05 CPU tool:
-
-```text
-phone-e05-<SOURCE_SHA>
-```
-
-GPU phase:
-
-```text
-phase-eXX-<SOURCE_SHA>
-```
-
-build scriptは `docker buildx imagetools inspect` でtag存在を先に確認します。存在すればrebuildしません。
-
-`dist/research-images.json` に実際のregistry/tag/digest/runtime parentを記録します。
-
-## 18. GHCR → public Docker Hub fallback
-
-Primary registryはGHCRです。
-
-Optional secrets:
-
-```text
-DOCKERHUB_ACCESS_TOKEN
-DOCKERHUB_REPOSITORY
-```
-
-`DOCKERHUB_REPOSITORY` 例:
-
-```text
-namespace/jpacf-yomi-tdt-research
-```
-
-publication policy:
-
-1. GHCR immutable tagを検索;
-2. あれば再利用;
-3. なければGHCRへdirect push;
-4. GHCR pushが失敗した場合のみDocker Hubへ同じsuffixでbuild/push;
-5. GHCR成功時はDocker Hubへ二重mirrorしない。
-
-consumer側もGHCR image取得に失敗し、`DOCKERHUB_REPOSITORY` が設定されている場合はpublic `docker.io/<repo>:<same-tag>` を試します。
-
-これによりGHCR quota/availability問題が起きてもartifact contractを変えずに研究を継続できます。
-
-## 19. Storage rule
-
-### Container registryに置いてよいもの
-
-```text
-software layers
-KenLM executable
-phase dispatcher
-CPU phone-head runtime
-small orchestration scripts
-OCI labels/manifests
-```
-
-### Container registryへ入れてはいけないもの
-
-```text
-evaluation audio
-ASR modelを研究artifactとして複製したもの
-trained ARPA/binary/NGPU-LM
-encoder *.pt
-phone_head.pt
-result JSONL/Parquet
-HF evidence
-```
-
-### HF Bucket
-
-保存対象:
-
-```text
-common audio/manifests
-encoded corpus
-ARPA/binary/.nemo LM
-e02 metadata
-encoder states
-phone artifacts
-phase results
-append-only runs/<run-id> evidence
-```
-
-ただし各stageはdeltaだけを保存し、既存snapshotを上書きしません。
-
-### GitHub Actions cache
-
-mise/uv等のsmall tool cacheに限定します。
-
-```text
-禁止: type=gha,mode=max をresearch image buildへ追加
-禁止: audio/LM/encoder tensorsをActions cacheへ保存
-```
-
-### GitHub workflow artifact
-
-14日程度のshort-lived control evidenceだけにします。
-
-```text
-research-images.json
-Vast selected offer
-Vast create response
-instance status
-short log
-```
-
-## 20. Artifact readiness
+local stateへsnapshotをrestoreした後、GPUを使う前に検証します。
 
 ```bash
-STATE=/workspace/state
-uv run --locked --no-sync python scripts/research/check_phase_artifacts.py E00 --state-root "$STATE"
-uv run --locked --no-sync python scripts/research/check_phase_artifacts.py E02 --state-root "$STATE"
-uv run --locked --no-sync python scripts/research/check_phase_artifacts.py E04 --state-root "$STATE"
-uv run --locked --no-sync python scripts/research/check_phase_artifacts.py E05 --state-root "$STATE"
-uv run --locked --no-sync python scripts/research/check_phase_artifacts.py E06 --state-root "$STATE"
+uv run --locked --no-sync python scripts/research/check_phase_artifacts.py E04 \
+  --state-root /workspace/state
 ```
 
-readiness failureはGPU experiment failureではありません。producer snapshotを先に作成してください。
+phaseごとのrequiresは `configs/research/e00-e06-artifacts.yaml` をsource of truthとします。
 
-## 21. Vast課金を避けるgate
+## 17. ローカル開発
 
-`research-phase-vast.yml` は次の順で処理します。
+通常の編集・lint・CPU testは `.devcontainer` を使います。
 
-```text
-research_key resolve
-    |
-    v
-HF output snapshot exists?
-    |
-    +-- yes --> success / GPU allocationなし
-    |
-    +-- no --> image resolve
-                  |
-                  v
-             offer search
-                  |
-                  v
-             Vast create
-                  |
-                  v
-              execute
-                  |
-                  v
-       immutable delta publish
-                  |
-                  v
-        destroy instance(always)
+```bash
+mise run ci
 ```
 
-Vast instance destroyは先行step成功に依存させません。
+Dev ContainerへCUDA/NeMoをもう一式導入しません。GPU validationはsource-matched GHCR phase imageをVast、またはNVIDIA Container Toolkitを持つlocal hostから実行します。
 
-## 22. 再現性metadata
+## 18. Storage policy
 
-少なくとも次を保持します。
+| Plane | 保存するもの | 保存しないもの |
+|---|---|---|
+| GHCR / Docker Hub | software environment, thin phase/tool image | audio, model artifact, LM, tensors, results |
+| HF Bucket | immutable Artifact snapshots, append-only run evidence | compiler/toolchain image |
+| GitHub Actions cache | mise/uv等の小型dependency cache | Docker layer, research dataset |
+| GitHub workflow artifact | image manifest, Vast control-plane evidence | persistent research state |
+| Vast disk | 実行中scratch | canonical long-term state |
 
-- benchmark repo + full revision
-- base model repo + full revision
-- source Git SHA
-- exact phase image digest
-- runtime parent digest
-- KenLM revision
-- N-gram order
-- source corpus SHA-256
-- encoded corpus SHA-256
-- ARPA SHA-256
-- binary SHA-256
-- NGPU-LM SHA-256
-- NeMo 3.0.0
-- torch 2.12.0+cu132
-- E05 phone-head hyperparameters
-- encoder feature model revision
-- Vast offer/GPU/cost
-- research key
-- snapshot stage manifest
-- immutable `runs/<run-id>` evidence
-
-## 23. 失敗時の扱い
-
-### Snapshotが足りない
-
-producer taskへ戻ります。GPUを再度借りないでください。
-
-### 同じsnapshotが既に存在する
-
-正常なcache hitです。上書きせず再利用します。
-
-### GHCR push/pull failure
-
-Docker Hub fallbackが設定されていれば同tagを使用します。
-
-### Vast task failure
-
-`dist/runtime/` とprovider inventoryを確認します。instanceは `if: always()` cleanupでdestroyします。
-
-### Audio pathが旧providerを指す
-
-`rebase_eval_manifest.py` を使います。snapshot内のaudio実体そのものは変更しません。
-
-### E02 LMがdriftした
-
-encoding/estimation/package metadataのSHA-256 chainで発生段階を特定します。
-
-## 24. E06 promotion gate
-
-E06はE04/E05でreproducibleなN-best gainが得られた後に進めます。
-
-その時点で:
-
-```text
-patches/nemo-<short-sha>/
-├── README.md
-├── inbeam_driver.py
-└── nemo.patch
-```
-
-を作り、NeMo commitとdriverを固定します。
-
-新しいCUDA runtimeを作るのではなく、既存 `phase-e06` にdriver/patchだけをthin overlayするのが原則です。
-
-## 25. Upstream design references
-
-この設計ではcurrent upstream contractを基準にしています。
-
-- Docker Buildx: `docker-container` builder + registry/image exporter + direct `--push`
-- Docker cache: registry cacheはfinal imageとは分離可能。複数targetではcache refを分ける必要がある
-- KenLM: CMake build、`lmplz`、`build_binary`
-- NVIDIA NeMo Speech: TDT/RNNT beam + N-gram LM、`malsd_batch`、GPU boosting tree
-- Hugging Face Bucket: local↔bucket syncとplan/apply
-
-upstream exampleは設計確認用であり、実際の研究identityはrepository lock・digest・snapshot manifestを優先します。
+この分離により、GHCR/cache容量を圧迫せず、Buildxはshared parent layerとremote immutable imageを活用し、GPU費用はmodel executionが必要なstageだけに限定できます。
