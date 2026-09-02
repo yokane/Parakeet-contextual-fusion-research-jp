@@ -197,6 +197,8 @@ def test_build_script_uses_registry_as_cache_and_dockerhub_only_as_fallback() ->
     assert "DOCKERHUB_REPOSITORY" in text
     assert "GHCR push failed" in text
     assert "resolve-remote-image.sh" in text
+    assert "PUBLISH_CURRENT" in text
+    assert "imagetools create --tag" in text
 
 
 def test_cpu_and_gpu_workflows_keep_compute_and_image_identity_explicit() -> None:
@@ -207,18 +209,24 @@ def test_cpu_and_gpu_workflows_keep_compute_and_image_identity_explicit() -> Non
     assert "vastai create instance" not in cpu
     assert "options: [common, e02-estimate, e05-phone]" in cpu
     assert "stage_fingerprints.py --field b64" in cpu
-    assert "phone-e05-${GITHUB_SHA}" in cpu
+    assert "phone-e05-current" in cpu
+    assert "Feature-branch e05-phone runs require an explicit phone_image" in cpu
+    assert "docker image inspect --format" in cpu
     assert "kenlm-4cb443e60b7b" in cpu
     assert "vastai create instance" in vast
     assert "vastai destroy instance" in vast
     assert "stage_fingerprints.py --field b64" in vast
-    assert "phase-${phase}-${GITHUB_SHA}" in vast
+    assert "phase-${phase}-current" in vast
+    assert "Feature-branch Vast runs require an explicit image" in vast
+    assert "resolve-remote-image.sh" in vast
+    assert "@sha256:[0-9a-f]{64}" in vast
     assert "JPA_CF_STAGE_FINGERPRINTS_B64" in vast
     assert "E06_DRIVER_SHA256_INPUT" in vast
     assert "JPA_CF_E06_DRIVER_SHA256" in vast
     assert "E05" not in vast.split("options:", 1)[1].split("]", 1)[0]
     assert "DOCKERHUB_REPOSITORY" in vast
     assert "docker-container" in images
+    assert "PUBLISH_CURRENT" in images
     assert "DOCKERHUB_ACCESS_TOKEN" in images
     assert "DOCKERHUB_REPOSITORY" in images
     assert "type=gha" not in images
