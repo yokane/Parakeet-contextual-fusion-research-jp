@@ -56,3 +56,21 @@ jobs:
             command -v ffmpeg >/dev/null
             sudo -n true
           '
+
+      - name: Verify full locked post-create bootstrap
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            --volume "$PWD:/src:ro" \
+            jpacf-devcontainer:ci bash -lc '
+              set -euo pipefail
+              sudo mkdir -p /workspaces/repo
+              sudo cp -a /src/. /workspaces/repo/
+              sudo chown -R "$(id -u):$(id -g)" /workspaces/repo
+              cd /workspaces/repo
+              bash .devcontainer/post-create.sh
+              test "$(python --version 2>&1)" = "Python 3.12.3"
+              test "$(uv --version | awk "{print \$2}")" = "0.12.1"
+              mise run test
+            '
