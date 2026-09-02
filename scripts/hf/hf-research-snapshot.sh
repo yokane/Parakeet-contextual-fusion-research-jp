@@ -66,31 +66,37 @@ pull_inputs() {
 }
 
 build_delta() {
-  local key="$1" task="$2" state_root="$3" staging="$4" stage source_sha
+  local key="$1" task="$2" state_root="$3" staging="$4" stage source_sha plan_json
   stage="$(output_stage "$task")"
   source_sha="$(git rev-parse HEAD 2>/dev/null || printf unknown)"
+  plan_json="$(task_plan "$task")"
 
-  STATE_ROOT="$state_root" STAGING="$staging" TASK="$task" STAGE="$stage" RESEARCH_KEY="$key" SOURCE_SHA="$source_sha" \
-    task_plan "$task" --field publish | python -c '
+  python - "$state_root" "$staging" "$task" "$stage" "$key" "$source_sha" "$plan_json" <<'PY'
 import hashlib
 import json
-import os
 import shutil
 import sys
 from pathlib import Path
 
-state = Path(os.environ["STATE_ROOT"]).resolve()
-staging = Path(os.environ["STAGING"]).resolve()
-paths = [line.strip() for line in sys.stdin if line.strip()]
+state = Path(sys.argv[1]).resolve()
+staging = Path(sys.argv[2]).resolve()
+task = sys.argv[3]
+stage = sys.argv[4]
+research_key = sys.argv[5]
+source_sha = sys.argv[6]
+plan = json.loads(sys.argv[7])
+paths = [str(item) for item in plan.get("publish") or []]
 if not paths:
     raise SystemExit("snapshot publish list is empty")
 
+
 def sha256(path: Path) -> str:
-    h = hashlib.sha256()
+    digest = hashlib.sha256()
     with path.open("rb") as handle:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
+            digest.update(chunk)
+    return digest.hexdigest()
+
 
 for rel in paths:
     src = state / rel
@@ -107,21 +113,24 @@ for rel in paths:
         raise SystemExit(f"missing or empty snapshot output: {src}")
 
 files = []
-for path in sorted(p for p in staging.rglob("*") if p.is_file()):
+for path in sorted(item for item in staging.rglob("*") if item.is_file()):
     rel = path.relative_to(staging).as_posix()
     files.append({"path": rel, "size": path.stat().st_size, "sha256": sha256(path)})
 manifest = {
     "schema_version": 1,
-    "research_key": os.environ["RESEARCH_KEY"],
-    "task": os.environ["TASK"],
-    "stage": os.environ["STAGE"],
-    "source_git_sha": os.environ["SOURCE_SHA"],
+    "research_key": research_key,
+    "task": task,
+    "stage": stage,
+    "source_git_sha": source_sha,
     "files": files,
 }
-manifest_path = staging / ".jpacf-snapshots" / f"{os.environ[\"STAGE\"]}.json"
+manifest_path = staging / ".jpacf-snapshots" / f"{stage}.json"
 manifest_path.parent.mkdir(parents=True, exist_ok=True)
-manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-'
+manifest_path.write_text(
+    json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+    encoding="utf-8",
+)
+PY
 }
 
 push_output() {
@@ -133,7 +142,6 @@ push_output() {
 
   staging="$(mktemp -d -t jpacf-research-delta.XXXXXX)"
   plan="$(mktemp -t jpacf-research-plan.XXXXXX.jsonl)"
-  trap 'rm -rf "$staging"; rm -f "$plan"' RETURN
   build_delta "$key" "$task" "$state_root" "$staging"
 
   hf_bucket_cli buckets sync --token "$HF_TOKEN" "$staging" "$remote" --plan "$plan"
@@ -144,7 +152,6 @@ push_output() {
   log "Published immutable delta snapshot: $remote (${uploads} uploads)"
   rm -rf "$staging"
   rm -f "$plan"
-  trap - RETURN
 }
 
 command="${1:-}"
