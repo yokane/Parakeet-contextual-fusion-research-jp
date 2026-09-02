@@ -1,0 +1,132 @@
+name: actions-cache-cleanup
+
+on:
+  workflow_dispatch:
+    inputs:
+      retention_days:
+        description: Delete caches not accessed for at least this many days
+        required: true
+        default: "14"
+        type: string
+      dry_run:
+        description: Report deletions without deleting caches
+        required: true
+        default: false
+        type: boolean
+  push:
+    paths:
+      - .github/actions-cache-cleanup.trigger
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: actions-cache-cleanup
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      RETENTION_DAYS: ${{ github.event_name == 'workflow_dispatch' && inputs.retention_days || '14' }}
+      DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+    steps:
+      - name: Delete stale and closed-PR caches
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          [[ "$RETENTION_DAYS" =~ ^[0-9]+$ ]] || {
+            echo "retention_days must be a non-negative integer" >&2
+            exit 2
+          }
+
+          cutoff_epoch="$(date -u -d "${RETENTION_DAYS} days ago" +%s)"
+          caches_file="$(mktemp)"
+          trap 'rm -f "$caches_file"' EXIT
+
+          gh api --paginate \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/repos/${GITHUB_REPOSITORY}/actions/caches?per_page=100" \
+            --jq '.actions_caches[] | [.id, .key, .ref, (.size_in_bytes | tostring), .last_accessed_at, .created_at] | @tsv' \
+            > "$caches_file"
+
+          before_count="$(wc -l < "$caches_file" | tr -d ' ')"
+          before_bytes="$(awk -F '\t' '{sum += $4} END {printf "%.0f", sum+0}' "$caches_file")"
+          delete_count=0
+          delete_bytes=0
+          deleted_count=0
+          deleted_bytes=0
+
+          declare -A pr_state_cache=()
+
+          while IFS=$'\t' read -r id key ref size last_accessed created_at; do
+            [[ -n "${id:-}" ]] || continue
+            reason=""
+            observed_at="${last_accessed:-$created_at}"
+            observed_epoch="$(date -u -d "$observed_at" +%s)"
+
+            if (( observed_epoch <= cutoff_epoch )); then
+              reason="stale-${RETENTION_DAYS}d"
+            elif [[ "$ref" =~ ^refs/pull/([0-9]+)/merge$ ]]; then
+              pr_number="${BASH_REMATCH[1]}"
+              state="${pr_state_cache[$pr_number]:-}"
+              if [[ -z "$state" ]]; then
+                state="$(gh api \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "X-GitHub-Api-Version: 2022-11-28" \
+                  "/repos/${GITHUB_REPOSITORY}/pulls/${pr_number}" \
+                  --jq '.state' 2>/dev/null || printf 'unknown')"
+                pr_state_cache[$pr_number]="$state"
+              fi
+              if [[ "$state" == "closed" ]]; then
+                reason="closed-pr-${pr_number}"
+              fi
+            fi
+
+            [[ -n "$reason" ]] || continue
+            delete_count=$((delete_count + 1))
+            delete_bytes=$((delete_bytes + size))
+            printf 'candidate id=%s ref=%s key=%q size=%s reason=%s\n' \
+              "$id" "$ref" "$key" "$size" "$reason"
+
+            if [[ "$DRY_RUN" == "true" ]]; then
+              continue
+            fi
+
+            if gh api --silent --method DELETE \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "/repos/${GITHUB_REPOSITORY}/actions/caches/${id}"; then
+              deleted_count=$((deleted_count + 1))
+              deleted_bytes=$((deleted_bytes + size))
+            else
+              echo "failed to delete cache id=${id}" >&2
+            fi
+          done < "$caches_file"
+
+          after_count="$(gh api --paginate \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "/repos/${GITHUB_REPOSITORY}/actions/caches?per_page=100" \
+            --jq '.actions_caches[].id' | wc -l | tr -d ' ')"
+
+          {
+            echo "### Actions cache cleanup"
+            echo
+            echo "- retention threshold: ${RETENTION_DAYS} days"
+            echo "- dry run: ${DRY_RUN}"
+            echo "- caches before: ${before_count}"
+            echo "- selected: ${delete_count}"
+            echo "- selected bytes: ${delete_bytes}"
+            echo "- deleted: ${deleted_count}"
+            echo "- deleted bytes: ${deleted_bytes}"
+            echo "- caches after: ${after_count}"
+            echo
+            echo "Policy: delete caches that are stale by last access time, plus caches scoped to closed pull-request merge refs."
+          } >> "$GITHUB_STEP_SUMMARY"
