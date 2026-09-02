@@ -1,4 +1,4 @@
-schema_version: 1
+schema_version: 2
 state_root: /workspace/state
 bucket_prefix: workspace-cache/e00-e06
 
@@ -10,6 +10,10 @@ artifacts:
   execution_manifest:
     path: generated/eval/nemo_eval.jsonl
     kind: file
+    producer: common-hosted
+  eval_audio:
+    path: generated/eval/audio
+    kind: directory
     producer: common-hosted
   eval_provenance:
     path: generated/eval/eval_provenance.json
@@ -51,6 +55,10 @@ artifacts:
     path: artifacts/lm/ja-6gram.nemo
     kind: file
     producer: e02-pack-vast
+  e02_package_metadata:
+    path: artifacts/lm/package-metadata.json
+    kind: file
+    producer: e02-pack-vast
   e04_result:
     path: results/E04_ctc_rerank.jsonl
     kind: file
@@ -71,6 +79,10 @@ artifacts:
     path: artifacts/phone_head.pt
     kind: file
     producer: e05-phone-hosted
+  e05_phone_ready:
+    path: results/E04_phone_ready.jsonl
+    kind: file
+    producer: e05-phone-hosted
   e05_result:
     path: results/E05_phone_rerank.jsonl
     kind: file
@@ -80,43 +92,44 @@ phases:
   E00:
     executor: vast
     image: phase-e00
-    requires: [execution_manifest]
+    requires: [execution_manifest, eval_audio]
     produces: [results/E00_tdt_greedy.jsonl]
   E01:
     executor: vast
     image: phase-e01
-    requires: [execution_manifest]
+    requires: [execution_manifest, eval_audio]
     produces: [results/E01_tdt_beam.jsonl]
   E02:
     executor: vast
     image: phase-e02
-    requires: [execution_manifest, e02_ngpu_lm]
+    requires: [execution_manifest, eval_audio, e02_ngpu_lm]
     produces: [results/E02_ngpulm.jsonl]
   E03:
     executor: vast
     image: phase-e03
-    requires: [execution_manifest, e02_ngpu_lm, context_phrases]
+    requires: [execution_manifest, eval_audio, e02_ngpu_lm, context_phrases]
     produces: [results/E03_gpu_pb.jsonl]
   E04:
     executor: vast
     image: phase-e04
-    requires: [execution_manifest, e02_ngpu_lm, context_phrases]
+    requires: [execution_manifest, eval_audio, e02_ngpu_lm, context_phrases]
     produces: [results/E04_nbest.jsonl, results/E04_ctc_rerank.jsonl]
   E05:
-    executor: split
-    image: phase-e05
-    requires: [benchmark_index, e04_result, e05_encoder_features, e05_phone_head, e05_phone_vocab]
+    executor: github-hosted
+    image: phone-e05
+    requires: [benchmark_index, e04_result, e05_encoder_features]
     produces: [results/E05_phone_rerank.jsonl]
   E06:
     executor: vast
     image: phase-e06
-    requires: [execution_manifest, e02_ngpu_lm, context_phrases]
+    requires:
+      [execution_manifest, eval_audio, e02_ngpu_lm, context_phrases, e05_encoder_features, e05_phone_head, e05_phone_vocab]
     produces: [results/E06_inbeam.jsonl]
 
 preparation_tasks:
   common-hosted:
     executor: github-hosted
-    outputs: [benchmark_index, execution_manifest, eval_provenance, audio_coverage, context_phrases, lm_corpus]
+    outputs: [benchmark_index, execution_manifest, eval_audio, eval_provenance, audio_coverage, context_phrases, lm_corpus]
   e02-encode-vast:
     executor: vast
     outputs: [e02_encoded_corpus, e02_encoding_metadata]
@@ -125,10 +138,87 @@ preparation_tasks:
     outputs: [e02_arpa, e02_binary, e02_estimation_metadata]
   e02-pack-vast:
     executor: vast
-    outputs: [e02_ngpu_lm]
+    outputs: [e02_ngpu_lm, e02_package_metadata]
   e05-extract-vast:
     executor: vast
     outputs: [e05_encoder_features]
   e05-phone-hosted:
     executor: github-hosted
-    outputs: [e05_phone_vocab, e05_phone_train_manifest, e05_phone_head, e05_result]
+    outputs: [e05_phone_vocab, e05_phone_train_manifest, e05_phone_head, e05_phone_ready, e05_result]
+
+# Each task writes only a delta snapshot under:
+#   workspace-cache/e00-e06/<research-key>/<output>/
+# Existing output snapshots are never overwritten. Consumers reconstruct local
+# state by overlaying the listed input snapshots. This preserves the repository's
+# immutable workspace-cache contract without duplicating the full audio/state tree
+# for every research step.
+snapshot_tasks:
+  common:
+    inputs: []
+    output: common
+    publish:
+      - generated/eval
+  e02-encode:
+    inputs: [common]
+    output: e02-encode
+    publish:
+      - artifacts/lm/lm_corpus.encoded.txt
+      - artifacts/lm/encoding-metadata.json
+  e02-estimate:
+    inputs: [e02-encode]
+    output: e02-estimate
+    publish:
+      - artifacts/lm/ja-6gram.arpa
+      - artifacts/lm/ja-6gram.binary
+      - artifacts/lm/estimation-metadata.json
+  e02-pack:
+    inputs: [e02-encode, e02-estimate]
+    output: e02-pack
+    publish:
+      - artifacts/lm/ja-6gram.nemo
+      - artifacts/lm/package-metadata.json
+  E00:
+    inputs: [common]
+    output: phase-e00
+    publish:
+      - results/E00_tdt_greedy.jsonl
+  E01:
+    inputs: [common]
+    output: phase-e01
+    publish:
+      - results/E01_tdt_beam.jsonl
+  E02:
+    inputs: [common, e02-pack]
+    output: phase-e02
+    publish:
+      - results/E02_ngpulm.jsonl
+  E03:
+    inputs: [common, e02-pack]
+    output: phase-e03
+    publish:
+      - results/E03_gpu_pb.jsonl
+  E04:
+    inputs: [common, e02-pack]
+    output: phase-e04
+    publish:
+      - results/E04_nbest.jsonl
+      - results/E04_ctc_rerank.jsonl
+  e05-extract:
+    inputs: [common]
+    output: e05-extract
+    publish:
+      - artifacts/encoder
+  e05-phone:
+    inputs: [common, phase-e04, e05-extract]
+    output: e05-phone
+    publish:
+      - artifacts/phone_vocab.json
+      - artifacts/phone_head.pt
+      - generated/phone_train.jsonl
+      - results/E04_phone_ready.jsonl
+      - results/E05_phone_rerank.jsonl
+  E06:
+    inputs: [common, e02-pack, e05-extract, e05-phone]
+    output: phase-e06
+    publish:
+      - results/E06_inbeam.jsonl
