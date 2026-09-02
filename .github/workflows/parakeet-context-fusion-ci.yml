@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
+      - ".devcontainer/**"
       - "src/**"
       - "scripts/**"
       - "tests/**"
@@ -23,6 +24,7 @@ on:
   push:
     branches: [main]
     paths:
+      - ".devcontainer/**"
       - "src/**"
       - "scripts/**"
       - "tests/**"
