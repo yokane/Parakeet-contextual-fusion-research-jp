@@ -61,7 +61,10 @@ pull_inputs() {
     [[ -n "$listing" ]] || fail "required snapshot is missing: key=$key stage=$stage"
     remote="$(remote_for_stage "$key" "$task" "$stage")"
     log "Restoring $remote"
-    hf_bucket_cli buckets sync --token "$HF_TOKEN" "$remote" "$state_root"
+    # hf buckets sync defaults to no-delete today. Keep it explicit because this
+    # operation intentionally overlays several immutable stage deltas into one
+    # local workspace; deleting files from an earlier stage would corrupt lineage.
+    hf_bucket_cli buckets sync --no-delete --token "$HF_TOKEN" "$remote" "$state_root"
   done < <(task_plan "$task" --field inputs)
 }
 
