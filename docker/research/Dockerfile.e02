@@ -18,6 +18,7 @@ COPY --from=kenlm-tools /usr/lib/x86_64-linux-gnu/libboost_thread.so.1.74.0 /opt
 COPY scripts/research/ngram_lm_pipeline.py /opt/jpacf/scripts/research/ngram_lm_pipeline.py
 COPY scripts/research/check_phase_artifacts.py /opt/jpacf/scripts/research/check_phase_artifacts.py
 COPY scripts/research/snapshot_plan.py /opt/jpacf/scripts/research/snapshot_plan.py
+COPY scripts/research/stage_fingerprints.py /opt/jpacf/scripts/research/stage_fingerprints.py
 COPY scripts/research/rebase_eval_manifest.py /opt/jpacf/scripts/research/rebase_eval_manifest.py
 COPY scripts/hf/hf-research-snapshot.sh /opt/jpacf/scripts/hf/hf-research-snapshot.sh
 COPY scripts/container/run-phase.sh /opt/jpacf/scripts/container/run-phase.sh
@@ -27,6 +28,7 @@ RUN chmod 0755 \
       /opt/jpacf/scripts/research/ngram_lm_pipeline.py \
       /opt/jpacf/scripts/research/check_phase_artifacts.py \
       /opt/jpacf/scripts/research/snapshot_plan.py \
+      /opt/jpacf/scripts/research/stage_fingerprints.py \
       /opt/jpacf/scripts/research/rebase_eval_manifest.py \
       /opt/jpacf/scripts/hf/hf-research-snapshot.sh \
       /opt/jpacf/scripts/container/run-phase.sh \

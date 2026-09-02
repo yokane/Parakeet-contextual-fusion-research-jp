@@ -26,6 +26,14 @@ validate_key() {
   [[ "$key" =~ ^[A-Za-z0-9._-]+$ ]] || fail "invalid research key: $key"
 }
 
+validate_ref() {
+  local ref="$1" stage fingerprint extra
+  IFS='/' read -r stage fingerprint extra <<< "$ref"
+  [[ -n "$stage" && -n "$fingerprint" && -z "${extra:-}" ]] || fail "invalid snapshot ref: $ref"
+  [[ "$stage" =~ ^[A-Za-z0-9._-]+$ ]] || fail "invalid snapshot stage: $stage"
+  [[ "$fingerprint" =~ ^[0-9a-f]{64}$ ]] || fail "invalid snapshot fingerprint: $fingerprint"
+}
+
 prefix_for_task() {
   task_plan "$1" --field json | python -c 'import json,sys; print(json.load(sys.stdin)["bucket_prefix"])'
 }
@@ -34,47 +42,55 @@ output_stage() {
   task_plan "$1" --field output
 }
 
-remote_for_stage() {
-  local key="$1" task="$2" stage="$3" prefix
-  prefix="$(prefix_for_task "$task")"
-  printf 'hf://buckets/%s/%s/%s/%s\n' "$BUCKET" "$prefix" "$key" "$stage"
+output_ref() {
+  task_plan "$1" --field output_ref
 }
 
-listing_for_stage() {
-  local key="$1" task="$2" stage="$3" prefix
+remote_for_ref() {
+  local key="$1" task="$2" ref="$3" prefix
+  validate_ref "$ref"
   prefix="$(prefix_for_task "$task")"
-  hf_bucket_cli buckets list "${BUCKET}/${prefix}/${key}/${stage}" -R -q --token "$HF_TOKEN" 2>/dev/null || true
+  printf 'hf://buckets/%s/%s/%s/%s\n' "$BUCKET" "$prefix" "$key" "$ref"
+}
+
+listing_for_ref() {
+  local key="$1" task="$2" ref="$3" prefix
+  validate_ref "$ref"
+  prefix="$(prefix_for_task "$task")"
+  hf_bucket_cli buckets list "${BUCKET}/${prefix}/${key}/${ref}" -R -q --token "$HF_TOKEN" 2>/dev/null || true
 }
 
 snapshot_exists() {
-  local key="$1" task="$2" stage
-  stage="$(output_stage "$task")"
-  [[ -n "$(listing_for_stage "$key" "$task" "$stage")" ]]
+  local key="$1" task="$2" ref
+  ref="$(output_ref "$task")"
+  [[ -n "$(listing_for_ref "$key" "$task" "$ref")" ]]
 }
 
 pull_inputs() {
-  local key="$1" task="$2" state_root="$3" stage remote listing
+  local key="$1" task="$2" state_root="$3" ref remote listing
   mkdir -p "$state_root"
-  while IFS= read -r stage; do
-    [[ -n "$stage" ]] || continue
-    listing="$(listing_for_stage "$key" "$task" "$stage")"
-    [[ -n "$listing" ]] || fail "required snapshot is missing: key=$key stage=$stage"
-    remote="$(remote_for_stage "$key" "$task" "$stage")"
+  while IFS= read -r ref; do
+    [[ -n "$ref" ]] || continue
+    listing="$(listing_for_ref "$key" "$task" "$ref")"
+    [[ -n "$listing" ]] || fail "required snapshot is missing: key=$key ref=$ref"
+    remote="$(remote_for_ref "$key" "$task" "$ref")"
     log "Restoring $remote"
     # hf buckets sync defaults to no-delete today. Keep it explicit because this
     # operation intentionally overlays several immutable stage deltas into one
     # local workspace; deleting files from an earlier stage would corrupt lineage.
     hf_bucket_cli buckets sync --no-delete --token "$HF_TOKEN" "$remote" "$state_root"
-  done < <(task_plan "$task" --field inputs)
+  done < <(task_plan "$task" --field input_refs)
 }
 
 build_delta() {
-  local key="$1" task="$2" state_root="$3" staging="$4" stage source_sha plan_json
+  local key="$1" task="$2" state_root="$3" staging="$4" stage ref fingerprint source_sha plan_json
   stage="$(output_stage "$task")"
+  ref="$(output_ref "$task")"
+  fingerprint="$(task_plan "$task" --field fingerprint)"
   source_sha="$(git rev-parse HEAD 2>/dev/null || printf unknown)"
   plan_json="$(task_plan "$task")"
 
-  python - "$state_root" "$staging" "$task" "$stage" "$key" "$source_sha" "$plan_json" <<'PY'
+  python - "$state_root" "$staging" "$task" "$stage" "$ref" "$fingerprint" "$key" "$source_sha" "$plan_json" <<'PY'
 import hashlib
 import json
 import shutil
@@ -85,9 +101,11 @@ state = Path(sys.argv[1]).resolve()
 staging = Path(sys.argv[2]).resolve()
 task = sys.argv[3]
 stage = sys.argv[4]
-research_key = sys.argv[5]
-source_sha = sys.argv[6]
-plan = json.loads(sys.argv[7])
+output_ref = sys.argv[5]
+fingerprint = sys.argv[6]
+research_key = sys.argv[7]
+source_sha = sys.argv[8]
+plan = json.loads(sys.argv[9])
 paths = [str(item) for item in plan.get("publish") or []]
 if not paths:
     raise SystemExit("snapshot publish list is empty")
@@ -120,14 +138,17 @@ for path in sorted(item for item in staging.rglob("*") if item.is_file()):
     rel = path.relative_to(staging).as_posix()
     files.append({"path": rel, "size": path.stat().st_size, "sha256": sha256(path)})
 manifest = {
-    "schema_version": 1,
+    "schema_version": 2,
     "research_key": research_key,
     "task": task,
     "stage": stage,
+    "fingerprint": fingerprint,
+    "output_ref": output_ref,
+    "input_refs": [str(item) for item in plan.get("input_refs") or []],
     "source_git_sha": source_sha,
     "files": files,
 }
-manifest_path = staging / ".jpacf-snapshots" / f"{stage}.json"
+manifest_path = staging / ".jpacf-snapshots" / f"{stage}-{fingerprint[:16]}.json"
 manifest_path.parent.mkdir(parents=True, exist_ok=True)
 manifest_path.write_text(
     json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -137,10 +158,10 @@ PY
 }
 
 push_output() {
-  local key="$1" task="$2" state_root="$3" stage remote existing staging plan summary uploads
-  stage="$(output_stage "$task")"
-  remote="$(remote_for_stage "$key" "$task" "$stage")"
-  existing="$(listing_for_stage "$key" "$task" "$stage")"
+  local key="$1" task="$2" state_root="$3" ref remote existing staging plan summary uploads
+  ref="$(output_ref "$task")"
+  remote="$(remote_for_ref "$key" "$task" "$ref")"
+  existing="$(listing_for_ref "$key" "$task" "$ref")"
   [[ -z "$existing" ]] || fail "immutable snapshot already exists: $remote"
 
   staging="$(mktemp -d -t jpacf-research-delta.XXXXXX)"
@@ -171,8 +192,8 @@ case "$command" in
   remote)
     [[ $# -eq 3 ]] || fail "usage: $0 remote <research-key> <task>"
     validate_key "$2"
-    stage="$(output_stage "$3")"
-    remote_for_stage "$2" "$3" "$stage"
+    ref="$(output_ref "$3")"
+    remote_for_ref "$2" "$3" "$ref"
     ;;
   pull)
     [[ $# -eq 4 ]] || fail "usage: $0 pull <research-key> <task> <state-root>"

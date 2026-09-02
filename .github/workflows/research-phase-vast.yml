@@ -13,11 +13,15 @@ on:
         required: false
         type: string
       image:
-        description: Optional immutable/current phase image override
+        description: Optional immutable phase image override; blank uses the current source SHA tag
         required: false
         type: string
       e06_driver:
-        description: Repository/image path for the pinned NeMo E06 driver
+        description: Path inside the selected image to the pinned NeMo E06 driver
+        required: false
+        type: string
+      e06_driver_sha256:
+        description: Full SHA-256 of E06_DRIVER; required for E06 snapshot identity
         required: false
         type: string
 
@@ -52,6 +56,7 @@ jobs:
       DOCKERHUB_REPOSITORY: ${{ secrets.DOCKERHUB_REPOSITORY }}
       TASK: ${{ inputs.task }}
       E06_DRIVER_INPUT: ${{ inputs.e06_driver }}
+      E06_DRIVER_SHA256_INPUT: ${{ inputs.e06_driver_sha256 }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -62,7 +67,7 @@ jobs:
           install: true
           cache: true
 
-      - name: Resolve snapshot and immutable phase image
+      - name: Resolve content-addressed snapshot and immutable phase image
         id: identity
         shell: bash
         run: |
@@ -71,6 +76,21 @@ jobs:
           mise run deps:sync-vast
           mise run hf:transport:sync
 
+          if [[ "$TASK" == "E06" ]]; then
+            test -n "$E06_DRIVER_INPUT"
+            digest="${E06_DRIVER_SHA256_INPUT,,}"
+            [[ "$digest" =~ ^[0-9a-f]{64}$ ]] || {
+              echo "E06 requires e06_driver_sha256 as a full SHA-256 digest" >&2
+              exit 2
+            }
+            export JPA_CF_E06_DRIVER_SHA256="$digest"
+            echo "JPA_CF_E06_DRIVER_SHA256=$digest" >> "$GITHUB_ENV"
+          fi
+
+          fingerprints_b64="$(uv run --locked --no-sync python scripts/research/stage_fingerprints.py --field b64)"
+          export JPA_CF_STAGE_FINGERPRINTS_B64="$fingerprints_b64"
+          echo "JPA_CF_STAGE_FINGERPRINTS_B64=$fingerprints_b64" >> "$GITHUB_ENV"
+
           key='${{ inputs.research_key }}'
           if [[ -z "$key" ]]; then
             key="$(uv run --locked --no-sync python scripts/research/research_key.py)"
@@ -78,6 +98,7 @@ jobs:
           [[ "$key" =~ ^[A-Za-z0-9._-]+$ ]]
           snapshot_exists="$(bash scripts/hf/hf-research-snapshot.sh exists "$key" "$TASK")"
           snapshot_remote="$(bash scripts/hf/hf-research-snapshot.sh remote "$key" "$TASK")"
+          stage_fingerprint="$(uv run --locked --no-sync python scripts/research/snapshot_plan.py "$TASK" --field fingerprint)"
 
           echo "RESEARCH_KEY=$key" >> "$GITHUB_ENV"
           echo "SNAPSHOT_REMOTE=$snapshot_remote" >> "$GITHUB_ENV"
@@ -85,14 +106,16 @@ jobs:
           echo "EVIDENCE_RUN_ID=vast-${TASK,,}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
           echo "snapshot_exists=$snapshot_exists" >> "$GITHUB_OUTPUT"
           echo "snapshot_remote=$snapshot_remote" >> "$GITHUB_OUTPUT"
+          echo "stage_fingerprint=$stage_fingerprint" >> "$GITHUB_OUTPUT"
 
           echo "- task: \`$TASK\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- research key: \`$key\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- stage fingerprint: \`$stage_fingerprint\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- output snapshot: \`$snapshot_remote\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- already exists: \`$snapshot_exists\`" >> "$GITHUB_STEP_SUMMARY"
 
           if [[ "$snapshot_exists" == "true" ]]; then
-            echo "Immutable output already exists; Vast allocation is skipped." >> "$GITHUB_STEP_SUMMARY"
+            echo "Immutable content-addressed output already exists; Vast allocation is skipped." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
 
@@ -105,7 +128,7 @@ jobs:
               E00|E01|E03|E04|E06) phase="${TASK,,}" ;;
               *) echo "unsupported task: $TASK" >&2; exit 2 ;;
             esac
-            image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/jpacf-yomi-tdt-runtime:phase-${phase}-current"
+            image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/jpacf-yomi-tdt-runtime:phase-${phase}-${GITHUB_SHA}"
           fi
 
           resolved=""
@@ -118,7 +141,7 @@ jobs:
             repo="${DOCKERHUB_REPOSITORY#docker.io/}"
             tag="${image##*:}"
             if [[ -z "$repo" || "$repo" != */* ]]; then
-              echo "Phase image is unavailable in GHCR and Docker Hub fallback is not configured" >&2
+              echo "Source-matched phase image is unavailable in GHCR and Docker Hub fallback is not configured" >&2
               exit 1
             fi
             image="docker.io/${repo}:${tag}"
@@ -178,10 +201,10 @@ jobs:
           set -euo pipefail
           echo "::add-mask::${HF_TOKEN}"
           echo "::add-mask::${GHCR_TOKEN}"
-          env_spec="-e HF_TOKEN=${HF_TOKEN} -e HF_BUCKET=${HF_BUCKET} -e RESEARCH_KEY=${RESEARCH_KEY} -e JPA_CF_RESEARCH_TASK=${TASK} -e JPA_CF_EVIDENCE_RUN_ID=${EVIDENCE_RUN_ID}"
+          env_spec="-e HF_TOKEN=${HF_TOKEN} -e HF_BUCKET=${HF_BUCKET} -e RESEARCH_KEY=${RESEARCH_KEY} -e JPA_CF_RESEARCH_TASK=${TASK} -e JPA_CF_EVIDENCE_RUN_ID=${EVIDENCE_RUN_ID} -e JPA_CF_STAGE_FINGERPRINTS_B64=${JPA_CF_STAGE_FINGERPRINTS_B64}"
           if [[ "$TASK" == "E06" ]]; then
             test -n "$E06_DRIVER_INPUT"
-            env_spec+=" -e E06_DRIVER=${E06_DRIVER_INPUT}"
+            env_spec+=" -e E06_DRIVER=${E06_DRIVER_INPUT} -e JPA_CF_E06_DRIVER_SHA256=${JPA_CF_E06_DRIVER_SHA256}"
           fi
           login_args=()
           if [[ "$PHASE_IMAGE" == ghcr.io/* ]]; then

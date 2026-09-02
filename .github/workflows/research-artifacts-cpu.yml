@@ -13,14 +13,14 @@ on:
         required: false
         type: string
       kenlm_image:
-        description: KenLM CPU tools image for e02-estimate
-        required: true
-        default: ghcr.io/yokane/jpacf-yomi-tdt-tools:kenlm-current
+        description: Optional immutable KenLM tools image override; blank uses the pinned KenLM revision tag
+        required: false
+        default: ""
         type: string
       phone_image:
-        description: E05 CPU phone-head image for e05-phone
-        required: true
-        default: ghcr.io/yokane/jpacf-yomi-tdt-tools:phone-e05-current
+        description: Optional immutable E05 CPU image override; blank uses the current source SHA tag
+        required: false
+        default: ""
         type: string
 
 permissions:
@@ -51,7 +51,7 @@ jobs:
           install: true
           cache: true
 
-      - name: Resolve immutable research snapshot
+      - name: Resolve content-addressed research snapshot
         id: workspace
         shell: bash
         run: |
@@ -59,6 +59,11 @@ jobs:
           test -n "${HF_TOKEN:-}"
           mise run deps:sync
           mise run hf:transport:sync
+
+          fingerprints_b64="$(uv run --locked --no-sync python scripts/research/stage_fingerprints.py --field b64)"
+          export JPA_CF_STAGE_FINGERPRINTS_B64="$fingerprints_b64"
+          echo "JPA_CF_STAGE_FINGERPRINTS_B64=$fingerprints_b64" >> "$GITHUB_ENV"
+
           key='${{ inputs.research_key }}'
           if [[ -z "$key" ]]; then
             key="$(uv run --locked --no-sync python scripts/research/research_key.py)"
@@ -68,19 +73,22 @@ jobs:
           mkdir -p "$state"
           exists="$(bash scripts/hf/hf-research-snapshot.sh exists "$key" '${{ inputs.task }}')"
           remote="$(bash scripts/hf/hf-research-snapshot.sh remote "$key" '${{ inputs.task }}')"
+          fingerprint="$(uv run --locked --no-sync python scripts/research/snapshot_plan.py '${{ inputs.task }}' --field fingerprint)"
           echo "RESEARCH_KEY=$key" >> "$GITHUB_ENV"
           echo "JPA_CF_STATE_ROOT=$state" >> "$GITHUB_ENV"
           echo "snapshot_exists=$exists" >> "$GITHUB_OUTPUT"
           echo "snapshot_remote=$remote" >> "$GITHUB_OUTPUT"
+          echo "stage_fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
           echo "- task: \`${{ inputs.task }}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- research key: \`$key\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- stage fingerprint: \`$fingerprint\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- output snapshot: \`$remote\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- already exists: \`$exists\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Reuse existing immutable snapshot
         if: ${{ steps.workspace.outputs.snapshot_exists == 'true' }}
         shell: bash
-        run: echo "Snapshot already exists; no CPU compute or registry pull is required." >> "$GITHUB_STEP_SUMMARY"
+        run: echo "Content-addressed snapshot already exists; no CPU compute or registry pull is required." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Restore required snapshot inputs
         if: ${{ steps.workspace.outputs.snapshot_exists != 'true' && inputs.task != 'common' }}
@@ -112,6 +120,9 @@ jobs:
           test -s "$encoded"
           test -s "$encoding_meta"
           image="$PREFERRED_IMAGE"
+          if [[ -z "$image" ]]; then
+            image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/jpacf-yomi-tdt-tools:kenlm-4cb443e60b7b"
+          fi
           if ! docker pull "$image"; then
             repo="${DOCKERHUB_REPOSITORY#docker.io/}"
             tag="${image##*:}"
@@ -145,6 +156,9 @@ jobs:
         run: |
           set -euo pipefail
           image="$PREFERRED_IMAGE"
+          if [[ -z "$image" ]]; then
+            image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/jpacf-yomi-tdt-tools:phone-e05-${GITHUB_SHA}"
+          fi
           if ! docker pull "$image"; then
             repo="${DOCKERHUB_REPOSITORY#docker.io/}"
             tag="${image##*:}"

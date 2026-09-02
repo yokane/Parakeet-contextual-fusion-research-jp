@@ -1,4 +1,4 @@
-schema_version: 2
+schema_version: 3
 state_root: /workspace/state
 bucket_prefix: workspace-cache/e00-e06
 
@@ -146,24 +146,44 @@ preparation_tasks:
     executor: github-hosted
     outputs: [e05_phone_vocab, e05_phone_train_manifest, e05_phone_head, e05_phone_ready, e05_result]
 
-# Each task writes only a delta snapshot under:
-#   workspace-cache/e00-e06/<research-key>/<output>/
-# Existing output snapshots are never overwritten. Consumers reconstruct local
-# state by overlaying the listed input snapshots. This preserves the repository's
-# immutable workspace-cache contract without duplicating the full audio/state tree
-# for every research step.
+# The research key identifies immutable data/model inputs. Each task adds a
+# content-addressed implementation fingerprint derived from only the files that
+# can affect that stage plus the fingerprints of its upstream stages. Remote
+# snapshots therefore live at:
+#   workspace-cache/e00-e06/<research-key>/<output>/<stage-fingerprint>/
+# This keeps independent stages reusable while invalidating downstream artifacts
+# transitively when an implementation changes.
 snapshot_tasks:
   common:
     inputs: []
     output: common
     publish:
       - generated/eval
+    fingerprint_sources:
+      - scripts/research/prepare_common_artifacts.sh
+      - scripts/materialize_hf_eval.py
+      - scripts/validate_eval_manifest.py
+      - scripts/validate_audio_coverage.py
+      - pyproject.toml
+      - uv.lock
+    fingerprint_values:
+      hf_config: homophone8-audio
+      hf_split: test
+      min_audio_per_category: 5
+      min_audio_total: 10
+
   e02-encode:
     inputs: [common]
     output: e02-encode
     publish:
       - artifacts/lm/lm_corpus.encoded.txt
       - artifacts/lm/encoding-metadata.json
+    fingerprint_sources:
+      - scripts/research/ngram_lm_pipeline.py
+      - docker/research/Dockerfile.e02
+      - uv.lock
+      - locks/containers.lock.json
+
   e02-estimate:
     inputs: [e02-encode]
     output: e02-estimate
@@ -171,43 +191,121 @@ snapshot_tasks:
       - artifacts/lm/ja-6gram.arpa
       - artifacts/lm/ja-6gram.binary
       - artifacts/lm/estimation-metadata.json
+    fingerprint_sources:
+      - scripts/research/ngram_lm_pipeline.py
+      - docker/research/Dockerfile.kenlm
+    fingerprint_values:
+      kenlm_revision: 4cb443e60b7bf2c0ddf3c745378f76cb59e254e5
+      ngram_order: 6
+
   e02-pack:
     inputs: [e02-encode, e02-estimate]
     output: e02-pack
     publish:
       - artifacts/lm/ja-6gram.nemo
       - artifacts/lm/package-metadata.json
+    fingerprint_sources:
+      - scripts/research/ngram_lm_pipeline.py
+      - docker/research/Dockerfile.e02
+      - uv.lock
+      - locks/containers.lock.json
+
   E00:
     inputs: [common]
     output: phase-e00
     publish:
       - results/E00_tdt_greedy.jsonl
+    fingerprint_sources:
+      - experiments/_common.sh
+      - experiments/E00_tdt_greedy.sh
+      - scripts/decode_nbest.py
+      - scripts/container/run-phase.sh
+      - scripts/container/vast_research_task.sh
+      - scripts/research/rebase_eval_manifest.py
+      - docker/phases/Dockerfile
+      - uv.lock
+      - locks/containers.lock.json
+
   E01:
     inputs: [common]
     output: phase-e01
     publish:
       - results/E01_tdt_beam.jsonl
+    fingerprint_sources:
+      - experiments/_common.sh
+      - experiments/E01_tdt_beam.sh
+      - scripts/decode_nbest.py
+      - scripts/container/run-phase.sh
+      - scripts/container/vast_research_task.sh
+      - scripts/research/rebase_eval_manifest.py
+      - docker/phases/Dockerfile
+      - uv.lock
+      - locks/containers.lock.json
+
   E02:
     inputs: [common, e02-pack]
     output: phase-e02
     publish:
       - results/E02_ngpulm.jsonl
+    fingerprint_sources:
+      - experiments/_common.sh
+      - experiments/E02_ngpulm.sh
+      - scripts/decode_nbest.py
+      - scripts/container/run-phase.sh
+      - scripts/container/vast_research_task.sh
+      - scripts/research/rebase_eval_manifest.py
+      - docker/research/Dockerfile.e02
+      - uv.lock
+      - locks/containers.lock.json
+
   E03:
     inputs: [common, e02-pack]
     output: phase-e03
     publish:
       - results/E03_gpu_pb.jsonl
+    fingerprint_sources:
+      - experiments/_common.sh
+      - experiments/E03_gpu_pb.sh
+      - scripts/decode_nbest.py
+      - scripts/container/run-phase.sh
+      - scripts/container/vast_research_task.sh
+      - scripts/research/rebase_eval_manifest.py
+      - docker/phases/Dockerfile
+      - uv.lock
+      - locks/containers.lock.json
+
   E04:
     inputs: [common, e02-pack]
     output: phase-e04
     publish:
       - results/E04_nbest.jsonl
       - results/E04_ctc_rerank.jsonl
+    fingerprint_sources:
+      - experiments/_common.sh
+      - experiments/E04_ctc_rerank.sh
+      - scripts/decode_nbest.py
+      - scripts/rerank_ctc.py
+      - scripts/container/run-phase.sh
+      - scripts/container/vast_research_task.sh
+      - scripts/research/rebase_eval_manifest.py
+      - docker/phases/Dockerfile
+      - uv.lock
+      - locks/containers.lock.json
+
   e05-extract:
     inputs: [common]
     output: e05-extract
     publish:
       - artifacts/encoder
+    fingerprint_sources:
+      - scripts/research/e05_extract_gpu.sh
+      - scripts/extract_encoder_features.py
+      - scripts/container/vast_research_task.sh
+      - scripts/research/rebase_eval_manifest.py
+      - docker/phases/Dockerfile
+      - uv.lock
+      - locks/containers.lock.json
+
   e05-phone:
     inputs: [common, phase-e04, e05-extract]
     output: e05-phone
@@ -217,8 +315,27 @@ snapshot_tasks:
       - generated/phone_train.jsonl
       - results/E04_phone_ready.jsonl
       - results/E05_phone_rerank.jsonl
+    fingerprint_sources:
+      - scripts/research/e05_train_rerank_cpu.sh
+      - scripts/prepare_phone_head_data.py
+      - scripts/train_phone_head.py
+      - scripts/rerank_phone.py
+      - src/parakeet_context_fusion
+      - docker/research/Dockerfile.e05-phone-cpu
+
   E06:
     inputs: [common, e02-pack, e05-extract, e05-phone]
     output: phase-e06
     publish:
       - results/E06_inbeam.jsonl
+    fingerprint_sources:
+      - experiments/_common.sh
+      - experiments/E06_inbeam.sh
+      - scripts/container/run-phase.sh
+      - scripts/container/vast_research_task.sh
+      - scripts/research/rebase_eval_manifest.py
+      - docker/phases/Dockerfile
+      - uv.lock
+      - locks/containers.lock.json
+    fingerprint_external:
+      - JPA_CF_E06_DRIVER_SHA256

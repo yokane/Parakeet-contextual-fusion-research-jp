@@ -21,6 +21,7 @@ COPY scripts/container/vast_research_task.sh /opt/jpacf/scripts/container/vast_r
 COPY scripts/hf/hf-research-snapshot.sh /opt/jpacf/scripts/hf/hf-research-snapshot.sh
 COPY scripts/research/check_phase_artifacts.py /opt/jpacf/scripts/research/check_phase_artifacts.py
 COPY scripts/research/snapshot_plan.py /opt/jpacf/scripts/research/snapshot_plan.py
+COPY scripts/research/stage_fingerprints.py /opt/jpacf/scripts/research/stage_fingerprints.py
 COPY scripts/research/rebase_eval_manifest.py /opt/jpacf/scripts/research/rebase_eval_manifest.py
 COPY scripts/research/e05_extract_gpu.sh /opt/jpacf/scripts/research/e05_extract_gpu.sh
 COPY configs/research/e00-e06-artifacts.yaml /opt/jpacf/configs/research/e00-e06-artifacts.yaml
@@ -30,6 +31,7 @@ RUN chmod 0755 \
       /opt/jpacf/scripts/hf/hf-research-snapshot.sh \
       /opt/jpacf/scripts/research/check_phase_artifacts.py \
       /opt/jpacf/scripts/research/snapshot_plan.py \
+      /opt/jpacf/scripts/research/stage_fingerprints.py \
       /opt/jpacf/scripts/research/rebase_eval_manifest.py \
       /opt/jpacf/scripts/research/e05_extract_gpu.sh
 

@@ -20,11 +20,15 @@ finish() {
 trap finish EXIT
 
 [[ -n "${HF_TOKEN:-}" ]] || { echo "HF_TOKEN is required" >&2; exit 2; }
+[[ -n "${JPA_CF_STAGE_FINGERPRINTS_B64:-}" ]] || {
+  echo "JPA_CF_STAGE_FINGERPRINTS_B64 is required for content-addressed snapshots" >&2
+  exit 2
+}
 mkdir -p "$STATE_ROOT" "$LM_DIR" "$RESULTS_DIR"
 
-# Restore only the immutable delta snapshots required by this task. The current
-# task's output is published under a new stage path and can never overwrite an
-# existing workspace-cache key.
+# Restore only the exact content-addressed delta snapshots selected by the
+# GitHub-hosted control plane. The same fingerprint mapping is passed into this
+# container, so pre-allocation existence checks and GPU pull/push paths agree.
 bash scripts/hf/hf-research-snapshot.sh pull "$RESEARCH_KEY" "$TASK" "$STATE_ROOT"
 
 if [[ -f "$EVAL_DIR/nemo_eval.jsonl" && -d "$EVAL_DIR/audio" ]]; then
@@ -70,6 +74,17 @@ case "$TASK" in
       --state-root "$STATE_ROOT"
     if [[ "$TASK" == "E06" ]]; then
       : "${E06_DRIVER:?E06_DRIVER is required for E06}"
+      : "${JPA_CF_E06_DRIVER_SHA256:?JPA_CF_E06_DRIVER_SHA256 is required for E06}"
+      [[ "$JPA_CF_E06_DRIVER_SHA256" =~ ^[0-9a-f]{64}$ ]] || {
+        echo "JPA_CF_E06_DRIVER_SHA256 must be a full lowercase SHA-256 digest" >&2
+        exit 2
+      }
+      [[ -f "$E06_DRIVER" ]] || { echo "E06 driver not found: $E06_DRIVER" >&2; exit 2; }
+      actual_driver_sha256="$(sha256sum "$E06_DRIVER" | awk '{print $1}')"
+      [[ "$actual_driver_sha256" == "$JPA_CF_E06_DRIVER_SHA256" ]] || {
+        echo "E06 driver digest mismatch: expected=$JPA_CF_E06_DRIVER_SHA256 actual=$actual_driver_sha256" >&2
+        exit 2
+      }
       export E06_DRIVER
       export PHONE_HEAD="${PHONE_HEAD:-${STATE_ROOT}/artifacts/phone_head.pt}"
       export PHONE_VOCAB="${PHONE_VOCAB:-${STATE_ROOT}/artifacts/phone_vocab.json}"
