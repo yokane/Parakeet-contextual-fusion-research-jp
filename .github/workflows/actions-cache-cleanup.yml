@@ -116,17 +116,20 @@ jobs:
             "/repos/${GITHUB_REPOSITORY}/actions/caches?per_page=100" \
             --jq '.actions_caches[].id' | wc -l | tr -d ' ')"
 
-          {
-            echo "### Actions cache cleanup"
-            echo
-            echo "- retention threshold: ${RETENTION_DAYS} days"
-            echo "- dry run: ${DRY_RUN}"
-            echo "- caches before: ${before_count}"
-            echo "- selected: ${delete_count}"
-            echo "- selected bytes: ${delete_bytes}"
-            echo "- deleted: ${deleted_count}"
-            echo "- deleted bytes: ${deleted_bytes}"
-            echo "- caches after: ${after_count}"
-            echo
-            echo "Policy: delete caches that are stale by last access time, plus caches scoped to closed pull-request merge refs."
-          } >> "$GITHUB_STEP_SUMMARY"
+          summary="$(cat <<EOF
+          ### Actions cache cleanup
+
+          - retention threshold: ${RETENTION_DAYS} days
+          - dry run: ${DRY_RUN}
+          - caches before: ${before_count}
+          - bytes before: ${before_bytes}
+          - selected: ${delete_count}
+          - selected bytes: ${delete_bytes}
+          - deleted: ${deleted_count}
+          - deleted bytes: ${deleted_bytes}
+          - caches after: ${after_count}
+
+          Policy: delete caches that are stale by last access time, plus caches scoped to closed pull-request merge refs.
+          EOF
+          )"
+          printf '%s\n' "$summary" | tee -a "$GITHUB_STEP_SUMMARY"
