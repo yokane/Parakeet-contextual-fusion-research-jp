@@ -7,13 +7,13 @@ on:
         description: GPU/Vast research task
         required: true
         type: choice
-        options: [e02-encode, e02-pack, e05-extract, E00, E01, E02, E03, E04, E05, E06]
+        options: [e02-encode, e02-pack, e05-extract, E00, E01, E02, E03, E04, E06]
       research_key:
         description: Optional existing research key; blank derives it from locked HF revisions
         required: false
         type: string
       image:
-        description: Optional phase image override; blank selects phase-<name>-current
+        description: Optional immutable/current phase image override
         required: false
         type: string
       e06_driver:
@@ -49,6 +49,7 @@ jobs:
       VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
       HF_TOKEN: ${{ secrets.HF_TOKEN }}
       GHCR_TOKEN: ${{ github.token }}
+      DOCKERHUB_REPOSITORY: ${{ secrets.DOCKERHUB_REPOSITORY }}
       TASK: ${{ inputs.task }}
       E06_DRIVER_INPUT: ${{ inputs.e06_driver }}
     steps:
@@ -61,43 +62,74 @@ jobs:
           install: true
           cache: true
 
-      - name: Resolve task identity and immutable image
+      - name: Resolve snapshot and immutable phase image
+        id: identity
         shell: bash
         run: |
           set -euo pipefail
-          test -n "${VAST_API_KEY:-}"
           test -n "${HF_TOKEN:-}"
           mise run deps:sync-vast
+          mise run hf:transport:sync
+
           key='${{ inputs.research_key }}'
           if [[ -z "$key" ]]; then
             key="$(uv run --locked --no-sync python scripts/research/research_key.py)"
           fi
           [[ "$key" =~ ^[A-Za-z0-9._-]+$ ]]
+          snapshot_exists="$(bash scripts/hf/hf-research-snapshot.sh exists "$key" "$TASK")"
+          snapshot_remote="$(bash scripts/hf/hf-research-snapshot.sh remote "$key" "$TASK")"
 
+          echo "RESEARCH_KEY=$key" >> "$GITHUB_ENV"
+          echo "SNAPSHOT_REMOTE=$snapshot_remote" >> "$GITHUB_ENV"
+          echo "VAST_LABEL=jpacf-${TASK,,}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+          echo "EVIDENCE_RUN_ID=vast-${TASK,,}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+          echo "snapshot_exists=$snapshot_exists" >> "$GITHUB_OUTPUT"
+          echo "snapshot_remote=$snapshot_remote" >> "$GITHUB_OUTPUT"
+
+          echo "- task: \`$TASK\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- research key: \`$key\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- output snapshot: \`$snapshot_remote\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- already exists: \`$snapshot_exists\`" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$snapshot_exists" == "true" ]]; then
+            echo "Immutable output already exists; Vast allocation is skipped." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+
+          test -n "${VAST_API_KEY:-}"
           image='${{ inputs.image }}'
           if [[ -z "$image" ]]; then
             case "$TASK" in
               e02-encode|e02-pack|E02) phase=e02 ;;
-              e05-extract|E05) phase=e05 ;;
+              e05-extract) phase=e05 ;;
               E00|E01|E03|E04|E06) phase="${TASK,,}" ;;
               *) echo "unsupported task: $TASK" >&2; exit 2 ;;
             esac
             image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/jpacf-yomi-tdt-runtime:phase-${phase}-current"
           fi
 
+          resolved=""
           if [[ "$image" == ghcr.io/* ]]; then
             echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin >/dev/null
           fi
-          resolved="$(bash scripts/container/resolve-remote-image.sh "$image")"
-          echo "RESEARCH_KEY=$key" >> "$GITHUB_ENV"
+          if resolved="$(bash scripts/container/resolve-remote-image.sh "$image" 2>/dev/null)"; then
+            :
+          else
+            repo="${DOCKERHUB_REPOSITORY#docker.io/}"
+            tag="${image##*:}"
+            if [[ -z "$repo" || "$repo" != */* ]]; then
+              echo "Phase image is unavailable in GHCR and Docker Hub fallback is not configured" >&2
+              exit 1
+            fi
+            image="docker.io/${repo}:${tag}"
+            resolved="$(bash scripts/container/resolve-remote-image.sh "$image")"
+          fi
           echo "PHASE_IMAGE=$resolved" >> "$GITHUB_ENV"
-          echo "VAST_LABEL=jpacf-${TASK,,}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
-          echo "EVIDENCE_RUN_ID=vast-${TASK,,}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
-          echo "- task: \`$TASK\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- research key: \`$key\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "phase_image=$resolved" >> "$GITHUB_OUTPUT"
           echo "- image: \`$resolved\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Select budget-compliant RTX 4090
+        if: ${{ steps.identity.outputs.snapshot_exists != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -140,6 +172,7 @@ jobs:
           cat dist/providers/research-inventory.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Launch research task on Vast
+        if: ${{ steps.identity.outputs.snapshot_exists != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -169,6 +202,7 @@ jobs:
           echo "VAST_INSTANCE_ID=$id" >> "$GITHUB_ENV"
 
       - name: Wait for research completion
+        if: ${{ steps.identity.outputs.snapshot_exists != 'true' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -208,10 +242,10 @@ jobs:
           cat dist/runtime/vast-container.log
           echo "- Vast GPU: \`${VAST_GPU_NAME}\`" >> "$GITHUB_STEP_SUMMARY"
           echo "- predicted cost: \`$${VAST_PREDICTED_COST}\`" >> "$GITHUB_STEP_SUMMARY"
-          echo "- HF state: \`hf://buckets/${HF_BUCKET}/workspace-cache/e00-e06/${RESEARCH_KEY}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- published snapshot: \`${SNAPSHOT_REMOTE}\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Destroy Vast instance
-        if: ${{ always() }}
+        if: ${{ always() && steps.identity.outputs.snapshot_exists != 'true' }}
         shell: bash
         run: |
           set +e
