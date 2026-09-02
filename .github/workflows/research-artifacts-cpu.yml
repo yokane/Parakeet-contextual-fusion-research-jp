@@ -13,12 +13,12 @@ on:
         required: false
         type: string
       kenlm_image:
-        description: Optional immutable KenLM tools image override; blank uses the pinned KenLM revision tag
+        description: Optional KenLM tools image override; blank uses the pinned KenLM revision tag
         required: false
         default: ""
         type: string
       phone_image:
-        description: Optional immutable E05 CPU image override; blank uses the current source SHA tag
+        description: Optional E05 CPU image override; blank uses phone-e05-current on main and resolves it to a digest
         required: false
         default: ""
         type: string
@@ -126,18 +126,21 @@ jobs:
           if ! docker pull "$image"; then
             repo="${DOCKERHUB_REPOSITORY#docker.io/}"
             tag="${image##*:}"
-            if [[ -z "$repo" || "$repo" != */* ]]; then
-              echo "GHCR tool image is unavailable and Docker Hub fallback is not configured" >&2
+            if [[ -z "$repo" || "$repo" != */* || "$image" == *@* ]]; then
+              echo "GHCR tool image is unavailable and Docker Hub fallback is not usable" >&2
               exit 1
             fi
             image="docker.io/${repo}:${tag}"
             docker pull "$image"
           fi
+          resolved="$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")"
+          [[ "$resolved" =~ @sha256:[0-9a-f]{64}$ ]]
+          echo "- KenLM tool image: \`$resolved\`" >> "$GITHUB_STEP_SUMMARY"
           docker run --rm \
             -v "$GITHUB_WORKSPACE:/repo:ro" \
             -v "$JPA_CF_STATE_ROOT:/workspace/state" \
             -w /repo \
-            "$image" \
+            "$resolved" \
             "python3 scripts/research/ngram_lm_pipeline.py estimate \
               --encoded-corpus /workspace/state/artifacts/lm/lm_corpus.encoded.txt \
               --encoding-metadata /workspace/state/artifacts/lm/encoding-metadata.json \
@@ -157,22 +160,29 @@ jobs:
           set -euo pipefail
           image="$PREFERRED_IMAGE"
           if [[ -z "$image" ]]; then
-            image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/jpacf-yomi-tdt-tools:phone-e05-${GITHUB_SHA}"
+            if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+              echo "Feature-branch e05-phone runs require an explicit phone_image; refusing to use main's current locator implicitly." >&2
+              exit 2
+            fi
+            image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/jpacf-yomi-tdt-tools:phone-e05-current"
           fi
           if ! docker pull "$image"; then
             repo="${DOCKERHUB_REPOSITORY#docker.io/}"
             tag="${image##*:}"
-            if [[ -z "$repo" || "$repo" != */* ]]; then
-              echo "GHCR tool image is unavailable and Docker Hub fallback is not configured" >&2
+            if [[ -z "$repo" || "$repo" != */* || "$image" == *@* ]]; then
+              echo "GHCR tool image is unavailable and Docker Hub fallback is not usable" >&2
               exit 1
             fi
             image="docker.io/${repo}:${tag}"
             docker pull "$image"
           fi
+          resolved="$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")"
+          [[ "$resolved" =~ @sha256:[0-9a-f]{64}$ ]]
+          echo "- E05 CPU image: \`$resolved\`" >> "$GITHUB_STEP_SUMMARY"
           docker run --rm \
             -v "$JPA_CF_STATE_ROOT:/workspace/state" \
             -e JPA_CF_STATE_ROOT=/workspace/state \
-            "$image"
+            "$resolved"
 
       - name: Publish immutable delta snapshot
         if: ${{ steps.workspace.outputs.snapshot_exists != 'true' }}
