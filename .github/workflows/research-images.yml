@@ -22,6 +22,10 @@ on:
       - scripts/hf/hf-research-snapshot.sh
       - scripts/container/run-phase.sh
       - scripts/container/vast_research_task.sh
+      - scripts/prepare_phone_head_data.py
+      - scripts/train_phone_head.py
+      - scripts/rerank_phone.py
+      - src/parakeet_context_fusion/**
       - configs/research/**
       - .github/workflows/research-images.yml
 
@@ -89,6 +93,9 @@ jobs:
           SOURCE_SHA: ${{ github.sha }}
           SOURCE_REPOSITORY: ${{ github.server_url }}/${{ github.repository }}
           RUNTIME_IMAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.runtime_image || 'ghcr.io/yokane/jpacf-yomi-tdt-runtime:runtime-current' }}
+          # On main the full runtime workflow is triggered by the same source
+          # changes. Wait for its exact sha tag instead of racing runtime-current.
+          WAIT_FOR_SOURCE_RUNTIME: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'true' || 'false' }}
           PUBLISH_CURRENT: ${{ (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.publish_current)) && 'true' || 'false' }}
         run: bash scripts/ci/build_research_images.sh
 
