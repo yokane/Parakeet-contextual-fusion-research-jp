@@ -14,10 +14,26 @@ LABEL org.opencontainers.image.source="${SOURCE_REPOSITORY}" \
       io.jpacf.runtime.kind="experiment-phase"
 
 # The parent runtime already owns Python, CUDA, PyTorch, NeMo, uv, the project
-# environment, and the experiment implementation. Only the phase dispatcher is
-# overlaid here, so all targets share the same heavy root filesystem layers.
+# environment, and the HF transport environment. Only small dispatch/contract
+# files are overlaid here, so all targets share the same heavy rootfs layers.
 COPY scripts/container/run-phase.sh /opt/jpacf/scripts/container/run-phase.sh
-RUN chmod 0755 /opt/jpacf/scripts/container/run-phase.sh
+COPY scripts/container/vast_research_task.sh /opt/jpacf/scripts/container/vast_research_task.sh
+COPY scripts/hf/hf-research-snapshot.sh /opt/jpacf/scripts/hf/hf-research-snapshot.sh
+COPY scripts/research/check_phase_artifacts.py /opt/jpacf/scripts/research/check_phase_artifacts.py
+COPY scripts/research/snapshot_plan.py /opt/jpacf/scripts/research/snapshot_plan.py
+COPY scripts/research/stage_fingerprints.py /opt/jpacf/scripts/research/stage_fingerprints.py
+COPY scripts/research/rebase_eval_manifest.py /opt/jpacf/scripts/research/rebase_eval_manifest.py
+COPY scripts/research/e05_extract_gpu.sh /opt/jpacf/scripts/research/e05_extract_gpu.sh
+COPY configs/research/e00-e06-artifacts.yaml /opt/jpacf/configs/research/e00-e06-artifacts.yaml
+RUN chmod 0755 \
+      /opt/jpacf/scripts/container/run-phase.sh \
+      /opt/jpacf/scripts/container/vast_research_task.sh \
+      /opt/jpacf/scripts/hf/hf-research-snapshot.sh \
+      /opt/jpacf/scripts/research/check_phase_artifacts.py \
+      /opt/jpacf/scripts/research/snapshot_plan.py \
+      /opt/jpacf/scripts/research/stage_fingerprints.py \
+      /opt/jpacf/scripts/research/rebase_eval_manifest.py \
+      /opt/jpacf/scripts/research/e05_extract_gpu.sh
 
 FROM phase-base AS e00
 ENV JPA_CF_PHASE=E00
@@ -29,6 +45,8 @@ ENV JPA_CF_PHASE=E01
 LABEL io.jpacf.phase="E01" io.jpacf.phase.description="TDT MAES/beam decoding"
 CMD ["bash", "/opt/jpacf/scripts/container/run-phase.sh", "E01"]
 
+# Kept for local compatibility. Canonical published E02 uses
+# docker/research/Dockerfile.e02 so the exact KenLM tools are present as a thin overlay.
 FROM phase-base AS e02
 ENV JPA_CF_PHASE=E02
 LABEL io.jpacf.phase="E02" io.jpacf.phase.description="TDT beam plus N-gram GPU LM"

@@ -1,0 +1,193 @@
+name: research-artifacts-cpu
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: CPU artifact task
+        required: true
+        type: choice
+        options: [common, e02-estimate, e05-phone]
+      research_key:
+        description: Optional existing research key; blank derives it from locked HF revisions
+        required: false
+        type: string
+      kenlm_image:
+        description: Optional KenLM tools image override; blank uses the pinned KenLM revision tag
+        required: false
+        default: ""
+        type: string
+      phone_image:
+        description: Optional E05 CPU image override; blank uses phone-e05-current on main and resolves it to a digest
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: research-artifacts-cpu-${{ inputs.task }}-${{ inputs.research_key || 'locked' }}
+  cancel-in-progress: false
+
+env:
+  HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
+
+jobs:
+  artifact:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      DOCKERHUB_REPOSITORY: ${{ secrets.DOCKERHUB_REPOSITORY }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install locked CPU toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: true
+
+      - name: Resolve content-addressed research snapshot
+        id: workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}"
+          mise run deps:sync
+          mise run hf:transport:sync
+
+          fingerprints_b64="$(uv run --locked --no-sync python scripts/research/stage_fingerprints.py --field b64)"
+          export JPA_CF_STAGE_FINGERPRINTS_B64="$fingerprints_b64"
+          echo "JPA_CF_STAGE_FINGERPRINTS_B64=$fingerprints_b64" >> "$GITHUB_ENV"
+
+          key='${{ inputs.research_key }}'
+          if [[ -z "$key" ]]; then
+            key="$(uv run --locked --no-sync python scripts/research/research_key.py)"
+          fi
+          [[ "$key" =~ ^[A-Za-z0-9._-]+$ ]]
+          state="${GITHUB_WORKSPACE}/.jpacf-state"
+          mkdir -p "$state"
+          exists="$(bash scripts/hf/hf-research-snapshot.sh exists "$key" '${{ inputs.task }}')"
+          remote="$(bash scripts/hf/hf-research-snapshot.sh remote "$key" '${{ inputs.task }}')"
+          fingerprint="$(uv run --locked --no-sync python scripts/research/snapshot_plan.py '${{ inputs.task }}' --field fingerprint)"
+          echo "RESEARCH_KEY=$key" >> "$GITHUB_ENV"
+          echo "JPA_CF_STATE_ROOT=$state" >> "$GITHUB_ENV"
+          echo "snapshot_exists=$exists" >> "$GITHUB_OUTPUT"
+          echo "snapshot_remote=$remote" >> "$GITHUB_OUTPUT"
+          echo "stage_fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+          echo "- task: \`${{ inputs.task }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- research key: \`$key\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- stage fingerprint: \`$fingerprint\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- output snapshot: \`$remote\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- already exists: \`$exists\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Reuse existing immutable snapshot
+        if: ${{ steps.workspace.outputs.snapshot_exists == 'true' }}
+        shell: bash
+        run: echo "Content-addressed snapshot already exists; no CPU compute or registry pull is required." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Restore required snapshot inputs
+        if: ${{ steps.workspace.outputs.snapshot_exists != 'true' && inputs.task != 'common' }}
+        shell: bash
+        run: bash scripts/hf/hf-research-snapshot.sh pull "$RESEARCH_KEY" '${{ inputs.task }}' "$JPA_CF_STATE_ROOT"
+
+      - name: Build common benchmark/audio/context artifacts
+        if: ${{ steps.workspace.outputs.snapshot_exists != 'true' && inputs.task == 'common' }}
+        shell: bash
+        run: JPA_CF_STATE_ROOT="$JPA_CF_STATE_ROOT" bash scripts/research/prepare_common_artifacts.sh
+
+      - name: Log in to GHCR for tool images
+        if: ${{ steps.workspace.outputs.snapshot_exists != 'true' && inputs.task != 'common' }}
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Estimate E02 KenLM on hosted CPU
+        if: ${{ steps.workspace.outputs.snapshot_exists != 'true' && inputs.task == 'e02-estimate' }}
+        shell: bash
+        env:
+          PREFERRED_IMAGE: ${{ inputs.kenlm_image }}
+        run: |
+          set -euo pipefail
+          encoded="$JPA_CF_STATE_ROOT/artifacts/lm/lm_corpus.encoded.txt"
+          encoding_meta="$JPA_CF_STATE_ROOT/artifacts/lm/encoding-metadata.json"
+          test -s "$encoded"
+          test -s "$encoding_meta"
+          image="$PREFERRED_IMAGE"
+          if [[ -z "$image" ]]; then
+            image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/jpacf-yomi-tdt-tools:kenlm-4cb443e60b7b"
+          fi
+          if ! docker pull "$image"; then
+            repo="${DOCKERHUB_REPOSITORY#docker.io/}"
+            tag="${image##*:}"
+            if [[ -z "$repo" || "$repo" != */* || "$image" == *@* ]]; then
+              echo "GHCR tool image is unavailable and Docker Hub fallback is not usable" >&2
+              exit 1
+            fi
+            image="docker.io/${repo}:${tag}"
+            docker pull "$image"
+          fi
+          resolved="$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")"
+          [[ "$resolved" =~ @sha256:[0-9a-f]{64}$ ]]
+          echo "- KenLM tool image: \`$resolved\`" >> "$GITHUB_STEP_SUMMARY"
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/repo:ro" \
+            -v "$JPA_CF_STATE_ROOT:/workspace/state" \
+            -w /repo \
+            "$resolved" \
+            "python3 scripts/research/ngram_lm_pipeline.py estimate \
+              --encoded-corpus /workspace/state/artifacts/lm/lm_corpus.encoded.txt \
+              --encoding-metadata /workspace/state/artifacts/lm/encoding-metadata.json \
+              --kenlm-bin-dir /opt/kenlm/bin \
+              --kenlm-revision 4cb443e60b7bf2c0ddf3c745378f76cb59e254e5 \
+              --order 6 \
+              --arpa /workspace/state/artifacts/lm/ja-6gram.arpa \
+              --binary /workspace/state/artifacts/lm/ja-6gram.binary \
+              --metadata /workspace/state/artifacts/lm/estimation-metadata.json"
+
+      - name: Train and apply E05 phone head on hosted CPU
+        if: ${{ steps.workspace.outputs.snapshot_exists != 'true' && inputs.task == 'e05-phone' }}
+        shell: bash
+        env:
+          PREFERRED_IMAGE: ${{ inputs.phone_image }}
+        run: |
+          set -euo pipefail
+          image="$PREFERRED_IMAGE"
+          if [[ -z "$image" ]]; then
+            if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+              echo "Feature-branch e05-phone runs require an explicit phone_image; refusing to use main's current locator implicitly." >&2
+              exit 2
+            fi
+            image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/jpacf-yomi-tdt-tools:phone-e05-current"
+          fi
+          if ! docker pull "$image"; then
+            repo="${DOCKERHUB_REPOSITORY#docker.io/}"
+            tag="${image##*:}"
+            if [[ -z "$repo" || "$repo" != */* || "$image" == *@* ]]; then
+              echo "GHCR tool image is unavailable and Docker Hub fallback is not usable" >&2
+              exit 1
+            fi
+            image="docker.io/${repo}:${tag}"
+            docker pull "$image"
+          fi
+          resolved="$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")"
+          [[ "$resolved" =~ @sha256:[0-9a-f]{64}$ ]]
+          echo "- E05 CPU image: \`$resolved\`" >> "$GITHUB_STEP_SUMMARY"
+          docker run --rm \
+            -v "$JPA_CF_STATE_ROOT:/workspace/state" \
+            -e JPA_CF_STATE_ROOT=/workspace/state \
+            "$resolved"
+
+      - name: Publish immutable delta snapshot
+        if: ${{ steps.workspace.outputs.snapshot_exists != 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash scripts/hf/hf-research-snapshot.sh push "$RESEARCH_KEY" '${{ inputs.task }}' "$JPA_CF_STATE_ROOT"
+          echo "Published: ${{ steps.workspace.outputs.snapshot_remote }}" >> "$GITHUB_STEP_SUMMARY"

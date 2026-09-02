@@ -1,0 +1,46 @@
+# syntax=docker/dockerfile:1.7
+ARG RUNTIME_IMAGE
+ARG KENLM_TOOLS_IMAGE
+
+FROM ${KENLM_TOOLS_IMAGE} AS kenlm-tools
+
+FROM ${RUNTIME_IMAGE} AS e02
+ARG SOURCE_REPOSITORY=https://github.com/yokane/Parakeet-contextual-fusion-research-jp
+ARG SOURCE_REVISION=unknown
+ARG KENLM_REVISION=4cb443e60b7bf2c0ddf3c745378f76cb59e254e5
+COPY --from=kenlm-tools /opt/kenlm/bin /opt/kenlm/bin
+# KenLM is built with static Boost where possible. Keep only the small runtime
+# edge libraries required by Debian's linker; compiler/source are never copied.
+COPY --from=kenlm-tools /usr/lib/x86_64-linux-gnu/libboost_iostreams.so.1.74.0 /opt/kenlm/lib/libboost_iostreams.so.1.74.0
+COPY --from=kenlm-tools /usr/lib/x86_64-linux-gnu/libboost_program_options.so.1.74.0 /opt/kenlm/lib/libboost_program_options.so.1.74.0
+COPY --from=kenlm-tools /usr/lib/x86_64-linux-gnu/libboost_system.so.1.74.0 /opt/kenlm/lib/libboost_system.so.1.74.0
+COPY --from=kenlm-tools /usr/lib/x86_64-linux-gnu/libboost_thread.so.1.74.0 /opt/kenlm/lib/libboost_thread.so.1.74.0
+COPY scripts/research/ngram_lm_pipeline.py /opt/jpacf/scripts/research/ngram_lm_pipeline.py
+COPY scripts/research/check_phase_artifacts.py /opt/jpacf/scripts/research/check_phase_artifacts.py
+COPY scripts/research/snapshot_plan.py /opt/jpacf/scripts/research/snapshot_plan.py
+COPY scripts/research/stage_fingerprints.py /opt/jpacf/scripts/research/stage_fingerprints.py
+COPY scripts/research/rebase_eval_manifest.py /opt/jpacf/scripts/research/rebase_eval_manifest.py
+COPY scripts/hf/hf-research-snapshot.sh /opt/jpacf/scripts/hf/hf-research-snapshot.sh
+COPY scripts/container/run-phase.sh /opt/jpacf/scripts/container/run-phase.sh
+COPY scripts/container/vast_research_task.sh /opt/jpacf/scripts/container/vast_research_task.sh
+COPY configs/research/e00-e06-artifacts.yaml /opt/jpacf/configs/research/e00-e06-artifacts.yaml
+RUN chmod 0755 \
+      /opt/jpacf/scripts/research/ngram_lm_pipeline.py \
+      /opt/jpacf/scripts/research/check_phase_artifacts.py \
+      /opt/jpacf/scripts/research/snapshot_plan.py \
+      /opt/jpacf/scripts/research/stage_fingerprints.py \
+      /opt/jpacf/scripts/research/rebase_eval_manifest.py \
+      /opt/jpacf/scripts/hf/hf-research-snapshot.sh \
+      /opt/jpacf/scripts/container/run-phase.sh \
+      /opt/jpacf/scripts/container/vast_research_task.sh
+ENV PATH=/opt/kenlm/bin:${PATH} \
+    LD_LIBRARY_PATH=/opt/kenlm/lib:${LD_LIBRARY_PATH} \
+    KENLM_BIN_DIR=/opt/kenlm/bin \
+    JPA_CF_PHASE=E02
+LABEL org.opencontainers.image.source="${SOURCE_REPOSITORY}" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}" \
+      org.opencontainers.image.title="J-PACF E02 KenLM/NGPU-LM research runtime" \
+      io.jpacf.runtime.kind="experiment-phase" \
+      io.jpacf.phase="E02" \
+      io.jpacf.kenlm.revision="${KENLM_REVISION}"
+CMD ["bash", "/opt/jpacf/scripts/container/run-phase.sh", "E02"]

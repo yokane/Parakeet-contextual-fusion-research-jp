@@ -1,0 +1,27 @@
+# syntax=docker/dockerfile:1.7
+ARG PYTHON_IMAGE=python:3.12.3-slim-bookworm
+FROM ${PYTHON_IMAGE} AS phone-cpu
+ARG SOURCE_REPOSITORY=https://github.com/yokane/Parakeet-contextual-fusion-research-jp
+ARG SOURCE_REVISION=unknown
+ARG TORCH_VERSION=2.12.0+cpu
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/opt/jpacf/src
+RUN python -m pip install --no-cache-dir \
+      --index-url https://download.pytorch.org/whl/cpu \
+      "torch==${TORCH_VERSION}"
+WORKDIR /opt/jpacf
+COPY src /opt/jpacf/src
+COPY scripts/prepare_phone_head_data.py /opt/jpacf/scripts/prepare_phone_head_data.py
+COPY scripts/train_phone_head.py /opt/jpacf/scripts/train_phone_head.py
+COPY scripts/rerank_phone.py /opt/jpacf/scripts/rerank_phone.py
+COPY scripts/research/e05_train_rerank_cpu.sh /opt/jpacf/scripts/research/e05_train_rerank_cpu.sh
+RUN chmod 0755 /opt/jpacf/scripts/research/e05_train_rerank_cpu.sh \
+    && python -c 'import torch; from parakeet_context_fusion.phoneme import PhoneCTCHead; print(torch.__version__); assert PhoneCTCHead'
+LABEL org.opencontainers.image.source="${SOURCE_REPOSITORY}" \
+      org.opencontainers.image.revision="${SOURCE_REVISION}" \
+      org.opencontainers.image.title="J-PACF E05 phone-head CPU tools" \
+      io.jpacf.runtime.kind="research-tool" \
+      io.jpacf.phase="E05" \
+      io.jpacf.executor="github-hosted"
+ENTRYPOINT ["/bin/bash", "/opt/jpacf/scripts/research/e05_train_rerank_cpu.sh"]

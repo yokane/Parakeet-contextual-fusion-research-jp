@@ -1,0 +1,341 @@
+schema_version: 3
+state_root: /workspace/state
+bucket_prefix: workspace-cache/e00-e06
+
+artifacts:
+  benchmark_index:
+    path: generated/eval/bench_index.jsonl
+    kind: file
+    producer: common-hosted
+  execution_manifest:
+    path: generated/eval/nemo_eval.jsonl
+    kind: file
+    producer: common-hosted
+  eval_audio:
+    path: generated/eval/audio
+    kind: directory
+    producer: common-hosted
+  eval_provenance:
+    path: generated/eval/eval_provenance.json
+    kind: file
+    producer: common-hosted
+  audio_coverage:
+    path: generated/eval/audio_coverage.json
+    kind: file
+    producer: common-hosted
+  context_phrases:
+    path: generated/eval/context_phrases.txt
+    kind: file
+    producer: common-hosted
+  lm_corpus:
+    path: generated/eval/lm_corpus.txt
+    kind: file
+    producer: common-hosted
+  e02_encoded_corpus:
+    path: artifacts/lm/lm_corpus.encoded.txt
+    kind: file
+    producer: e02-encode-vast
+  e02_encoding_metadata:
+    path: artifacts/lm/encoding-metadata.json
+    kind: file
+    producer: e02-encode-vast
+  e02_arpa:
+    path: artifacts/lm/ja-6gram.arpa
+    kind: file
+    producer: e02-estimate-hosted
+  e02_binary:
+    path: artifacts/lm/ja-6gram.binary
+    kind: file
+    producer: e02-estimate-hosted
+  e02_estimation_metadata:
+    path: artifacts/lm/estimation-metadata.json
+    kind: file
+    producer: e02-estimate-hosted
+  e02_ngpu_lm:
+    path: artifacts/lm/ja-6gram.nemo
+    kind: file
+    producer: e02-pack-vast
+  e02_package_metadata:
+    path: artifacts/lm/package-metadata.json
+    kind: file
+    producer: e02-pack-vast
+  e04_result:
+    path: results/E04_ctc_rerank.jsonl
+    kind: file
+    producer: E04
+  e05_encoder_features:
+    path: artifacts/encoder
+    kind: directory
+    producer: e05-extract-vast
+  e05_phone_vocab:
+    path: artifacts/phone_vocab.json
+    kind: file
+    producer: e05-phone-hosted
+  e05_phone_train_manifest:
+    path: generated/phone_train.jsonl
+    kind: file
+    producer: e05-phone-hosted
+  e05_phone_head:
+    path: artifacts/phone_head.pt
+    kind: file
+    producer: e05-phone-hosted
+  e05_phone_ready:
+    path: results/E04_phone_ready.jsonl
+    kind: file
+    producer: e05-phone-hosted
+  e05_result:
+    path: results/E05_phone_rerank.jsonl
+    kind: file
+    producer: e05-phone-hosted
+
+phases:
+  E00:
+    executor: vast
+    image: phase-e00
+    requires: [execution_manifest, eval_audio]
+    produces: [results/E00_tdt_greedy.jsonl]
+  E01:
+    executor: vast
+    image: phase-e01
+    requires: [execution_manifest, eval_audio]
+    produces: [results/E01_tdt_beam.jsonl]
+  E02:
+    executor: vast
+    image: phase-e02
+    requires: [execution_manifest, eval_audio, e02_ngpu_lm]
+    produces: [results/E02_ngpulm.jsonl]
+  E03:
+    executor: vast
+    image: phase-e03
+    requires: [execution_manifest, eval_audio, e02_ngpu_lm, context_phrases]
+    produces: [results/E03_gpu_pb.jsonl]
+  E04:
+    executor: vast
+    image: phase-e04
+    requires: [execution_manifest, eval_audio, e02_ngpu_lm, context_phrases]
+    produces: [results/E04_nbest.jsonl, results/E04_ctc_rerank.jsonl]
+  E05:
+    executor: github-hosted
+    image: phone-e05
+    requires: [benchmark_index, e04_result, e05_encoder_features]
+    produces: [results/E05_phone_rerank.jsonl]
+  E06:
+    executor: vast
+    image: phase-e06
+    requires:
+      [execution_manifest, eval_audio, e02_ngpu_lm, context_phrases, e05_encoder_features, e05_phone_head, e05_phone_vocab]
+    produces: [results/E06_inbeam.jsonl]
+
+preparation_tasks:
+  common-hosted:
+    executor: github-hosted
+    outputs: [benchmark_index, execution_manifest, eval_audio, eval_provenance, audio_coverage, context_phrases, lm_corpus]
+  e02-encode-vast:
+    executor: vast
+    outputs: [e02_encoded_corpus, e02_encoding_metadata]
+  e02-estimate-hosted:
+    executor: github-hosted
+    outputs: [e02_arpa, e02_binary, e02_estimation_metadata]
+  e02-pack-vast:
+    executor: vast
+    outputs: [e02_ngpu_lm, e02_package_metadata]
+  e05-extract-vast:
+    executor: vast
+    outputs: [e05_encoder_features]
+  e05-phone-hosted:
+    executor: github-hosted
+    outputs: [e05_phone_vocab, e05_phone_train_manifest, e05_phone_head, e05_phone_ready, e05_result]
+
+# The research key identifies immutable data/model inputs. Each task adds a
+# content-addressed implementation fingerprint derived from only the files that
+# can affect that stage plus the fingerprints of its upstream stages. Remote
+# snapshots therefore live at:
+#   workspace-cache/e00-e06/<research-key>/<output>/<stage-fingerprint>/
+# This keeps independent stages reusable while invalidating downstream artifacts
+# transitively when an implementation changes.
+snapshot_tasks:
+  common:
+    inputs: []
+    output: common
+    publish:
+      - generated/eval
+    fingerprint_sources:
+      - scripts/research/prepare_common_artifacts.sh
+      - scripts/materialize_hf_eval.py
+      - scripts/validate_eval_manifest.py
+      - scripts/validate_audio_coverage.py
+      - pyproject.toml
+      - uv.lock
+    fingerprint_values:
+      hf_config: homophone8-audio
+      hf_split: test
+      min_audio_per_category: 5
+      min_audio_total: 10
+
+  e02-encode:
+    inputs: [common]
+    output: e02-encode
+    publish:
+      - artifacts/lm/lm_corpus.encoded.txt
+      - artifacts/lm/encoding-metadata.json
+    fingerprint_sources:
+      - scripts/research/ngram_lm_pipeline.py
+      - docker/research/Dockerfile.e02
+      - uv.lock
+      - locks/containers.lock.json
+
+  e02-estimate:
+    inputs: [e02-encode]
+    output: e02-estimate
+    publish:
+      - artifacts/lm/ja-6gram.arpa
+      - artifacts/lm/ja-6gram.binary
+      - artifacts/lm/estimation-metadata.json
+    fingerprint_sources:
+      - scripts/research/ngram_lm_pipeline.py
+      - docker/research/Dockerfile.kenlm
+    fingerprint_values:
+      kenlm_revision: 4cb443e60b7bf2c0ddf3c745378f76cb59e254e5
+      ngram_order: 6
+
+  e02-pack:
+    inputs: [e02-encode, e02-estimate]
+    output: e02-pack
+    publish:
+      - artifacts/lm/ja-6gram.nemo
+      - artifacts/lm/package-metadata.json
+    fingerprint_sources:
+      - scripts/research/ngram_lm_pipeline.py
+      - docker/research/Dockerfile.e02
+      - uv.lock
+      - locks/containers.lock.json
+
+  E00:
+    inputs: [common]
+    output: phase-e00
+    publish:
+      - results/E00_tdt_greedy.jsonl
+    fingerprint_sources:
+      - experiments/_common.sh
+      - experiments/E00_tdt_greedy.sh
+      - scripts/decode_nbest.py
+      - scripts/container/run-phase.sh
+      - scripts/container/vast_research_task.sh
+      - scripts/research/rebase_eval_manifest.py
+      - docker/phases/Dockerfile
+      - uv.lock
+      - locks/containers.lock.json
+
+  E01:
+    inputs: [common]
+    output: phase-e01
+    publish:
+      - results/E01_tdt_beam.jsonl
+    fingerprint_sources:
+      - experiments/_common.sh
+      - experiments/E01_tdt_beam.sh
+      - scripts/decode_nbest.py
+      - scripts/container/run-phase.sh
+      - scripts/container/vast_research_task.sh
+      - scripts/research/rebase_eval_manifest.py
+      - docker/phases/Dockerfile
+      - uv.lock
+      - locks/containers.lock.json
+
+  E02:
+    inputs: [common, e02-pack]
+    output: phase-e02
+    publish:
+      - results/E02_ngpulm.jsonl
+    fingerprint_sources:
+      - experiments/_common.sh
+      - experiments/E02_ngpulm.sh
+      - scripts/decode_nbest.py
+      - scripts/container/run-phase.sh
+      - scripts/container/vast_research_task.sh
+      - scripts/research/rebase_eval_manifest.py
+      - docker/research/Dockerfile.e02
+      - uv.lock
+      - locks/containers.lock.json
+
+  E03:
+    inputs: [common, e02-pack]
+    output: phase-e03
+    publish:
+      - results/E03_gpu_pb.jsonl
+    fingerprint_sources:
+      - experiments/_common.sh
+      - experiments/E03_gpu_pb.sh
+      - scripts/decode_nbest.py
+      - scripts/container/run-phase.sh
+      - scripts/container/vast_research_task.sh
+      - scripts/research/rebase_eval_manifest.py
+      - docker/phases/Dockerfile
+      - uv.lock
+      - locks/containers.lock.json
+
+  E04:
+    inputs: [common, e02-pack]
+    output: phase-e04
+    publish:
+      - results/E04_nbest.jsonl
+      - results/E04_ctc_rerank.jsonl
+    fingerprint_sources:
+      - experiments/_common.sh
+      - experiments/E04_ctc_rerank.sh
+      - scripts/decode_nbest.py
+      - scripts/rerank_ctc.py
+      - scripts/container/run-phase.sh
+      - scripts/container/vast_research_task.sh
+      - scripts/research/rebase_eval_manifest.py
+      - docker/phases/Dockerfile
+      - uv.lock
+      - locks/containers.lock.json
+
+  e05-extract:
+    inputs: [common]
+    output: e05-extract
+    publish:
+      - artifacts/encoder
+    fingerprint_sources:
+      - scripts/research/e05_extract_gpu.sh
+      - scripts/extract_encoder_features.py
+      - scripts/container/vast_research_task.sh
+      - scripts/research/rebase_eval_manifest.py
+      - docker/phases/Dockerfile
+      - uv.lock
+      - locks/containers.lock.json
+
+  e05-phone:
+    inputs: [common, phase-e04, e05-extract]
+    output: e05-phone
+    publish:
+      - artifacts/phone_vocab.json
+      - artifacts/phone_head.pt
+      - generated/phone_train.jsonl
+      - results/E04_phone_ready.jsonl
+      - results/E05_phone_rerank.jsonl
+    fingerprint_sources:
+      - scripts/research/e05_train_rerank_cpu.sh
+      - scripts/prepare_phone_head_data.py
+      - scripts/train_phone_head.py
+      - scripts/rerank_phone.py
+      - src/parakeet_context_fusion
+      - docker/research/Dockerfile.e05-phone-cpu
+
+  E06:
+    inputs: [common, e02-pack, e05-extract, e05-phone]
+    output: phase-e06
+    publish:
+      - results/E06_inbeam.jsonl
+    fingerprint_sources:
+      - experiments/_common.sh
+      - experiments/E06_inbeam.sh
+      - scripts/container/run-phase.sh
+      - scripts/container/vast_research_task.sh
+      - scripts/research/rebase_eval_manifest.py
+      - docker/phases/Dockerfile
+      - uv.lock
+      - locks/containers.lock.json
+    fingerprint_external:
+      - JPA_CF_E06_DRIVER_SHA256
