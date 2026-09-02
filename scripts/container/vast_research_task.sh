@@ -7,7 +7,6 @@ STATE_ROOT="${JPA_CF_STATE_ROOT:-/workspace/state}"
 HF_BUCKET="${HF_BUCKET:-saeeew/J-PACF-YOMI-tdt-bucket}"
 RESEARCH_KEY="${RESEARCH_KEY:?RESEARCH_KEY is required}"
 TASK="${JPA_CF_RESEARCH_TASK:?JPA_CF_RESEARCH_TASK is required}"
-REMOTE="hf://buckets/${HF_BUCKET}/workspace-cache/e00-e06/${RESEARCH_KEY}"
 EVAL_DIR="${STATE_ROOT}/generated/eval"
 LM_DIR="${STATE_ROOT}/artifacts/lm"
 RESULTS_DIR="${STATE_ROOT}/results"
@@ -22,11 +21,11 @@ trap finish EXIT
 
 [[ -n "${HF_TOKEN:-}" ]] || { echo "HF_TOKEN is required" >&2; exit 2; }
 mkdir -p "$STATE_ROOT" "$LM_DIR" "$RESULTS_DIR"
-source scripts/hf/hf-identity.sh
 
-# Reusable research state is mutable by design; immutable experiment evidence is
-# published separately under runs/ after successful phase execution.
-hf_bucket_cli buckets sync --token "$HF_TOKEN" "$REMOTE" "$STATE_ROOT"
+# Restore only the immutable delta snapshots required by this task. The current
+# task's output is published under a new stage path and can never overwrite an
+# existing workspace-cache key.
+bash scripts/hf/hf-research-snapshot.sh pull "$RESEARCH_KEY" "$TASK" "$STATE_ROOT"
 
 if [[ -f "$EVAL_DIR/nemo_eval.jsonl" && -d "$EVAL_DIR/audio" ]]; then
   uv run --locked --no-sync python scripts/research/rebase_eval_manifest.py \
@@ -43,7 +42,7 @@ PY
 
 case "$TASK" in
   e02-encode)
-    model_nemo="${STATE_ROOT}/artifacts/model/parakeet-tdt_ctc-0.6b-ja.nemo"
+    model_nemo="${STATE_ROOT}/scratch/model/parakeet-tdt_ctc-0.6b-ja.nemo"
     mkdir -p "$(dirname "$model_nemo")"
     test -s "$EVAL_DIR/lm_corpus.txt"
     uv run --locked --no-sync python scripts/materialize_locked_model.py --output "$model_nemo"
@@ -66,12 +65,15 @@ case "$TASK" in
   e05-extract)
     bash scripts/research/e05_extract_gpu.sh
     ;;
-  E00|E01|E02|E03|E04|E05|E06)
+  E00|E01|E02|E03|E04|E06)
     uv run --locked --no-sync python scripts/research/check_phase_artifacts.py "$TASK" \
       --state-root "$STATE_ROOT"
     if [[ "$TASK" == "E06" ]]; then
       : "${E06_DRIVER:?E06_DRIVER is required for E06}"
       export E06_DRIVER
+      export PHONE_HEAD="${PHONE_HEAD:-${STATE_ROOT}/artifacts/phone_head.pt}"
+      export PHONE_VOCAB="${PHONE_VOCAB:-${STATE_ROOT}/artifacts/phone_vocab.json}"
+      export ENCODER_FEATURE_DIR="${ENCODER_FEATURE_DIR:-${STATE_ROOT}/artifacts/encoder}"
     fi
     bash scripts/container/run-phase.sh "$TASK"
     ;;
@@ -81,12 +83,9 @@ case "$TASK" in
     ;;
 esac
 
-plan="$(mktemp -t jpacf-research-sync.XXXXXX.jsonl)"
-hf_bucket_cli buckets sync --token "$HF_TOKEN" "$STATE_ROOT" "$REMOTE" --plan "$plan"
-hf_bucket_cli buckets sync --token "$HF_TOKEN" --apply "$plan"
-rm -f "$plan"
+bash scripts/hf/hf-research-snapshot.sh push "$RESEARCH_KEY" "$TASK" "$STATE_ROOT"
 
-if [[ "$TASK" =~ ^E0[0-6]$ && -n "${JPA_CF_EVIDENCE_RUN_ID:-}" ]]; then
+if [[ "$TASK" =~ ^E0[0-46]$ && -n "${JPA_CF_EVIDENCE_RUN_ID:-}" ]]; then
   run_dir="${STATE_ROOT}/dist/hf-runs/${JPA_CF_EVIDENCE_RUN_ID}"
   uv run --locked --no-sync python scripts/hf/build_run_bundle.py \
     --results-dir "$RESULTS_DIR" \
