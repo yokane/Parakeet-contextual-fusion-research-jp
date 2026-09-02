@@ -16,6 +16,10 @@ HEX64 = re.compile(r"^[0-9a-f]{64}$")
 DOMAIN = "jpacf-stage-fingerprint-v1"
 
 
+class MissingExternalFingerprint(RuntimeError):
+    pass
+
+
 def _hash_file(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -47,6 +51,7 @@ def compute_fingerprints(
     *,
     root: Path,
     environ: dict[str, str] | None = None,
+    targets: list[str] | None = None,
 ) -> dict[str, str]:
     env = os.environ if environ is None else environ
     tasks = payload.get("snapshot_tasks") or {}
@@ -74,78 +79,93 @@ def compute_fingerprints(
         if task not in tasks:
             raise SystemExit(f"unknown snapshot task: {task}")
         visiting.add(task)
+        try:
+            spec = dict(tasks[task] or {})
+            inputs = [str(item) for item in spec.get("inputs") or []]
+            sources = [str(item) for item in spec.get("fingerprint_sources") or []]
+            if not sources:
+                raise SystemExit(f"snapshot task has no fingerprint_sources: {task}")
 
-        spec = dict(tasks[task] or {})
-        inputs = [str(item) for item in spec.get("inputs") or []]
-        sources = [str(item) for item in spec.get("fingerprint_sources") or []]
-        if not sources:
-            raise SystemExit(f"snapshot task has no fingerprint_sources: {task}")
+            values = spec.get("fingerprint_values") or {}
+            if not isinstance(values, dict):
+                raise SystemExit(f"fingerprint_values must be a mapping: {task}")
 
-        values = spec.get("fingerprint_values") or {}
-        if not isinstance(values, dict):
-            raise SystemExit(f"fingerprint_values must be a mapping: {task}")
+            external_names = [str(item) for item in spec.get("fingerprint_external") or []]
+            external: dict[str, str] = {}
+            for name in external_names:
+                value = str(env.get(name) or "")
+                if not value:
+                    raise MissingExternalFingerprint(name)
+                if name.endswith("SHA256") and not HEX64.fullmatch(value.lower()):
+                    raise SystemExit(f"{name} must be a full SHA-256 hex digest")
+                external[name] = value.lower() if name.endswith("SHA256") else value
 
-        external_names = [str(item) for item in spec.get("fingerprint_external") or []]
-        external: dict[str, str] = {}
-        for name in external_names:
-            value = str(env.get(name) or "")
-            if not value:
-                raise SystemExit(f"required fingerprint environment is missing: {name}")
-            if name.endswith("SHA256") and not HEX64.fullmatch(value.lower()):
-                raise SystemExit(f"{name} must be a full SHA-256 hex digest")
-            external[name] = value.lower() if name.endswith("SHA256") else value
+            files: list[dict[str, str]] = []
+            seen: set[Path] = set()
+            for source in sources:
+                for path in _expand_source(root, source):
+                    resolved = path.resolve()
+                    if resolved in seen:
+                        continue
+                    seen.add(resolved)
+                    try:
+                        rel = resolved.relative_to(root.resolve()).as_posix()
+                    except ValueError as exc:
+                        raise SystemExit(f"fingerprint source escaped repository root: {path}") from exc
+                    files.append({"path": rel, "sha256": _hash_file(resolved)})
+            files.sort(key=lambda row: row["path"])
 
-        files: list[dict[str, str]] = []
-        seen: set[Path] = set()
-        for source in sources:
-            for path in _expand_source(root, source):
-                resolved = path.resolve()
-                if resolved in seen:
-                    continue
-                seen.add(resolved)
-                try:
-                    rel = resolved.relative_to(root.resolve()).as_posix()
-                except ValueError as exc:
-                    raise SystemExit(f"fingerprint source escaped repository root: {path}") from exc
-                files.append({"path": rel, "sha256": _hash_file(resolved)})
-        files.sort(key=lambda row: row["path"])
+            upstream: list[dict[str, str]] = []
+            for stage in inputs:
+                upstream_task = producer.get(stage)
+                if upstream_task is None:
+                    raise SystemExit(f"snapshot input has no producer: task={task} stage={stage}")
+                upstream.append(
+                    {
+                        "stage": stage,
+                        "task": upstream_task,
+                        "fingerprint": fingerprint(upstream_task),
+                    }
+                )
 
-        upstream: list[dict[str, str]] = []
-        for stage in inputs:
-            upstream_task = producer.get(stage)
-            if upstream_task is None:
-                raise SystemExit(f"snapshot input has no producer: task={task} stage={stage}")
-            upstream.append(
-                {
-                    "stage": stage,
-                    "task": upstream_task,
-                    "fingerprint": fingerprint(upstream_task),
-                }
-            )
+            canonical = {
+                "domain": DOMAIN,
+                "task": task,
+                "output": str(spec.get("output") or ""),
+                "publish": [str(item) for item in spec.get("publish") or []],
+                "files": files,
+                "values": values,
+                "external": external,
+                "upstream": upstream,
+            }
+            encoded = json.dumps(
+                canonical,
+                ensure_ascii=False,
+                separators=(",", ":"),
+                sort_keys=True,
+            ).encode("utf-8")
+            memo[task] = hashlib.sha256(encoded).hexdigest()
+            return memo[task]
+        finally:
+            visiting.discard(task)
 
-        canonical = {
-            "domain": DOMAIN,
-            "task": task,
-            "output": str(spec.get("output") or ""),
-            "publish": [str(item) for item in spec.get("publish") or []],
-            "files": files,
-            "values": values,
-            "external": external,
-            "upstream": upstream,
-        }
-        encoded = json.dumps(
-            canonical,
-            ensure_ascii=False,
-            separators=(",", ":"),
-            sort_keys=True,
-        ).encode("utf-8")
-        memo[task] = hashlib.sha256(encoded).hexdigest()
-        visiting.remove(task)
-        return memo[task]
+    if targets:
+        for task in [str(item) for item in targets]:
+            try:
+                fingerprint(task)
+            except MissingExternalFingerprint as exc:
+                raise SystemExit(f"required fingerprint environment is missing: {exc.args[0]}") from exc
+    else:
+        # Full-map callers such as non-E06 workflows do not need an optional
+        # external-only leaf like E06. Omit only those unreachable tasks whose
+        # external identity is unavailable; requested task closures still fail closed.
+        for task in [str(item) for item in tasks]:
+            try:
+                fingerprint(task)
+            except MissingExternalFingerprint:
+                continue
 
-    for task in tasks:
-        fingerprint(str(task))
-    return {str(task): memo[str(task)] for task in tasks}
+    return {str(task): memo[str(task)] for task in tasks if str(task) in memo}
 
 
 def main() -> None:
@@ -162,12 +182,16 @@ def main() -> None:
         type=Path,
         default=Path(__file__).resolve().parents[2],
     )
-    parser.add_argument("--task")
+    parser.add_argument(
+        "--task",
+        help="Compute only this task and its transitive input closure; omit for every resolvable task",
+    )
     parser.add_argument("--field", choices=["json", "b64", "fingerprint"], default="json")
     args = parser.parse_args()
 
     payload = yaml.safe_load(args.config.read_text(encoding="utf-8"))
-    mapping = compute_fingerprints(payload, root=args.root.resolve())
+    targets = [args.task] if args.task else None
+    mapping = compute_fingerprints(payload, root=args.root.resolve(), targets=targets)
 
     if args.field == "fingerprint":
         if not args.task:

@@ -16,7 +16,7 @@ SAFE = re.compile(r"^[A-Za-z0-9._-]+$")
 HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
 
-def _fingerprints(config: Path) -> dict[str, str]:
+def _fingerprints(config: Path, task: str) -> dict[str, str]:
     encoded = os.environ.get("JPA_CF_STAGE_FINGERPRINTS_B64", "")
     if encoded:
         try:
@@ -26,7 +26,16 @@ def _fingerprints(config: Path) -> dict[str, str]:
     else:
         tool = Path(__file__).with_name("stage_fingerprints.py")
         proc = subprocess.run(
-            [sys.executable, str(tool), "--config", str(config), "--field", "json"],
+            [
+                sys.executable,
+                str(tool),
+                "--config",
+                str(config),
+                "--task",
+                task,
+                "--field",
+                "json",
+            ],
             check=True,
             capture_output=True,
             text=True,
@@ -36,9 +45,9 @@ def _fingerprints(config: Path) -> dict[str, str]:
     if not isinstance(payload, dict) or not payload:
         raise SystemExit("stage fingerprint mapping is empty")
     mapping = {str(key): str(value).lower() for key, value in payload.items()}
-    for task, value in mapping.items():
+    for task_name, value in mapping.items():
         if not HEX64.fullmatch(value):
-            raise SystemExit(f"invalid stage fingerprint for {task}: {value!r}")
+            raise SystemExit(f"invalid stage fingerprint for {task_name}: {value!r}")
     return mapping
 
 
@@ -83,7 +92,7 @@ def main() -> None:
         if path.is_absolute() or ".." in path.parts or value in {"", "."}:
             raise SystemExit(f"unsafe publish path: {value!r}")
 
-    fingerprints = _fingerprints(args.config)
+    fingerprints = _fingerprints(args.config, args.task)
     if args.task not in fingerprints:
         raise SystemExit(f"missing fingerprint for task: {args.task}")
 
