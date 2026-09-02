@@ -138,7 +138,8 @@ def test_research_doc_names_all_phases_and_storage_planes() -> None:
     text = DOC.read_text(encoding="utf-8")
     for phase in range(7):
         assert f"E{phase:02d}" in text
-    assert "workspace-cache/e00-e06" in text
+    assert "workspace-cache/" in text
+    assert "e00-e06/" in text
     assert "immutable delta snapshot" in text
     assert "DOCKERHUB_ACCESS_TOKEN" in text
     assert "DOCKERHUB_REPOSITORY" in text
