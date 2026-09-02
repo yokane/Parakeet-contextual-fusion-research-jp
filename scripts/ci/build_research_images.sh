@@ -9,9 +9,14 @@ set -euo pipefail
 
 KENLM_REVISION="${KENLM_REVISION:-4cb443e60b7bf2c0ddf3c745378f76cb59e254e5}"
 PUBLISH_CURRENT="${PUBLISH_CURRENT:-false}"
+WAIT_FOR_SOURCE_RUNTIME="${WAIT_FOR_SOURCE_RUNTIME:-false}"
+SOURCE_RUNTIME_WAIT_ATTEMPTS="${SOURCE_RUNTIME_WAIT_ATTEMPTS:-180}"
+SOURCE_RUNTIME_WAIT_SECONDS="${SOURCE_RUNTIME_WAIT_SECONDS:-10}"
 DOCKERHUB_REPOSITORY="${DOCKERHUB_REPOSITORY:-}"
 [[ "$SOURCE_SHA" =~ ^[0-9a-f]{40}$ ]]
 [[ "$KENLM_REVISION" =~ ^[0-9a-f]{40}$ ]]
+[[ "$SOURCE_RUNTIME_WAIT_ATTEMPTS" =~ ^[1-9][0-9]*$ ]]
+[[ "$SOURCE_RUNTIME_WAIT_SECONDS" =~ ^[1-9][0-9]*$ ]]
 
 mkdir -p dist
 records="$(mktemp)"
@@ -58,6 +63,12 @@ publish_one() {
   if exists "$ghcr_ref"; then
     echo "Reusing immutable image: $ghcr_ref"
     selected="$ghcr_ref"
+  elif [[ -n "$docker_ref" ]] && exists "$docker_ref"; then
+    # If a previous GHCR outage already produced the immutable fallback, do not
+    # repeat the same build/push on every run. Consumers can use this exact tag.
+    echo "Reusing immutable Docker Hub fallback: $docker_ref"
+    selected="$docker_ref"
+    registry="dockerhub"
   else
     args=(
       docker buildx build --progress=plain --platform linux/amd64
@@ -96,6 +107,27 @@ publish_one() {
   LAST_PUBLISHED_REF="$reference"
   echo "Published ${name}: ${reference}"
 }
+
+# On main, bind the phase wrappers to the exact source runtime. ghcr-runtime and
+# research-images may start from the same push concurrently, so using
+# runtime-current here would race and could capture the previous source tree.
+if [[ "$WAIT_FOR_SOURCE_RUNTIME" == "true" ]]; then
+  source_runtime="${GHCR_PHASE_REPO}:sha-${SOURCE_SHA}"
+  echo "Waiting for source-matched runtime: $source_runtime"
+  found=0
+  for _attempt in $(seq 1 "$SOURCE_RUNTIME_WAIT_ATTEMPTS"); do
+    if exists "$source_runtime"; then
+      RUNTIME_IMAGE="$source_runtime"
+      found=1
+      break
+    fi
+    sleep "$SOURCE_RUNTIME_WAIT_SECONDS"
+  done
+  [[ "$found" == 1 ]] || {
+    echo "source-matched runtime was not published: $source_runtime" >&2
+    exit 1
+  }
+fi
 
 # Resolve the heavy parent remotely. Never docker-pull the multi-GB CUDA/NeMo
 # image into a GitHub-hosted runner just to discover its digest.
