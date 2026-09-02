@@ -48,10 +48,35 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
 
       - name: Report hosted runner disk
         shell: bash
         run: df -h /
+
+      - name: Decide whether source-matched runtime is required
+        id: runtime-binding
+        shell: bash
+        run: |
+          set -euo pipefail
+          wait=false
+          if [[ "$GITHUB_EVENT_NAME" == "push" && "$GITHUB_REF" == "refs/heads/main" ]]; then
+            before='${{ github.event.before }}'
+            if [[ "$before" =~ ^0+$ ]]; then
+              wait=true
+            else
+              git fetch --no-tags --depth=1 origin "$before" || true
+              changed="$(git diff --name-only "$before" "$GITHUB_SHA")"
+              printf '%s\n' "$changed"
+              if printf '%s\n' "$changed" | grep -Eq \
+                '^(Dockerfile$|Dockerfile\.runtime-base$|\.dockerignore$|pyproject\.toml$|uv\.lock$|stack\.lock\.yaml$|locks/containers\.lock\.json$|src/|scripts/|schemas/|configs/|experiments/|hf_model/|tools/hf-bucket/)'; then
+                wait=true
+              fi
+            fi
+          fi
+          echo "wait=$wait" >> "$GITHUB_OUTPUT"
+          echo "- wait for source-matched runtime: \`$wait\`" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Log in to GHCR
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
@@ -93,9 +118,7 @@ jobs:
           SOURCE_SHA: ${{ github.sha }}
           SOURCE_REPOSITORY: ${{ github.server_url }}/${{ github.repository }}
           RUNTIME_IMAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.runtime_image || 'ghcr.io/yokane/jpacf-yomi-tdt-runtime:runtime-current' }}
-          # On main the full runtime workflow is triggered by the same source
-          # changes. Wait for its exact sha tag instead of racing runtime-current.
-          WAIT_FOR_SOURCE_RUNTIME: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'true' || 'false' }}
+          WAIT_FOR_SOURCE_RUNTIME: ${{ steps.runtime-binding.outputs.wait }}
           PUBLISH_CURRENT: ${{ (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.publish_current)) && 'true' || 'false' }}
         run: bash scripts/ci/build_research_images.sh
 
