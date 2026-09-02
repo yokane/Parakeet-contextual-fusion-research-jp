@@ -1,0 +1,50 @@
+{
+  "name": "J-PACF local development (CPU/static)",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "..",
+    "args": {
+      "MISE_VERSION": "2026.8.16"
+    }
+  },
+  "remoteUser": "vscode",
+  "updateRemoteUserUID": true,
+  "containerEnv": {
+    "JPA_CF_STATE_ROOT": "/workspace/state",
+    "MISE_DATA_DIR": "/home/vscode/.local/share/mise",
+    "MISE_CACHE_DIR": "/home/vscode/.cache/mise",
+    "UV_CACHE_DIR": "/home/vscode/.cache/uv",
+    "HF_HOME": "/home/vscode/.cache/huggingface",
+    "HF_HUB_CACHE": "/home/vscode/.cache/huggingface/hub",
+    "HF_XET_CACHE": "/home/vscode/.cache/huggingface/xet",
+    "PYTHONUNBUFFERED": "1"
+  },
+  "mounts": [
+    "source=jpacf-dev-mise,target=/home/vscode/.local/share/mise,type=volume",
+    "source=jpacf-dev-cache,target=/home/vscode/.cache,type=volume",
+    "source=jpacf-dev-state,target=/workspace/state,type=volume"
+  ],
+  "postCreateCommand": "bash .devcontainer/post-create.sh",
+  "postStartCommand": "bash .devcontainer/post-start.sh",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "charliermarsh.ruff",
+        "redhat.vscode-yaml",
+        "timonwong.shellcheck",
+        "ms-azuretools.vscode-docker"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/home/vscode/.local/share/mise/shims/python",
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": [
+          "tests",
+          "-m",
+          "not gpu"
+        ],
+        "ruff.nativeServer": "on"
+      }
+    }
+  }
+}
