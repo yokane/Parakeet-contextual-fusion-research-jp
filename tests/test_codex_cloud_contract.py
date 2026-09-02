@@ -1,10 +1,8 @@
-from __future__ import annotations
-
 from pathlib import Path
-
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENTS = ROOT / "AGENTS.md"
+COMMON = ROOT / "scripts" / "codex" / "_common.sh"
 SETUP = ROOT / "scripts" / "codex" / "setup.sh"
 MAINTENANCE = ROOT / "scripts" / "codex" / "maintenance.sh"
 PREFLIGHT = ROOT / "scripts" / "codex" / "preflight.sh"
@@ -13,13 +11,14 @@ DOC = ROOT / "docs" / "codex-cloud.md"
 
 
 def test_codex_cloud_contract_files_exist() -> None:
-    for path in (AGENTS, SETUP, MAINTENANCE, PREFLIGHT, CHECK, DOC):
+    for path in (AGENTS, COMMON, SETUP, MAINTENANCE, PREFLIGHT, CHECK, DOC):
         assert path.is_file(), path
 
 
 def test_setup_materializes_locked_cpu_environment_only() -> None:
+    common = COMMON.read_text(encoding="utf-8")
     text = SETUP.read_text(encoding="utf-8")
-    assert "mise.run" in text
+    assert "https://mise.run" in common
     assert "install --locked" in text
     assert "uv sync --locked --extra dev" in text
     assert "hf:transport:sync" in text
@@ -45,7 +44,7 @@ def test_preflight_enforces_exact_toolchain_and_cpu_platform() -> None:
 
 def test_check_uses_canonical_ci() -> None:
     text = CHECK.read_text(encoding="utf-8")
-    assert 'run ci' in text
+    assert "run ci" in text
     assert "preflight.sh" in text
     assert "git diff --check" in text
 
