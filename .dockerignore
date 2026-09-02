@@ -1,8 +1,11 @@
 .git
 .github
+.cache
+.jpacf-state
 .pytest_cache
 .ruff_cache
 .venv
+tools/hf-bucket/.venv
 __pycache__
 *.py[cod]
 *.egg-info

@@ -1,0 +1,119 @@
+name: research-images
+
+on:
+  workflow_dispatch:
+    inputs:
+      runtime_image:
+        description: Canonical CUDA/NeMo runtime tag or digest
+        required: true
+        default: ghcr.io/yokane/jpacf-yomi-tdt-runtime:runtime-current
+        type: string
+      publish_current:
+        description: Also move phase/tool current aliases
+        required: true
+        default: false
+        type: boolean
+  push:
+    paths:
+      - docker/research/**
+      - docker/phases/Dockerfile
+      - scripts/ci/build_research_images.sh
+      - scripts/research/**
+      - scripts/container/run-phase.sh
+      - configs/research/**
+      - .github/workflows/research-images.yml
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: research-images-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GHCR_PHASE_REPO: ghcr.io/${{ github.repository_owner }}/jpacf-yomi-tdt-runtime
+  GHCR_TOOLS_REPO: ghcr.io/${{ github.repository_owner }}/jpacf-yomi-tdt-tools
+  KENLM_REVISION: 4cb443e60b7bf2c0ddf3c745378f76cb59e254e5
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Free hosted runner disk
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL || true
+          sudo apt-get clean || true
+          docker system prune -af || true
+          df -h /
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure optional public Docker Hub fallback
+        shell: bash
+        env:
+          DOCKERHUB_ACCESS_TOKEN: ${{ secrets.DOCKERHUB_ACCESS_TOKEN }}
+          DOCKERHUB_REPOSITORY: ${{ secrets.DOCKERHUB_REPOSITORY }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${DOCKERHUB_ACCESS_TOKEN:-}" && -n "${DOCKERHUB_REPOSITORY:-}" ]]; then
+            repo="${DOCKERHUB_REPOSITORY#docker.io/}"
+            repo="${repo#https://hub.docker.com/r/}"
+            username="${repo%%/*}"
+            [[ -n "$username" && "$repo" == */* ]]
+            echo "$DOCKERHUB_ACCESS_TOKEN" | docker login docker.io --username "$username" --password-stdin
+            echo "DOCKERHUB_REPOSITORY=$repo" >> "$GITHUB_ENV"
+            echo "Docker Hub fallback configured for a public repository." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Docker Hub fallback is not configured; GHCR remains the only publication target." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # docker-container + --push keeps the large parent layers out of the local
+      # Docker Engine. We deliberately do not export a GHA cache: immutable
+      # tool tags and the shared runtime parent are the cache contract.
+      - name: Set up direct-to-registry Buildx
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e # v4.3.0
+        with:
+          driver: docker-container
+
+      - name: Build and publish thin research images
+        shell: bash
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_REPOSITORY: ${{ github.server_url }}/${{ github.repository }}
+          RUNTIME_IMAGE: ${{ github.event_name == 'workflow_dispatch' && inputs.runtime_image || 'ghcr.io/yokane/jpacf-yomi-tdt-runtime:runtime-current' }}
+          PUBLISH_CURRENT: ${{ (github.ref == 'refs/heads/main' || (github.event_name == 'workflow_dispatch' && inputs.publish_current)) && 'true' || 'false' }}
+        run: bash scripts/ci/build_research_images.sh
+
+      - name: Summarize image identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          from pathlib import Path
+          payload=json.loads(Path('dist/research-images.json').read_text())
+          print('### Research images')
+          print()
+          print(f"- runtime parent: `{payload['runtime_parent']}`")
+          for row in payload['images']:
+              print(f"- {row['name']}: `{row['reference']}` ({row['registry']})")
+          PY
+
+      - name: Upload image manifest only
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: research-images-${{ github.sha }}
+          path: dist/research-images.json
+          if-no-files-found: error
+          retention-days: 14

@@ -1,0 +1,232 @@
+name: research-phase-vast
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: GPU/Vast research task
+        required: true
+        type: choice
+        options: [e02-encode, e02-pack, e05-extract, E00, E01, E02, E03, E04, E05, E06]
+      research_key:
+        description: Optional existing research key; blank derives it from locked HF revisions
+        required: false
+        type: string
+      image:
+        description: Optional phase image override; blank selects phase-<name>-current
+        required: false
+        type: string
+      e06_driver:
+        description: Repository/image path for the pinned NeMo E06 driver
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: research-vast-${{ inputs.task }}-${{ inputs.research_key || 'locked' }}
+  cancel-in-progress: false
+
+env:
+  HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
+  STORAGE_GB: "80"
+  GPU_RAM_GB: "24"
+  GPU_ALLOWLIST: RTX_4090
+  MIN_INET_DOWN_MBPS: "1000"
+  MIN_RELIABILITY: "0.98"
+  PREDICTED_MINUTES: "60"
+  MAX_COST_USD: "0.75"
+  OFFER_LIMIT: "50"
+  WAIT_MAX_ATTEMPTS: "720"
+
+jobs:
+  vast:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      VAST_API_KEY: ${{ secrets.VAST_API_KEY }}
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      GHCR_TOKEN: ${{ github.token }}
+      TASK: ${{ inputs.task }}
+      E06_DRIVER_INPUT: ${{ inputs.e06_driver }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install Vast control-plane environment
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: true
+
+      - name: Resolve task identity and immutable image
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${VAST_API_KEY:-}"
+          test -n "${HF_TOKEN:-}"
+          mise run deps:sync-vast
+          key='${{ inputs.research_key }}'
+          if [[ -z "$key" ]]; then
+            key="$(uv run --locked --no-sync python scripts/research/research_key.py)"
+          fi
+          [[ "$key" =~ ^[A-Za-z0-9._-]+$ ]]
+
+          image='${{ inputs.image }}'
+          if [[ -z "$image" ]]; then
+            case "$TASK" in
+              e02-encode|e02-pack|E02) phase=e02 ;;
+              e05-extract|E05) phase=e05 ;;
+              E00|E01|E03|E04|E06) phase="${TASK,,}" ;;
+              *) echo "unsupported task: $TASK" >&2; exit 2 ;;
+            esac
+            image="ghcr.io/${GITHUB_REPOSITORY_OWNER}/jpacf-yomi-tdt-runtime:phase-${phase}-current"
+          fi
+
+          if [[ "$image" == ghcr.io/* ]]; then
+            echo "$GHCR_TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin >/dev/null
+          fi
+          resolved="$(bash scripts/container/resolve-remote-image.sh "$image")"
+          echo "RESEARCH_KEY=$key" >> "$GITHUB_ENV"
+          echo "PHASE_IMAGE=$resolved" >> "$GITHUB_ENV"
+          echo "VAST_LABEL=jpacf-${TASK,,}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+          echo "EVIDENCE_RUN_ID=vast-${TASK,,}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" >> "$GITHUB_ENV"
+          echo "- task: \`$TASK\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- research key: \`$key\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- image: \`$resolved\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Select budget-compliant RTX 4090
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/providers dist/runtime
+          uv run --locked python scripts/providers/vast/build_search_query.py \
+            --gpu-name "$GPU_ALLOWLIST" --num-gpus 1 \
+            --gpu-ram ">=${GPU_RAM_GB}" \
+            --inet-down ">=${MIN_INET_DOWN_MBPS}" \
+            --reliability ">=${MIN_RELIABILITY}" \
+            --output-json dist/providers/research-search-query.json \
+            > dist/providers/research-search-query.txt
+          query="$(cat dist/providers/research-search-query.txt)"
+          timeout 30s uv run --locked vastai search offers \
+            --api-key "$VAST_API_KEY" --raw --no-default --type on-demand \
+            --order 'inet_down-,dph_total' --storage "$STORAGE_GB" --limit "$OFFER_LIMIT" \
+            "$query" > dist/providers/research-raw.json
+          uv run --locked python scripts/providers/vast/rank_offers.py \
+            --input dist/providers/research-raw.json \
+            --predicted-minutes "$PREDICTED_MINUTES" \
+            --max-cost-usd "$MAX_COST_USD" \
+            --min-inet-down-mbps "$MIN_INET_DOWN_MBPS" \
+            --output dist/providers/research-inventory.json \
+            > dist/providers/research-inventory.md
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          payload=json.loads(Path('dist/providers/research-inventory.json').read_text())
+          offers=[row for row in payload.get('offers', []) if not row.get('is_bid')]
+          if not offers:
+              raise SystemExit('no budget-compliant on-demand RTX 4090 offer')
+          selected=max(offers,key=lambda row:(float(row.get('inet_down_mbps') or 0),-float(row.get('dph_total') or 999)))
+          Path('dist/providers/research-selected.json').write_text(json.dumps(selected,indent=2,sort_keys=True)+'\n')
+          with open('/tmp/vast.env','w') as handle:
+              handle.write(f"VAST_OFFER_ID={selected['offer_id']}\n")
+              handle.write(f"VAST_GPU_NAME={selected['gpu_name']}\n")
+              handle.write(f"VAST_DPH_TOTAL={selected['dph_total']}\n")
+              handle.write(f"VAST_PREDICTED_COST={selected['predicted_cost_usd']}\n")
+          PY
+          cat /tmp/vast.env >> "$GITHUB_ENV"
+          cat dist/providers/research-inventory.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Launch research task on Vast
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "::add-mask::${HF_TOKEN}"
+          echo "::add-mask::${GHCR_TOKEN}"
+          env_spec="-e HF_TOKEN=${HF_TOKEN} -e HF_BUCKET=${HF_BUCKET} -e RESEARCH_KEY=${RESEARCH_KEY} -e JPA_CF_RESEARCH_TASK=${TASK} -e JPA_CF_EVIDENCE_RUN_ID=${EVIDENCE_RUN_ID}"
+          if [[ "$TASK" == "E06" ]]; then
+            test -n "$E06_DRIVER_INPUT"
+            env_spec+=" -e E06_DRIVER=${E06_DRIVER_INPUT}"
+          fi
+          login_args=()
+          if [[ "$PHASE_IMAGE" == ghcr.io/* ]]; then
+            login_args=(--login "-u ${GITHUB_ACTOR} -p ${GHCR_TOKEN} ghcr.io")
+          fi
+          response="$(timeout 30s uv run --locked vastai create instance "$VAST_OFFER_ID" \
+            --api-key "$VAST_API_KEY" --raw \
+            --image "$PHASE_IMAGE" \
+            --disk "$STORAGE_GB" \
+            --label "$VAST_LABEL" \
+            --env "$env_spec" \
+            --cancel-unavail \
+            "${login_args[@]}" \
+            --args /opt/jpacf/scripts/container/vast_research_task.sh)"
+          printf '%s\n' "$response" > dist/runtime/create-response.json
+          id="$(python -c "import json; print(int(json.load(open('dist/runtime/create-response.json'))['new_contract']))")"
+          printf '%s\n' "$id" > "$RUNNER_TEMP/vast-instance-id"
+          echo "VAST_INSTANCE_ID=$id" >> "$GITHUB_ENV"
+
+      - name: Wait for research completion
+        shell: bash
+        run: |
+          set -euo pipefail
+          : > dist/runtime/instance-status.jsonl
+          : > dist/runtime/vast-container.log
+          complete=0
+          for attempt in $(seq 1 "$WAIT_MAX_ATTEMPTS"); do
+            raw="$(timeout 20s uv run --locked vastai show instance "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --raw 2>/dev/null || true)"
+            actual_status=""
+            if [[ -n "$raw" ]]; then
+              printf '%s\n' "$raw" > "$RUNNER_TEMP/vast-status.json"
+              actual_status="$(python - "$attempt" "$RUNNER_TEMP/vast-status.json" <<'PY' | tee -a dist/runtime/instance-status.jsonl | python -c 'import json,sys; print(json.load(sys.stdin).get("actual_status", ""))'
+          import json,sys
+          from pathlib import Path
+          row=json.loads(Path(sys.argv[2]).read_text())
+          print(json.dumps({'attempt':int(sys.argv[1]),'actual_status':row.get('actual_status') or '','dph_total':row.get('dph_total')},sort_keys=True))
+          PY
+              )"
+            fi
+            timeout 20s uv run --locked vastai logs "$VAST_INSTANCE_ID" --api-key "$VAST_API_KEY" --tail 4000 > dist/runtime/vast-container.log 2>&1 || true
+            if grep -q "JPA_CF_RESEARCH_TASK rc=0 task=${TASK}" dist/runtime/vast-container.log; then
+              complete=1
+              break
+            fi
+            if grep -Eq "JPA_CF_RESEARCH_TASK rc=[1-9][0-9]* task=${TASK}" dist/runtime/vast-container.log; then
+              cat dist/runtime/vast-container.log >&2
+              exit 1
+            fi
+            if [[ "$actual_status" == "exited" ]]; then
+              echo "Vast task exited before success marker" >&2
+              cat dist/runtime/vast-container.log >&2
+              exit 1
+            fi
+            sleep 5
+          done
+          [[ "$complete" == 1 ]] || { tail -300 dist/runtime/vast-container.log >&2; exit 1; }
+          cat dist/runtime/vast-container.log
+          echo "- Vast GPU: \`${VAST_GPU_NAME}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- predicted cost: \`$${VAST_PREDICTED_COST}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- HF state: \`hf://buckets/${HF_BUCKET}/workspace-cache/e00-e06/${RESEARCH_KEY}\`" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Destroy Vast instance
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          set +e
+          if [[ -s "$RUNNER_TEMP/vast-instance-id" ]]; then
+            id="$(cat "$RUNNER_TEMP/vast-instance-id")"
+            timeout 30s uv run --locked vastai destroy instance "$id" --api-key "$VAST_API_KEY" -y || true
+          fi
+
+      - name: Upload control-plane evidence only
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: research-vast-${{ inputs.task }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            dist/providers/research-*
+            dist/runtime/
+          if-no-files-found: warn
+          retention-days: 14

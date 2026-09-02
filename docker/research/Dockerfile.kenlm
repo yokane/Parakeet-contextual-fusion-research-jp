@@ -1,0 +1,46 @@
+# syntax=docker/dockerfile:1.7
+ARG DEBIAN_IMAGE=debian:bookworm-slim
+
+FROM ${DEBIAN_IMAGE} AS build
+ARG KENLM_REVISION=4cb443e60b7bf2c0ddf3c745378f76cb59e254e5
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      build-essential ca-certificates cmake git \
+      libboost-all-dev libbz2-dev libeigen3-dev liblzma-dev zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /src/kenlm
+RUN git init . \
+    && git remote add origin https://github.com/kpu/kenlm.git \
+    && git fetch --depth=1 origin "${KENLM_REVISION}" \
+    && git checkout --detach FETCH_HEAD \
+    && test "$(git rev-parse HEAD)" = "${KENLM_REVISION}"
+RUN cmake -S . -B build \
+      -DCMAKE_BUILD_TYPE=Release \
+      -DCOMPILE_TESTS=OFF \
+      -DENABLE_PYTHON=OFF \
+      -DBUILD_SHARED_LIBS=OFF \
+      -DBoost_USE_STATIC_LIBS=ON \
+    && cmake --build build --parallel "$(nproc)" --target lmplz build_binary \
+    && install -D -m 0755 build/bin/lmplz /opt/kenlm/bin/lmplz \
+    && install -D -m 0755 build/bin/build_binary /opt/kenlm/bin/build_binary
+
+FROM ${DEBIAN_IMAGE} AS kenlm-tools
+ARG KENLM_REVISION=4cb443e60b7bf2c0ddf3c745378f76cb59e254e5
+ARG SOURCE_REPOSITORY=https://github.com/yokane/Parakeet-contextual-fusion-research-jp
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      ca-certificates python3-minimal \
+      libboost-iostreams1.74.0 libboost-program-options1.74.0 \
+      libboost-system1.74.0 libboost-thread1.74.0 libbz2-1.0 liblzma5 libstdc++6 zlib1g \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=build /opt/kenlm /opt/kenlm
+ENV PATH=/opt/kenlm/bin:${PATH}
+LABEL org.opencontainers.image.source="${SOURCE_REPOSITORY}" \
+      org.opencontainers.image.title="J-PACF KenLM CPU tools" \
+      io.jpacf.runtime.kind="research-tool" \
+      io.jpacf.tool="kenlm" \
+      io.jpacf.kenlm.revision="${KENLM_REVISION}"
+RUN lmplz --help >/dev/null 2>&1 || test "$?" = 1 \
+    && build_binary 2>&1 | grep -qi 'usage' \
+    && python3 --version
+WORKDIR /workspace
+ENTRYPOINT ["/bin/bash", "-lc"]
+CMD ["lmplz --help | head"]

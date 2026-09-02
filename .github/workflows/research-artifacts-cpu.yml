@@ -1,0 +1,143 @@
+name: research-artifacts-cpu
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: CPU artifact task
+        required: true
+        type: choice
+        options: [common, e02-estimate, e05-phone]
+      research_key:
+        description: Optional existing research key; blank derives it from locked HF revisions
+        required: false
+        type: string
+      kenlm_image:
+        description: KenLM CPU tools image for e02-estimate
+        required: true
+        default: ghcr.io/yokane/jpacf-yomi-tdt-tools:kenlm-current
+        type: string
+      phone_image:
+        description: E05 CPU phone-head image for e05-phone
+        required: true
+        default: ghcr.io/yokane/jpacf-yomi-tdt-tools:phone-e05-current
+        type: string
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: research-artifacts-cpu-${{ inputs.task }}-${{ inputs.research_key || 'locked' }}
+  cancel-in-progress: false
+
+env:
+  HF_BUCKET: saeeew/J-PACF-YOMI-tdt-bucket
+
+jobs:
+  artifact:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    env:
+      HF_TOKEN: ${{ secrets.HF_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install locked CPU toolchain
+        uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4.3.0
+        with:
+          version: 2026.8.16
+          install: true
+          cache: true
+
+      - name: Resolve research workspace
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${HF_TOKEN:-}"
+          mise run deps:sync
+          mise run hf:transport:sync
+          key='${{ inputs.research_key }}'
+          if [[ -z "$key" ]]; then
+            key="$(uv run --locked --no-sync python scripts/research/research_key.py)"
+          fi
+          [[ "$key" =~ ^[A-Za-z0-9._-]+$ ]]
+          state="${GITHUB_WORKSPACE}/.jpacf-state"
+          mkdir -p "$state"
+          echo "RESEARCH_KEY=$key" >> "$GITHUB_ENV"
+          echo "JPA_CF_STATE_ROOT=$state" >> "$GITHUB_ENV"
+          echo "REMOTE=hf://buckets/${HF_BUCKET}/workspace-cache/e00-e06/${key}" >> "$GITHUB_ENV"
+
+      - name: Log in to GHCR for tool images
+        if: ${{ inputs.task != 'common' }}
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build common benchmark/audio/context artifacts
+        if: ${{ inputs.task == 'common' }}
+        shell: bash
+        run: JPA_CF_STATE_ROOT="$JPA_CF_STATE_ROOT" bash scripts/research/prepare_common_artifacts.sh
+
+      - name: Restore reusable research state
+        if: ${{ inputs.task != 'common' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/hf/hf-identity.sh
+          hf_bucket_cli buckets sync --token "$HF_TOKEN" "$REMOTE" "$JPA_CF_STATE_ROOT"
+
+      - name: Estimate E02 KenLM on hosted CPU
+        if: ${{ inputs.task == 'e02-estimate' }}
+        shell: bash
+        env:
+          KENLM_IMAGE: ${{ inputs.kenlm_image }}
+        run: |
+          set -euo pipefail
+          encoded="$JPA_CF_STATE_ROOT/artifacts/lm/lm_corpus.encoded.txt"
+          encoding_meta="$JPA_CF_STATE_ROOT/artifacts/lm/encoding-metadata.json"
+          test -s "$encoded"
+          test -s "$encoding_meta"
+          docker pull "$KENLM_IMAGE"
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/repo:ro" \
+            -v "$JPA_CF_STATE_ROOT:/workspace/state" \
+            -w /repo \
+            "$KENLM_IMAGE" \
+            "python3 scripts/research/ngram_lm_pipeline.py estimate \
+              --encoded-corpus /workspace/state/artifacts/lm/lm_corpus.encoded.txt \
+              --encoding-metadata /workspace/state/artifacts/lm/encoding-metadata.json \
+              --kenlm-bin-dir /opt/kenlm/bin \
+              --kenlm-revision 4cb443e60b7bf2c0ddf3c745378f76cb59e254e5 \
+              --order 6 \
+              --arpa /workspace/state/artifacts/lm/ja-6gram.arpa \
+              --binary /workspace/state/artifacts/lm/ja-6gram.binary \
+              --metadata /workspace/state/artifacts/lm/estimation-metadata.json"
+
+      - name: Train and apply E05 phone head on hosted CPU
+        if: ${{ inputs.task == 'e05-phone' }}
+        shell: bash
+        env:
+          PHONE_IMAGE: ${{ inputs.phone_image }}
+        run: |
+          set -euo pipefail
+          docker pull "$PHONE_IMAGE"
+          docker run --rm \
+            -v "$JPA_CF_STATE_ROOT:/workspace/state" \
+            -e JPA_CF_STATE_ROOT=/workspace/state \
+            "$PHONE_IMAGE"
+
+      - name: Persist reusable state to HF Bucket
+        shell: bash
+        run: |
+          set -euo pipefail
+          source scripts/hf/hf-identity.sh
+          plan="$RUNNER_TEMP/research-sync.jsonl"
+          hf_bucket_cli buckets sync --token "$HF_TOKEN" "$JPA_CF_STATE_ROOT" "$REMOTE" --plan "$plan"
+          hf_bucket_cli buckets sync --token "$HF_TOKEN" --apply "$plan"
+          echo "### Research artifact update" >> "$GITHUB_STEP_SUMMARY"
+          echo "- task: `${{ inputs.task }}`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- research key: `$RESEARCH_KEY`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- state: `$REMOTE`" >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,134 @@
+schema_version: 1
+state_root: /workspace/state
+bucket_prefix: workspace-cache/e00-e06
+
+artifacts:
+  benchmark_index:
+    path: generated/eval/bench_index.jsonl
+    kind: file
+    producer: common-hosted
+  execution_manifest:
+    path: generated/eval/nemo_eval.jsonl
+    kind: file
+    producer: common-hosted
+  eval_provenance:
+    path: generated/eval/eval_provenance.json
+    kind: file
+    producer: common-hosted
+  audio_coverage:
+    path: generated/eval/audio_coverage.json
+    kind: file
+    producer: common-hosted
+  context_phrases:
+    path: generated/eval/context_phrases.txt
+    kind: file
+    producer: common-hosted
+  lm_corpus:
+    path: generated/eval/lm_corpus.txt
+    kind: file
+    producer: common-hosted
+  e02_encoded_corpus:
+    path: artifacts/lm/lm_corpus.encoded.txt
+    kind: file
+    producer: e02-encode-vast
+  e02_encoding_metadata:
+    path: artifacts/lm/encoding-metadata.json
+    kind: file
+    producer: e02-encode-vast
+  e02_arpa:
+    path: artifacts/lm/ja-6gram.arpa
+    kind: file
+    producer: e02-estimate-hosted
+  e02_binary:
+    path: artifacts/lm/ja-6gram.binary
+    kind: file
+    producer: e02-estimate-hosted
+  e02_estimation_metadata:
+    path: artifacts/lm/estimation-metadata.json
+    kind: file
+    producer: e02-estimate-hosted
+  e02_ngpu_lm:
+    path: artifacts/lm/ja-6gram.nemo
+    kind: file
+    producer: e02-pack-vast
+  e04_result:
+    path: results/E04_ctc_rerank.jsonl
+    kind: file
+    producer: E04
+  e05_encoder_features:
+    path: artifacts/encoder
+    kind: directory
+    producer: e05-extract-vast
+  e05_phone_vocab:
+    path: artifacts/phone_vocab.json
+    kind: file
+    producer: e05-phone-hosted
+  e05_phone_train_manifest:
+    path: generated/phone_train.jsonl
+    kind: file
+    producer: e05-phone-hosted
+  e05_phone_head:
+    path: artifacts/phone_head.pt
+    kind: file
+    producer: e05-phone-hosted
+  e05_result:
+    path: results/E05_phone_rerank.jsonl
+    kind: file
+    producer: e05-phone-hosted
+
+phases:
+  E00:
+    executor: vast
+    image: phase-e00
+    requires: [execution_manifest]
+    produces: [results/E00_tdt_greedy.jsonl]
+  E01:
+    executor: vast
+    image: phase-e01
+    requires: [execution_manifest]
+    produces: [results/E01_tdt_beam.jsonl]
+  E02:
+    executor: vast
+    image: phase-e02
+    requires: [execution_manifest, e02_ngpu_lm]
+    produces: [results/E02_ngpulm.jsonl]
+  E03:
+    executor: vast
+    image: phase-e03
+    requires: [execution_manifest, e02_ngpu_lm, context_phrases]
+    produces: [results/E03_gpu_pb.jsonl]
+  E04:
+    executor: vast
+    image: phase-e04
+    requires: [execution_manifest, e02_ngpu_lm, context_phrases]
+    produces: [results/E04_nbest.jsonl, results/E04_ctc_rerank.jsonl]
+  E05:
+    executor: split
+    image: phase-e05
+    requires: [benchmark_index, e04_result, e05_encoder_features, e05_phone_head, e05_phone_vocab]
+    produces: [results/E05_phone_rerank.jsonl]
+  E06:
+    executor: vast
+    image: phase-e06
+    requires: [execution_manifest, e02_ngpu_lm, context_phrases]
+    produces: [results/E06_inbeam.jsonl]
+
+preparation_tasks:
+  common-hosted:
+    executor: github-hosted
+    outputs: [benchmark_index, execution_manifest, eval_provenance, audio_coverage, context_phrases, lm_corpus]
+  e02-encode-vast:
+    executor: vast
+    outputs: [e02_encoded_corpus, e02_encoding_metadata]
+  e02-estimate-hosted:
+    executor: github-hosted
+    outputs: [e02_arpa, e02_binary, e02_estimation_metadata]
+  e02-pack-vast:
+    executor: vast
+    outputs: [e02_ngpu_lm]
+  e05-extract-vast:
+    executor: vast
+    outputs: [e05_encoder_features]
+  e05-phone-hosted:
+    executor: github-hosted
+    outputs: [e05_phone_vocab, e05_phone_train_manifest, e05_phone_head, e05_result]
